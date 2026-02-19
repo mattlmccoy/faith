@@ -1,25 +1,28 @@
 /**
  * ABIDE - Cloudflare Worker
- * Routes: /bible, /search, /push/*
+ * Routes: /bible, /search, /ai/plan, /ai/phrase, /push/*
  *
- * Environment variables (set in Cloudflare dashboard or wrangler.toml secrets):
- *   SERPER_API_KEY  - Serper.dev API key for web search
+ * Secrets (set with: wrangler secret put SECRET_NAME):
+ *   ESV_API_TOKEN     - api.esv.org token
+ *   SERPER_API_KEY    - Serper.dev search API key
+ *   OPENAI_API_KEY    - OpenAI API key for AI plan + phrase search
  *   VAPID_PUBLIC_KEY  - VAPID public key for push
  *   VAPID_PRIVATE_KEY - VAPID private key for push
- *   VAPID_SUBJECT    - mailto:your@email.com
+ *   VAPID_SUBJECT     - mailto:your@email.com
  */
 
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
+import { handleAIPlan, handleAIPhrase } from './ai.js';
 
-// CORS headers - only allow your GitHub Pages origin
+// CORS — allow GitHub Pages origin + local dev
 const ALLOWED_ORIGINS = [
   'https://mattlmccoy.github.io',
   'http://localhost:8080',
   'http://localhost:3000',
   'http://127.0.0.1:5500',
-  'null', // file:// protocol during development
+  'null',
 ];
 
 function corsHeaders(origin) {
@@ -47,14 +50,13 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
 
-    // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
     try {
       if (url.pathname === '/health') {
-        return json({ status: 'ok', version: '1.0.0' }, 200, origin);
+        return json({ status: 'ok', version: '2.0.0', service: 'abide-worker' }, 200, origin);
       }
 
       if (url.pathname.startsWith('/bible')) {
@@ -63,6 +65,16 @@ export default {
 
       if (url.pathname.startsWith('/search')) {
         return handleSearch(request, url, env, origin, json);
+      }
+
+      // AI-powered devotional plan builder
+      if (url.pathname === '/ai/plan') {
+        return handleAIPlan(request, url, env, origin, json);
+      }
+
+      // AI-powered verse phrase search
+      if (url.pathname === '/ai/phrase') {
+        return handleAIPhrase(request, url, env, origin, json);
       }
 
       if (url.pathname.startsWith('/push')) {
@@ -76,7 +88,6 @@ export default {
     }
   },
 
-  // Scheduled cron: send morning/evening push notifications
   async scheduled(event, env, ctx) {
     const { handleScheduledPush } = await import('./push.js');
     ctx.waitUntil(handleScheduledPush(env));

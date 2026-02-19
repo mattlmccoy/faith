@@ -11,13 +11,24 @@ id = "YOUR_KV_NAMESPACE_ID_HERE"
 [triggers]
 crons = ["*/30 * * * *"]
 
-# Secrets (set with: wrangler secret put SERPER_API_KEY)
-# SERPER_API_KEY
-# VAPID_PUBLIC_KEY
-# VAPID_PRIVATE_KEY
-# VAPID_SUBJECT
-
-# Routes (after deployment, update with your GitHub Pages URL)
-# [[routes]]
-# pattern = "abide-worker.YOUR_USERNAME.workers.dev/*"
-# zone_name = "workers.dev"
+# Secrets — set each with: wrangler secret put SECRET_NAME
+# (You will be prompted to paste the value securely)
+#
+# Required for ESV translation:
+#   wrangler secret put ESV_API_TOKEN
+#   → paste: 92b3774f0e4f96c24bc8398b6b5c1fd93bd0f57d
+#
+# Required for AI plan builder + phrase search:
+#   wrangler secret put OPENAI_API_KEY
+#   → paste your OpenAI key (get one at platform.openai.com)
+#
+# Required for devotional web search:
+#   wrangler secret put SERPER_API_KEY
+#   → paste your Serper.dev key (free tier: 2,500/month)
+#
+# Required for push notifications:
+#   npx web-push generate-vapid-keys   (run this once to get the keys)
+#   wrangler secret put VAPID_PUBLIC_KEY
+#   wrangler secret put VAPID_PRIVATE_KEY
+#   wrangler secret put VAPID_SUBJECT
+#   → VAPID_SUBJECT value: mailto:mmac32s1@gmail.com

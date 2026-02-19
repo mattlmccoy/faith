@@ -665,7 +665,7 @@
   background: var(--color-surface-raised);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  overflow: hidden;
+  /* Do NOT use overflow:hidden here — it clips native select pickers on iOS */
 }
 
 .settings-row {
@@ -674,10 +674,20 @@
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
   gap: var(--space-4);
+  min-width: 0; /* prevent flex children from overflowing */
+}
+
+.settings-row:first-child {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .settings-row:last-child {
   border-bottom: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.settings-row:first-child:last-child {
+  border-radius: var(--radius-lg);
 }
 
 .settings-row__icon {
@@ -687,6 +697,7 @@
 
 .settings-row__content {
   flex: 1;
+  min-width: 0; /* allow text truncation inside */
 }
 
 .settings-row__label {
@@ -698,11 +709,21 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settings-row__action {
   flex-shrink: 0;
+  max-width: 160px;  /* cap width so select can't overflow the row */
   color: var(--color-text-muted);
+}
+
+/* Select elements inside settings rows */
+.settings-row__action .input {
+  max-width: 100%;
+  font-size: var(--text-sm);
 }
 
 .settings-time-picker {

@@ -37,33 +37,35 @@
 
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
-  /* Brand Colors — Desert Dawn palette */
-  --color-primary: #8B3A2A;       /* terracotta */
-  --color-primary-light: #B05040; /* lighter terracotta */
-  --color-primary-muted: #C4826E; /* muted terracotta */
-  --color-primary-faint: #F5EAE6; /* blush tint */
+  /* Brand Colors — Tuscan Sunset
+     Terracotta #E35336 · Soft peach #FFD3AC · Dusty lavender #9988A1 · Deep tuscan #8A2B0E
+  */
+  --color-primary: #C44A32;       /* main terracotta (slightly deeper for legibility) */
+  --color-primary-light: #E35336; /* bright terracotta hover/active */
+  --color-primary-muted: #D9856E; /* muted clay */
+  --color-primary-faint: #FDF0EB; /* blush parchment */
 
-  --color-accent: #D4A853;        /* honey gold */
-  --color-accent-light: #E6C07A;  /* pale gold */
-  --color-accent-warm: #F6EDD5;   /* warm gold tint */
-  --color-accent-faint: #FBF6EC;  /* near-white warm */
+  --color-accent: #9988A1;        /* dusty lavender */
+  --color-accent-light: #B5A8C0;  /* pale lavender */
+  --color-accent-warm: #EDE9F2;   /* lavender tint */
+  --color-accent-faint: #F7F5FA;  /* near-white lavender */
 
-  /* Surfaces — warm sand */
-  --color-surface: #FAF6F0;
+  /* Surfaces — soft peach parchment */
+  --color-surface: #FFF8F3;
   --color-surface-raised: #FFFFFF;
-  --color-surface-sunken: #F0E9DF;
-  --color-border: #E4D9CC;
-  --color-border-strong: #C9B9A8;
+  --color-surface-sunken: #F5E8DF;
+  --color-border: #EDD9CC;
+  --color-border-strong: #D4B8A8;
 
   /* Text */
-  --color-text-primary: #1E1612;
-  --color-text-secondary: #7A5C48;
-  --color-text-muted: #A8917E;
+  --color-text-primary: #1A100C;
+  --color-text-secondary: #6B4438;
+  --color-text-muted: #A07868;
   --color-text-inverse: #FFFFFF;
 
   /* Semantic / State */
-  --color-morning: #D4845A;       /* canyon morning */
-  --color-evening: #4A3560;       /* desert dusk purple */
+  --color-morning: #E35336;       /* tuscan sunrise */
+  --color-evening: #9988A1;       /* dusty lavender dusk */
   --color-success: #4A7A3A;
   --color-error: #C0392B;
 
@@ -132,32 +134,32 @@
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* --- Dark Theme — Desert Night --- */
+/* --- Dark Theme — Tuscan Night --- */
 [data-theme="dark"] {
-  --color-primary: #D4845A;       /* warm canyon glow */
-  --color-primary-light: #E0A080;
-  --color-primary-muted: #8B5040;
-  --color-primary-faint: #1E1008;
+  --color-primary: #C9705A;       /* muted terracotta glow */
+  --color-primary-light: #D98870;
+  --color-primary-muted: #7A4035;
+  --color-primary-faint: #1C0D09;
 
-  --color-accent: #D4A853;
-  --color-accent-light: #E6C07A;
-  --color-accent-warm: #2A2010;
-  --color-accent-faint: #1E1808;
+  --color-accent: #8877A0;        /* deep dusty lavender */
+  --color-accent-light: #A090B8;
+  --color-accent-warm: #1E1828;
+  --color-accent-faint: #16121E;
 
-  --color-surface: #110D09;
-  --color-surface-raised: #1E1610;
-  --color-surface-sunken: #0A0705;
-  --color-border: #2E2018;
-  --color-border-strong: #4A3028;
+  --color-surface: #120A07;       /* deep burnt umber night */
+  --color-surface-raised: #1E1210;
+  --color-surface-sunken: #0C0705;
+  --color-border: #2E1E18;
+  --color-border-strong: #4A2E25;
 
-  --color-text-primary: #F0EAE2;
-  --color-text-secondary: #C0A088;
-  --color-text-muted: #806050;
-  --color-text-inverse: #1E1612;
+  --color-text-primary: #F2EAE4;
+  --color-text-secondary: #C0907A;
+  --color-text-muted: #7A5548;
+  --color-text-inverse: #1E1210;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
 /* --- Reset --- */
@@ -300,16 +302,18 @@ input, textarea, select {
   background: var(--color-surface-raised);
   border-top: 1px solid var(--color-border);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* anchor items at top of bar, above safe-area padding */
   position: relative;
   z-index: 10;
 }
 
 .tab-item {
   flex: 1;
+  height: var(--tab-bar-height); /* exactly fills the visual bar, ignoring safe-area */
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   padding: var(--space-1) var(--space-2);
   color: var(--color-text-muted);

@@ -263,7 +263,7 @@ const ScriptureView = (() => {
     });
   }
 
-  function searchPhrase(phrase) {
+  async function searchPhrase(phrase) {
     searchMode = 'phrase';
     const input = document.getElementById('scripture-search');
     if (input) input.value = phrase;
@@ -274,39 +274,65 @@ const ScriptureView = (() => {
 
     if (quickLinks) quickLinks.style.display = 'none';
 
-    // Find matching passages from keyword map
-    const q = phrase.toLowerCase();
-    let matchedRefs = [];
+    // Show loading state
+    container.innerHTML = `
+      <div style="padding:32px;text-align:center;">
+        <div class="plan-searching__spinner" style="margin:0 auto;"></div>
+        <p class="text-muted text-sm" style="margin-top:12px;">Finding verses about "${phrase}"…</p>
+      </div>
+    `;
 
-    for (const entry of KEYWORD_PASSAGES) {
-      if (entry.keywords.some(k => q.includes(k) || k.includes(q))) {
-        matchedRefs.push(...entry.refs);
+    // Try AI search first, fall back to local keyword map
+    let matchedRefs = [];
+    let aiWhy = {};
+    let usedAI = false;
+
+    try {
+      const aiResult = await API.searchPhrase(phrase);
+      if (!aiResult.fallback && aiResult.verses?.length) {
+        matchedRefs = aiResult.verses.map(v => v.ref);
+        aiResult.verses.forEach(v => { aiWhy[v.ref] = v.why; });
+        usedAI = true;
       }
+    } catch (e) {
+      console.warn('AI phrase search unavailable, using local fallback');
     }
 
-    // Dedupe and limit
-    matchedRefs = [...new Set(matchedRefs)].slice(0, 8);
+    // Fallback: local keyword map
+    if (!matchedRefs.length) {
+      const q = phrase.toLowerCase();
+      for (const entry of KEYWORD_PASSAGES) {
+        if (entry.keywords.some(k => q.includes(k) || k.includes(q))) {
+          matchedRefs.push(...entry.refs);
+        }
+      }
+      matchedRefs = [...new Set(matchedRefs)].slice(0, 8);
+    }
 
     if (!matchedRefs.length) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state__title">No matching passages</div>
-          <div class="empty-state__description">Try a word like "fear", "hope", "peace", or switch to Book/Chapter mode.</div>
+          <div class="empty-state__description">Try different words, or switch to Book/Chapter mode to look up a specific passage.</div>
           <button class="btn btn-secondary btn-sm" onclick="ScriptureView.clearPassage()">Clear</button>
         </div>
       `;
       return;
     }
 
-    // Show list of matching passages to tap into
     container.innerHTML = `
       <div style="margin-bottom:var(--space-4);">
         <div class="section-header">
           <span class="section-title">Verses about "${phrase}"</span>
+          ${usedAI ? '<span class="text-xs text-muted">✨ AI matched</span>' : ''}
         </div>
-        <div class="quick-links-grid" style="margin-top:var(--space-2);">
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);">
           ${matchedRefs.map(ref => `
-            <button class="quick-link-btn" onclick="ScriptureView.loadPassage('${ref}')">${ref}</button>
+            <button class="quick-link-btn" onclick="ScriptureView.loadPassage('${ref}')"
+              style="display:flex;align-items:center;justify-content:space-between;text-align:left;padding:var(--space-3) var(--space-4);">
+              <span style="font-weight:600;">${ref}</span>
+              ${aiWhy[ref] ? `<span style="font-size:var(--text-xs);color:var(--color-text-muted);margin-left:8px;flex:1;text-align:right;line-height:1.3;">${aiWhy[ref]}</span>` : ''}
+            </button>
           `).join('')}
         </div>
         <div style="margin-top:var(--space-3);">

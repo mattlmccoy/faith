@@ -1,15 +1,18 @@
 /* ============================================================
    ABIDE - API Client
-   All external calls: Bible, search, push
+   All external calls: Bible, search, push, AI
    ============================================================ */
 
 const API = (() => {
-  // Direct Bible API (CORS-enabled, no key needed)
+  // Direct Bible API (CORS-enabled, no key needed) — for non-ESV translations
   const BIBLE_BASE = 'https://bible-api.com';
 
-  // Default Worker URL — baked in after you deploy once.
-  // Users don't need to configure this. Override in Settings → Advanced only if self-hosting.
+  // Default Worker URL — baked in. Users don't need to configure this.
+  // Override in Settings → Advanced only if self-hosting.
   const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
+
+  // Translations that MUST go through the worker (have server-side API keys)
+  const WORKER_TRANSLATIONS = ['esv'];
 
   function bibleTranslation() {
     return Store.get('bibleTranslation') || 'web';
@@ -21,7 +24,6 @@ const API = (() => {
   }
 
   function hasWorker() {
-    // Always true once the default URL is baked in; false only if explicitly cleared
     const url = workerUrl();
     return !!url && url !== '';
   }
@@ -29,25 +31,31 @@ const API = (() => {
   // --- Bible API ---
 
   async function getPassage(ref) {
-    // Normalize reference for URL
-    const encoded = encodeURIComponent(ref);
     const translation = bibleTranslation();
-    const url = `${BIBLE_BASE}/${encoded}?translation=${translation}`;
-
     const cacheKey = `bible:${ref}:${translation}`;
     const cached = Cache.get(cacheKey);
     if (cached) return cached;
 
-    try {
+    let data;
+
+    // ESV goes through worker (API token kept server-side)
+    if (WORKER_TRANSLATIONS.includes(translation)) {
+      const url = `${workerUrl()}/bible?ref=${encodeURIComponent(ref)}&translation=${translation}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Bible API error: ${res.status}`);
-      const data = await res.json();
-      Cache.set(cacheKey, data, 7 * 24 * 60 * 60 * 1000); // 7 days
-      return data;
-    } catch (err) {
-      console.error('getPassage error:', err);
-      throw err;
+      data = await res.json();
+    } else {
+      // All others: call bible-api.com directly (free, CORS-enabled)
+      const url = `${BIBLE_BASE}/${encodeURIComponent(ref)}?translation=${translation}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Bible API error: ${res.status}`);
+      data = await res.json();
     }
+
+    if (data.error) throw new Error(data.error);
+
+    Cache.set(cacheKey, data, 7 * 24 * 60 * 60 * 1000); // 7 days
+    return data;
   }
 
   async function getVerses(ref) {
@@ -74,7 +82,6 @@ const API = (() => {
     'Jude', 'Revelation'
   ];
 
-  // Abbreviation map
   const ABBREVS = {
     'gen': 'Genesis', 'ex': 'Exodus', 'lev': 'Leviticus', 'num': 'Numbers',
     'deut': 'Deuteronomy', 'dt': 'Deuteronomy', 'josh': 'Joshua', 'judg': 'Judges',
@@ -99,72 +106,86 @@ const API = (() => {
 
   function getSuggestions(query) {
     if (!query || query.length < 2) return [];
-
     const q = query.trim().toLowerCase();
-
-    // Try to parse abbreviation + chapter:verse
     const match = q.match(/^(\d?\s?[a-z]+)\s*(\d*)(:?)(\d*)$/);
     if (!match) return [];
-
     const bookPart = match[1].replace(/\s/g, '').toLowerCase();
     const chapterPart = match[2];
     const hasColon = match[3] === ':';
     const versePart = match[4];
-
-    // Resolve book name
     let resolvedBook = ABBREVS[bookPart] || null;
     if (!resolvedBook) {
-      // Fuzzy: find books starting with query
       resolvedBook = BIBLE_BOOKS.find(b => b.toLowerCase().startsWith(bookPart)) || null;
     }
-
     const suggestions = [];
-
     if (!resolvedBook) {
-      // Show books that match
       BIBLE_BOOKS.filter(b => b.toLowerCase().startsWith(bookPart))
         .slice(0, 5)
         .forEach(b => suggestions.push({ label: b, ref: b }));
       return suggestions;
     }
-
     if (!chapterPart) {
-      // Suggest book:1-5
       for (let c = 1; c <= 5; c++) {
         suggestions.push({ label: `${resolvedBook} ${c}`, ref: `${resolvedBook} ${c}` });
       }
       return suggestions.slice(0, 5);
     }
-
     const ch = parseInt(chapterPart, 10);
     if (!hasColon) {
-      // Suggest full chapter
       suggestions.push({ label: `${resolvedBook} ${ch}`, ref: `${resolvedBook} ${ch}` });
-      // Also next chapters
       for (let c = ch + 1; c <= ch + 3; c++) {
         suggestions.push({ label: `${resolvedBook} ${c}`, ref: `${resolvedBook} ${c}` });
       }
       return suggestions.slice(0, 5);
     }
-
-    // Has colon - suggest verses
     const v = parseInt(versePart, 10) || 1;
     for (let i = 0; i < 5; i++) {
-      const vs = v + i;
-      suggestions.push({
-        label: `${resolvedBook} ${ch}:${vs}`,
-        ref: `${resolvedBook} ${ch}:${vs}`
-      });
+      suggestions.push({ label: `${resolvedBook} ${ch}:${v + i}`, ref: `${resolvedBook} ${ch}:${v + i}` });
     }
     return suggestions;
   }
 
-  // --- Devotional Search (via Cloudflare Worker) ---
+  // --- AI Phrase Search (via Worker → OpenAI) ---
+
+  async function searchPhrase(phrase) {
+    const cacheKey = `phrase:${phrase.toLowerCase().trim()}`;
+    const cached = Cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${workerUrl()}/ai/phrase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phrase }),
+      });
+      if (!res.ok) return { verses: [], fallback: true };
+      const data = await res.json();
+      if (!data.fallback && data.verses?.length) {
+        Cache.set(cacheKey, data, 60 * 60 * 1000); // 1 hour
+      }
+      return data;
+    } catch (err) {
+      console.warn('AI phrase search failed, using fallback:', err);
+      return { verses: [], fallback: true };
+    }
+  }
+
+  // --- AI Plan Builder (via Worker → OpenAI) ---
+
+  async function buildAIPlan(topic) {
+    const res = await fetch(`${workerUrl()}/ai/plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    });
+    if (!res.ok) throw new Error(`AI plan error: ${res.status}`);
+    return res.json();
+  }
+
+  // --- Devotional Search (via Worker → Serper) ---
 
   async function searchDevotional(topic, weekKey) {
-    if (!hasWorker()) {
-      throw new Error('NO_WORKER');
-    }
+    if (!hasWorker()) throw new Error('NO_WORKER');
     const url = `${workerUrl()}/search?topic=${encodeURIComponent(topic)}&week=${weekKey}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Search error: ${res.status}`);
@@ -196,6 +217,8 @@ const API = (() => {
     getVerses,
     getSuggestions,
     BIBLE_BOOKS,
+    searchPhrase,
+    buildAIPlan,
     searchDevotional,
     subscribePush,
     sendTestPush,
@@ -205,21 +228,18 @@ const API = (() => {
   };
 })();
 
-// --- Simple in-memory + sessionStorage cache ---
+// --- Simple in-memory cache ---
 const Cache = (() => {
   const mem = new Map();
-
   function get(key) {
     const item = mem.get(key);
     if (!item) return null;
     if (Date.now() > item.exp) { mem.delete(key); return null; }
     return item.value;
   }
-
   function set(key, value, ttlMs = 60 * 60 * 1000) {
     mem.set(key, { value, exp: Date.now() + ttlMs });
   }
-
   return { get, set };
 })();
 

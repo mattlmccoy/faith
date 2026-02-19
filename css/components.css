@@ -28,11 +28,11 @@
 }
 
 .scripture-card--morning {
-  background: linear-gradient(135deg, #4A7C2F 0%, #2D5016 100%);
+  background: linear-gradient(135deg, #D4604A 0%, #A83828 100%);
 }
 
 .scripture-card--evening {
-  background: linear-gradient(135deg, #5C4B8A 0%, #3A2D6A 100%);
+  background: linear-gradient(135deg, #7A6898 0%, #5A4870 100%);
 }
 
 .scripture-card__text {
@@ -87,13 +87,13 @@
 .session-toggle__btn--active[data-session="morning"] {
   background: var(--color-morning);
   color: white;
-  box-shadow: 0 2px 8px rgba(232, 147, 74, 0.35);
+  box-shadow: 0 2px 8px rgba(227, 83, 54, 0.35);
 }
 
 .session-toggle__btn--active[data-session="evening"] {
   background: var(--color-evening);
   color: white;
-  box-shadow: 0 2px 8px rgba(74, 59, 124, 0.35);
+  box-shadow: 0 2px 8px rgba(153, 136, 161, 0.35);
 }
 
 /* --- Reflection Prompt Card --- */
@@ -172,14 +172,14 @@
 /* --- Prayer Card --- */
 .prayer-card {
   background: var(--color-primary-faint);
-  border: 1px solid rgba(45, 80, 22, 0.15);
+  border: 1px solid rgba(196, 74, 50, 0.15);
   border-radius: var(--radius-xl);
   padding: var(--space-5) var(--space-6);
 }
 
 [data-theme="dark"] .prayer-card {
   background: var(--color-primary-faint);
-  border-color: rgba(143, 175, 110, 0.2);
+  border-color: rgba(201, 112, 90, 0.2);
 }
 
 .prayer-card__label {
@@ -272,18 +272,18 @@
 .btn-primary {
   background: var(--color-primary);
   color: white;
-  box-shadow: 0 2px 8px rgba(45, 80, 22, 0.3);
+  box-shadow: 0 2px 8px rgba(196, 74, 50, 0.3);
 }
 
 .btn-primary:hover {
   background: var(--color-primary-light);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(45, 80, 22, 0.35);
+  box-shadow: 0 4px 12px rgba(196, 74, 50, 0.35);
 }
 
 .btn-primary:active {
   transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(45, 80, 22, 0.2);
+  box-shadow: 0 1px 4px rgba(196, 74, 50, 0.2);
 }
 
 .btn-secondary {
@@ -356,12 +356,12 @@
 }
 
 .badge-morning {
-  background: rgba(232, 147, 74, 0.12);
+  background: rgba(227, 83, 54, 0.10);
   color: var(--color-morning);
 }
 
 .badge-evening {
-  background: rgba(74, 59, 124, 0.12);
+  background: rgba(153, 136, 161, 0.14);
   color: var(--color-evening);
 }
 
@@ -434,7 +434,7 @@
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1);
+  box-shadow: 0 0 0 3px rgba(196, 74, 50, 0.12);
 }
 
 .input::placeholder {
@@ -711,8 +711,8 @@
 
 /* --- Midday Prompt Banner --- */
 .midday-banner {
-  background: linear-gradient(135deg, #FFF8EE 0%, #FFF2DC 100%);
-  border: 1px solid var(--color-accent-warm);
+  background: linear-gradient(135deg, #FFF4EF 0%, #FDEAE2 100%);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);
   display: flex;

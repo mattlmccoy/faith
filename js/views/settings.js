@@ -68,21 +68,19 @@ const SettingsView = (() => {
               <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
                 <option value="web"   ${(state.bibleTranslation || 'web') === 'web'   ? 'selected' : ''}>WEB – World English Bible</option>
                 <option value="asv"   ${state.bibleTranslation === 'asv'   ? 'selected' : ''}>ASV – American Standard Version</option>
-                <option value="net"   ${state.bibleTranslation === 'net'   ? 'selected' : ''}>NET – New English Translation</option>
                 <option value="bbe"   ${state.bibleTranslation === 'bbe'   ? 'selected' : ''}>BBE – Bible in Basic English</option>
-                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>Darby Translation</option>
                 <option value="kjv"   ${state.bibleTranslation === 'kjv'   ? 'selected' : ''}>KJV – King James Version</option>
+                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>Darby Translation</option>
                 <option value="esv"   ${state.bibleTranslation === 'esv'   ? 'selected' : ''}>ESV – English Standard Version ⚠️</option>
-                <option value="niv"   ${state.bibleTranslation === 'niv'   ? 'selected' : ''}>NIV – New International Version ⚠️</option>
               </select>
             </div>
           </div>
-          <div id="translation-notice" style="display:${['esv','niv'].includes(state.bibleTranslation) ? 'flex' : 'none'};background:var(--color-accent-warm);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--color-accent-warm);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
             <div style="display:flex;flex-direction:column;gap:4px;">
               <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--color-text-primary);">⚠️ Copyrighted Translation</div>
               <div style="font-size:var(--text-xs);line-height:1.6;color:var(--color-text-secondary);">
-                ESV and NIV are copyrighted. Passages are displayed for personal devotional use with full attribution.
-                ESV® Bible © Crossway. NIV® © Biblica, Inc.
+                ESV is copyrighted. Passages are displayed for personal devotional use with full attribution.
+                ESV® Bible © Crossway. Requires Worker to be deployed.
               </div>
             </div>
           </div>
@@ -257,23 +255,24 @@ const SettingsView = (() => {
       applyTheme(theme);
 
       // Handle notification toggle
+      // Note: We already saved notificationsEnabled to the store above.
+      // We only show a status message here — we do NOT override the saved preference
+      // based on whether the push subscription succeeds. This prevents the toggle
+      // from appearing to "reset" when the worker isn't reachable.
       if (notifEnabled) {
         Notifications.subscribeToPush().then(sub => {
           const msgEl = root.querySelector('#notif-status-msg');
           if (sub) {
             if (msgEl) msgEl.textContent = '✅ Reminders active!';
           } else {
-            // subscribeToPush returns null on failure — get status message
+            // Subscription couldn't complete (worker not deployed, not installed, etc.)
+            // Show status info but KEEP the toggle on and preference saved.
             Notifications.getStatusMessage().then(msg => {
-              if (msgEl) msgEl.textContent = msg;
+              if (msgEl) msgEl.textContent = msg || 'Enable when app is installed to Home Screen';
             });
-            // Uncheck the toggle since subscription failed
-            const toggle = root.querySelector('#notif-toggle');
-            if (toggle) toggle.checked = false;
-            Store.set('notificationsEnabled', false);
           }
         }).catch(err => {
-          console.error('Notification setup error:', err);
+          console.warn('Notification setup error (preference still saved):', err);
         });
       } else {
         Notifications.unsubscribe().catch(console.error);
@@ -292,11 +291,11 @@ const SettingsView = (() => {
       applyTheme(e.target.value);
     });
 
-    // Show copyright warning for ESV/NIV
+    // Show copyright warning for ESV
     root.querySelector('#translation-select')?.addEventListener('change', (e) => {
       const notice = root.querySelector('#translation-notice');
       if (notice) {
-        notice.style.display = ['esv', 'niv'].includes(e.target.value) ? 'flex' : 'none';
+        notice.style.display = e.target.value === 'esv' ? 'flex' : 'none';
       }
     });
   }
