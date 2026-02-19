@@ -31,6 +31,7 @@ const PlanView = (() => {
 
     const currentPlan = Store.getPlan();
     const weekStart = DateUtils.weekStart(DateUtils.today());
+    const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -51,18 +52,13 @@ const PlanView = (() => {
       <div style="background:var(--glass-fill);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);">
         <div style="font-size:var(--text-xs);font-weight:var(--weight-bold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-2);">Inspired by trusted teachers</div>
         <div id="pastor-chips" style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3);">
-          <span class="pastor-chip">Tim Keller</span>
-          <span class="pastor-chip">John Mark Comer</span>
-          <span class="pastor-chip">Jon Pokluda</span>
-          <span class="pastor-chip">Louie Giglio</span>
-          <span class="pastor-chip">John Piper</span>
-          <span class="pastor-chip">Ben Stuart</span>
-          <button class="pastor-chip pastor-chip--add" id="add-pastor-btn" type="button">+ Add your own</button>
+          ${trustedPastors.length
+            ? trustedPastors.map(name => `<span class="pastor-chip">${name}</span>`).join('')
+            : '<span class="text-sm text-secondary">No trusted pastors selected yet.</span>'}
         </div>
-        <div id="custom-pastor-wrap" style="display:none;">
-          <input id="custom-pastor" class="input" type="text" placeholder="e.g. C.S. Lewis, A.W. Tozer…" style="font-size:var(--text-sm);" />
-          <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px;line-height:1.5;">Their theological style will inform the AI devotions.</p>
-        </div>
+        <p style="font-size:var(--text-xs);color:var(--text-tertiary);line-height:1.5;">
+          Manage trusted pastors in Settings. Every generated day will list who influenced it.
+        </p>
       </div>
 
       <!-- Topic suggestions -->
@@ -129,16 +125,6 @@ const PlanView = (() => {
       });
     }
 
-    // "Add your own pastor" toggle
-    const addPastorBtn = root.querySelector('#add-pastor-btn');
-    const customPastorWrap = root.querySelector('#custom-pastor-wrap');
-    if (addPastorBtn && customPastorWrap) {
-      addPastorBtn.addEventListener('click', () => {
-        const isVisible = customPastorWrap.style.display !== 'none';
-        customPastorWrap.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) root.querySelector('#custom-pastor')?.focus();
-      });
-    }
   }
 
   async function startBuild() {
@@ -152,8 +138,12 @@ const PlanView = (() => {
 
     selectedTopic = topic;
 
-    // Pick up custom pastor if provided
-    const customPastor = document.getElementById('custom-pastor')?.value?.trim() || '';
+    const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
+    if (!trustedPastors.length) {
+      alert('Select at least one trusted pastor in Settings first.');
+      return;
+    }
+
     const results = document.getElementById('plan-results');
     const buildBtn = document.getElementById('build-btn');
     if (!results) return;
@@ -170,17 +160,18 @@ const PlanView = (() => {
         <p class="text-sm text-secondary" style="text-align:center;max-width:260px;">
           Searching trusted ministries for "${topic}"<br>and writing your devotions…
         </p>
+        <p class="text-xs text-muted" style="text-align:center;margin-top:4px;">Influences: ${trustedPastors.join(', ')}</p>
         <p class="text-xs text-muted" style="text-align:center;margin-top:4px;">This takes about 20 seconds</p>
       </div>
     `;
 
     try {
       // Try AI-generated plan first
-      const aiPlan = await API.buildAIPlan(topic, customPastor);
+      const aiPlan = await API.buildAIPlan(topic, trustedPastors);
 
       if (aiPlan && aiPlan.days && aiPlan.days.length > 0) {
         // Convert AI plan format to the app's internal format
-        const plan = convertAIPlanToAppFormat(topic, aiPlan);
+        const plan = convertAIPlanToAppFormat(topic, aiPlan, trustedPastors);
         Store.savePlan(plan);
         showSuccess(results, topic, true);
       } else {
@@ -226,9 +217,10 @@ const PlanView = (() => {
     `;
   }
 
-  function convertAIPlanToAppFormat(topic, aiPlan) {
+  function convertAIPlanToAppFormat(topic, aiPlan, trustedPastors = []) {
     const weekStart = DateUtils.weekStart(DateUtils.today());
     const keys = DateUtils.weekKeys(weekStart);
+    const translation = API.translationLabel(Store.get('bibleTranslation') || 'web');
 
     const days = {};
     const aiDays = aiPlan.days || [];
@@ -241,37 +233,48 @@ const PlanView = (() => {
       const morningRef = aiDay.morning?.scripture_ref || '';
       const eveningRef = aiDay.evening?.scripture_ref || '';
 
+      const inspiredBy = Array.isArray(aiDay.inspired_by) && aiDay.inspired_by.length
+        ? aiDay.inspired_by
+        : trustedPastors.slice(0, 3);
+
       days[key] = {
         theme: aiDay.title || topic,
         morning: {
           title: aiDay.morning?.title || `Morning — Day ${i + 1}`,
           opening_verse: morningRef
-            ? { reference: morningRef, text: aiDay.morning?.devotion || '', translation: 'WEB' }
+            ? { reference: morningRef, text: '', translation }
             : (aiDay.morning?.opening_verse || null),
           body: aiDay.morning?.body
             ? aiDay.morning.body
             : (aiDay.morning?.devotion
-                ? [{ type: 'paragraph', content: aiDay.morning.devotion }]
+                ? aiDay.morning.devotion.split(/\n{2,}/).map(p => ({ type: 'paragraph', content: p.trim() })).filter(b => b.content)
                 : []),
           reflection_prompts: aiDay.morning?.reflection_prompts || [],
           prayer: aiDay.morning?.prayer || '',
           midday_prompt: aiDay.morning?.midday_prompt || '',
+          inspired_by: inspiredBy,
         },
         evening: {
           title: aiDay.evening?.title || `Evening — Day ${i + 1}`,
           opening_verse: eveningRef
-            ? { reference: eveningRef, text: aiDay.evening?.devotion || '', translation: 'WEB' }
+            ? { reference: eveningRef, text: '', translation }
             : (aiDay.evening?.opening_verse || null),
           body: aiDay.evening?.body
             ? aiDay.evening.body
             : (aiDay.evening?.devotion
-                ? [{ type: 'paragraph', content: aiDay.evening.devotion }]
+                ? aiDay.evening.devotion.split(/\n{2,}/).map(p => ({ type: 'paragraph', content: p.trim() })).filter(b => b.content)
                 : []),
           reflection_prompts: aiDay.evening?.reflection_prompts || [],
           prayer: aiDay.evening?.prayer || '',
           lectio_divina: aiDay.evening?.lectio_divina || null,
+          inspired_by: inspiredBy,
         },
         faith_stretch: aiDay.faith_stretch || null,
+        sources: inspiredBy.map(name => ({
+          pastor: name,
+          approved: true,
+          note: 'Pastoral influence',
+        })),
       };
     });
 
@@ -285,7 +288,7 @@ const PlanView = (() => {
   }
 
   function loadSeedPlan() {
-    fetch('/faith/content/seed/week-1.json')
+    fetch('/abide/content/seed/week-1.json')
       .then(r => r.json())
       .then(data => {
         Store.savePlan(data);

@@ -3,34 +3,34 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v4';
+const SW_VERSION = 'abide-v5';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 
 const STATIC_ASSETS = [
-  '/faith/',
-  '/faith/index.html',
-  '/faith/offline.html',
-  '/faith/manifest.json',
-  '/faith/css/app.css',
-  '/faith/css/components.css',
-  '/faith/css/views.css',
-  '/faith/css/animations.css',
-  '/faith/js/date.js',
-  '/faith/js/store.js',
-  '/faith/js/api.js',
-  '/faith/js/router.js',
-  '/faith/js/notifications.js',
-  '/faith/js/app.js',
-  '/faith/js/views/home.js',
-  '/faith/js/views/devotion.js',
-  '/faith/js/views/scripture.js',
-  '/faith/js/views/prayer.js',
-  '/faith/js/views/journal.js',
-  '/faith/js/views/plan.js',
-  '/faith/js/views/settings.js',
-  '/faith/assets/fonts/playfair-display.woff2',
-  '/faith/assets/fonts/inter.woff2',
+  '/abide/',
+  '/abide/index.html',
+  '/abide/offline.html',
+  '/abide/manifest.json',
+  '/abide/css/app.css',
+  '/abide/css/components.css',
+  '/abide/css/views.css',
+  '/abide/css/animations.css',
+  '/abide/js/date.js',
+  '/abide/js/store.js',
+  '/abide/js/api.js',
+  '/abide/js/router.js',
+  '/abide/js/notifications.js',
+  '/abide/js/app.js',
+  '/abide/js/views/home.js',
+  '/abide/js/views/devotion.js',
+  '/abide/js/views/scripture.js',
+  '/abide/js/views/prayer.js',
+  '/abide/js/views/journal.js',
+  '/abide/js/views/plan.js',
+  '/abide/js/views/settings.js',
+  '/abide/assets/fonts/playfair-display.woff2',
+  '/abide/assets/fonts/inter.woff2',
 ];
 
 // --- Install: cache static assets ---
@@ -75,7 +75,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Content JSON files: network first, cache fallback
-  if (url.pathname.includes('/faith/content/')) {
+  if (url.pathname.includes('/abide/content/')) {
     event.respondWith(networkFirst(request, CONTENT_CACHE, 60 * 60));
     return;
   }
@@ -99,7 +99,7 @@ async function cacheFirst(request, cacheName) {
     // Return offline page for navigation requests
     if (request.mode === 'navigate') {
       const cache = await caches.open(STATIC_CACHE);
-      return cache.match('/faith/offline.html') || new Response('Offline', { status: 503 });
+      return cache.match('/abide/offline.html') || new Response('Offline', { status: 503 });
     }
     throw err;
   }
@@ -139,12 +139,12 @@ self.addEventListener('push', (event) => {
   // iOS-compatible options — no 'actions' field (unsupported on iOS)
   const options = {
     body: data.body || 'Time to spend a moment with God.',
-    icon: '/faith/icons/icon-192.png',
-    badge: '/faith/icons/icon-192.png',
+    icon: '/abide/icons/icon-192.png',
+    badge: '/abide/icons/icon-192.png',
     tag: data.tag || 'abide-reminder',
     renotify: true,
     silent: false,
-    data: { url: data.url || '/faith/' },
+    data: { url: data.url || '/abide/' },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -155,10 +155,10 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
-  const url = event.notification.data?.url || '/faith/';
+  const url = event.notification.data?.url || '/abide/';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      const existingClient = clientList.find(c => c.url.includes('/faith/'));
+      const existingClient = clientList.find(c => c.url.includes('/abide/'));
       if (existingClient) {
         return existingClient.focus();
       }

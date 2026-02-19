@@ -143,8 +143,8 @@ const Notifications = (() => {
     if (Notification.permission === 'granted') {
       new Notification(title, {
         body,
-        icon: '/faith/icons/icon-192.png',
-        badge: '/faith/icons/icon-192.png',
+        icon: '/abide/icons/icon-192.png',
+        badge: '/abide/icons/icon-192.png',
       });
     }
   }

@@ -27,7 +27,7 @@
   // --- Register service worker ---
   function registerSW() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/faith/sw.js', { scope: '/faith/' })
+      navigator.serviceWorker.register('/abide/sw.js', { scope: '/abide/' })
         .then(reg => {
           console.log('[Abide] SW registered:', reg.scope);
         })
@@ -97,7 +97,7 @@
   async function autoLoadSeedIfNeeded() {
     if (!Store.getPlan()) {
       try {
-        const res = await fetch('/faith/content/seed/week-1.json');
+        const res = await fetch('/abide/content/seed/week-1.json');
         if (res.ok) {
           const data = await res.json();
           Store.savePlan(data);

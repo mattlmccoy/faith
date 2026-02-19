@@ -11,10 +11,9 @@ const HomeView = (() => {
 
     currentSession = Store.get('_sessionOverride') || DateUtils.session();
 
-    const devotionData = Store.getTodayDevotionData();
+    const selectedDate = Store.getSelectedDevotionDate();
+    const devotionData = Store.getDevotionData(selectedDate);
     const userName = Store.get('userName');
-    const today = DateUtils.today();
-
     if (!devotionData && !Store.get('onboardingDone')) {
       renderSetup(container, userName);
       return;
@@ -24,9 +23,9 @@ const HomeView = (() => {
     div.className = 'view-content tab-switch-enter';
 
     if (devotionData) {
-      renderDevotion(div, devotionData, userName, today);
+      renderDevotion(div, devotionData, userName, selectedDate);
     } else {
-      renderNoPlan(div);
+      renderNoPlan(div, selectedDate);
     }
 
     container.innerHTML = '';
@@ -76,7 +75,7 @@ const HomeView = (() => {
     });
   }
 
-  function renderNoPlan(div) {
+  function renderNoPlan(div, selectedDate) {
     div.innerHTML = `
       <div class="empty-state">
         <div class="empty-state__icon">
@@ -85,24 +84,37 @@ const HomeView = (() => {
           </svg>
         </div>
         <h2 class="empty-state__title">No devotion for today</h2>
-        <p class="empty-state__description">Build this week's plan to start your daily devotions.</p>
+        <p class="empty-state__description">No devotion found for ${DateUtils.format(selectedDate)}. Build this week's plan to start your daily devotions.</p>
         <button class="btn btn-primary" onclick="Router.navigate('/settings')">Build This Week's Plan</button>
       </div>
     `;
   }
 
-  function renderDevotion(div, data, userName, today) {
+  function renderDevotion(div, data, userName, selectedDate) {
     const session = currentSession;
     const sessionData = data[session];
-    if (!sessionData) { renderNoPlan(div); return; }
+    if (!sessionData) { renderNoPlan(div, selectedDate); return; }
 
-    const isCompleted = Store.isCompleted(today, session);
+    const isCompleted = Store.isCompleted(selectedDate, session);
+    const isSaved = Store.isSavedDevotion(selectedDate, session);
+    const dayKeys = Store.getPlanDayKeys();
+    const dayIndex = Math.max(0, dayKeys.indexOf(selectedDate));
+    const hasPrev = dayIndex > 0;
+    const hasNext = dayIndex < dayKeys.length - 1;
 
     div.innerHTML = `
       <!-- Greeting -->
       <div class="home-greeting card-enter">
-        <div class="home-greeting__time">${DateUtils.format(today)}</div>
+        <div class="home-greeting__time">${DateUtils.format(selectedDate)}</div>
         <h2 class="home-greeting__name">${DateUtils.greeting(userName)}</h2>
+      </div>
+
+      <div class="home-session-toggle card-enter" style="margin-top:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <button class="btn btn-secondary btn-sm" ${hasPrev ? '' : 'disabled'} onclick="HomeView.shiftDay(-1)">← Previous</button>
+          <div class="text-sm text-secondary">Day ${dayIndex + 1} of ${dayKeys.length || 7}</div>
+          <button class="btn btn-secondary btn-sm" ${hasNext ? '' : 'disabled'} onclick="HomeView.shiftDay(1)">Next →</button>
+        </div>
       </div>
 
       <!-- Date + series -->
@@ -125,12 +137,12 @@ const HomeView = (() => {
 
       <!-- Key Verse -->
       <div class="home-verse card-enter">
-        ${renderVerseCard(sessionData.opening_verse, session)}
+        ${renderVerseCard(sessionData.opening_verse, session, selectedDate)}
       </div>
 
-      <!-- Devotion excerpt -->
+      <!-- Scripture splash -->
       <div class="home-devotion-excerpt card-enter">
-        ${renderExcerpt(sessionData)}
+        ${renderScriptureSplash(sessionData)}
       </div>
 
       <!-- Reflection prompts -->
@@ -222,8 +234,8 @@ const HomeView = (() => {
         <button class="btn btn-secondary" style="flex:1;" onclick="Router.navigate('/devotion')">
           Read Full Devotion
         </button>
-        <button class="btn btn-secondary" style="flex:1;" onclick="Router.navigate('/prayer')">
-          Open Prayer
+        <button class="btn ${isSaved ? 'btn-primary' : 'btn-secondary'}" style="flex:1;" id="save-devotion-btn" onclick="HomeView.toggleSave()">
+          ${isSaved ? 'Saved ✓' : 'Save Devotion'}
         </button>
       </div>
 
@@ -250,30 +262,34 @@ const HomeView = (() => {
         render(document.getElementById('view-container'));
       });
     });
+
+    hydrateOpeningVerse(div, sessionData, selectedDate);
   }
 
-  function renderVerseCard(verse, session) {
+  function renderVerseCard(verse, session, selectedDate) {
     if (!verse) return '';
+    const selectedTranslation = API.translationLabel(Store.get('bibleTranslation') || 'web');
     return `
-      <div class="scripture-card scripture-card--${session}">
-        <div class="scripture-card__text">${verse.text || ''}</div>
-        <div class="scripture-card__reference">${verse.reference || ''}</div>
-        <div class="scripture-card__translation">${verse.translation || 'WEB'}</div>
+      <div class="scripture-card scripture-card--${session}" data-opening-verse data-date="${selectedDate}">
+        <div class="scripture-card__text" data-opening-text>${verse.text || ''}</div>
+        <div class="scripture-card__reference" data-opening-ref>${verse.reference || ''}</div>
+        <div class="scripture-card__translation" data-opening-translation>${selectedTranslation}</div>
       </div>
     `;
   }
 
-  function renderExcerpt(sessionData) {
-    const firstPara = sessionData.body?.find(b => b.type === 'paragraph');
-    if (!firstPara && !sessionData.excerpt) return '';
-    const text = firstPara?.content || sessionData.excerpt || '';
+  function renderScriptureSplash(sessionData) {
+    const verse = sessionData.opening_verse || {};
+    if (!verse.reference && !verse.text) return '';
+    const text = verse.text || '';
 
     return `
       <div class="section-header">
-        <span class="section-title">${sessionData.title || 'Devotion'}</span>
+        <span class="section-title">Scripture Splash</span>
         <button class="section-action" onclick="Router.navigate('/devotion')">Read all →</button>
       </div>
-      <p class="home-devotion-text">${text}</p>
+      <p class="home-devotion-text" data-splash-scripture>${text}</p>
+      <p class="text-xs text-secondary" data-splash-reference>${verse.reference || ''}</p>
     `;
   }
 
@@ -290,11 +306,11 @@ const HomeView = (() => {
   }
 
   function toggleComplete() {
-    const today = DateUtils.today();
+    const selectedDate = Store.getSelectedDevotionDate();
     const session = currentSession;
-    const isNow = Store.isCompleted(today, session);
+    const isNow = Store.isCompleted(selectedDate, session);
     if (!isNow) {
-      Store.markCompleted(today, session);
+      Store.markCompleted(selectedDate, session);
       const btn = document.getElementById('complete-btn');
       if (btn) {
         btn.classList.add('completed');
@@ -306,7 +322,49 @@ const HomeView = (() => {
     }
   }
 
-  return { render, toggleComplete };
+  function toggleSave() {
+    const selectedDate = Store.getSelectedDevotionDate();
+    const saved = Store.toggleSavedDevotion(selectedDate, currentSession);
+    const btn = document.getElementById('save-devotion-btn');
+    if (btn) {
+      btn.className = `btn ${saved ? 'btn-primary' : 'btn-secondary'}`;
+      btn.textContent = saved ? 'Saved ✓' : 'Save Devotion';
+    }
+  }
+
+  function shiftDay(offset) {
+    const next = Store.shiftSelectedDevotionDay(offset);
+    if (!next) return;
+    render(document.getElementById('view-container'));
+  }
+
+  async function hydrateOpeningVerse(root, sessionData, selectedDate) {
+    const ref = sessionData?.opening_verse?.reference;
+    if (!ref) return;
+    const selectedRef = Store.getSelectedDevotionDate();
+    if (selectedRef !== selectedDate) return;
+
+    try {
+      const data = await API.getPassage(ref);
+      if (Store.getSelectedDevotionDate() !== selectedDate) return;
+      const text = (data.text || '').trim();
+      const translation = API.translationLabel(data.translation_id || Store.get('bibleTranslation'));
+      const textEl = root.querySelector('[data-opening-text]');
+      const refEl = root.querySelector('[data-opening-ref]');
+      const translationEl = root.querySelector('[data-opening-translation]');
+      const splashText = root.querySelector('[data-splash-scripture]');
+      const splashRef = root.querySelector('[data-splash-reference]');
+      if (textEl && text) textEl.textContent = text;
+      if (refEl) refEl.textContent = ref;
+      if (translationEl) translationEl.textContent = translation;
+      if (splashText && text) splashText.textContent = text;
+      if (splashRef) splashRef.textContent = ref;
+    } catch (err) {
+      console.warn('Could not hydrate opening verse:', err);
+    }
+  }
+
+  return { render, toggleComplete, toggleSave, shiftDay };
 })();
 
 // Global collapsible toggle helper

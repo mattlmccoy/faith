@@ -172,14 +172,28 @@ const API = (() => {
 
   // --- AI Plan Builder (via Worker → OpenAI) ---
 
-  async function buildAIPlan(topic, customPastor = '') {
+  async function buildAIPlan(topic, pastors = []) {
     const res = await fetch(`${workerUrl()}/ai/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, customPastor }),
+      body: JSON.stringify({ topic, pastors }),
     });
     if (!res.ok) throw new Error(`AI plan error: ${res.status}`);
     return res.json();
+  }
+
+  function translationLabel(id) {
+    const key = (id || '').toLowerCase();
+    const labels = {
+      web: 'WEB',
+      asv: 'ASV',
+      bbe: 'BBE',
+      kjv: 'KJV',
+      darby: 'DARBY',
+      esv: 'ESV',
+      net: 'NET',
+    };
+    return labels[key] || key.toUpperCase() || 'WEB';
   }
 
   // --- Devotional Search (via Worker → Serper) ---
@@ -225,6 +239,7 @@ const API = (() => {
     hasWorker,
     workerUrl,
     bibleTranslation,
+    translationLabel,
   };
 })();
 

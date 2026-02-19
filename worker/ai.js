@@ -15,7 +15,7 @@ const PHRASE_CACHE_TTL = 60 * 60;    // 1 hour
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 // ---------------------------------------------------------------------------
-// POST /ai/plan  { topic: string }
+// POST /ai/plan  { topic: string, pastors?: string[] }
 // Returns a full 7-day devotional plan as JSON
 // ---------------------------------------------------------------------------
 export async function handleAIPlan(request, url, env, origin, json) {
@@ -23,26 +23,31 @@ export async function handleAIPlan(request, url, env, origin, json) {
   if (!env.AI) return json({ error: 'AI binding not configured' }, 503, origin);
 
   let topic = 'Grace';
-  let customPastor = '';
-  try { const b = await request.json(); topic = b.topic || 'Grace'; customPastor = b.customPastor || ''; } catch {}
+  let pastors = [];
+  try {
+    const b = await request.json();
+    topic = b.topic || 'Grace';
+    pastors = Array.isArray(b.pastors) ? b.pastors.filter(Boolean) : [];
+  } catch {}
 
-  const cacheKey = `plan:cf:${topic.toLowerCase().trim()}`;
+  const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
+  const cacheKey = `plan:cf:${topic.toLowerCase().trim()}:${pastorKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
   }
 
   const systemPrompt = `You are a thoughtful non-denominational Protestant pastor writing personal daily Bible devotions.
-You draw inspiration from pastors like Tim Keller, John Mark Comer, Jon Pokluda, Louie Giglio, John Piper, and Ben Stuart.
+You draw inspiration from trusted Protestant pastors provided by the user.
 You write in a warm, direct, gospel-centered style. Scripture references use the World English Bible (WEB).
 CRITICAL REQUIREMENT: Every single morning AND evening block MUST have a non-empty scripture_ref field with a real Bible reference (e.g. "Romans 8:28", "Psalm 23:1"). A day with no scripture_ref is invalid and will be rejected. Use a different passage for each day.
 You MUST respond with valid JSON only — no markdown, no code blocks, no extra text before or after the JSON.`;
 
-  const customPastorLine = customPastor
-    ? `\nAlso draw from the theological style of ${customPastor}.`
-    : '';
+  const pastorLine = pastors.length
+    ? `\nTrusted pastors to draw from: ${pastors.join(', ')}.`
+    : '\nTrusted pastors to draw from: Tim Keller, John Mark Comer, Jon Pokluda, Louie Giglio, John Piper, Ben Stuart.';
 
-  const userPrompt = `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${customPastorLine}
+  const userPrompt = `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${pastorLine}
 
 Return ONLY this exact JSON structure (no markdown fences, no explanation, just raw JSON):
 {
@@ -51,15 +56,16 @@ Return ONLY this exact JSON structure (no markdown fences, no explanation, just 
     {
       "dayIndex": 0,
       "title": "Day title",
+      "inspired_by": ["Pastor Name 1", "Pastor Name 2"],
       "morning": {
         "scripture_ref": "Book Chapter:Verse",
-        "devotion": "2-3 paragraph devotional (150-200 words). Gospel-centered, personal, warm.",
+        "devotion": "4-5 paragraph devotional (280-380 words). Gospel-centered, personal, warm.",
         "reflection_prompts": ["Question 1?", "Question 2?", "Question 3?"],
         "prayer": "A 2-3 sentence personal prayer."
       },
       "evening": {
         "scripture_ref": "Book Chapter:Verse",
-        "devotion": "2-3 paragraph evening reflection (100-150 words). Quieter, reflective tone.",
+        "devotion": "3-4 paragraph evening reflection (220-300 words). Quieter, reflective tone.",
         "reflection_prompts": ["Question 1?", "Question 2?"],
         "prayer": "A 1-2 sentence evening prayer."
       },
@@ -111,6 +117,9 @@ Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each 
     planData.days.forEach((day, i) => {
       if (!day.morning) day.morning = {};
       if (!day.evening) day.evening = {};
+      if (!Array.isArray(day.inspired_by) || !day.inspired_by.length) {
+        day.inspired_by = pastors.length ? pastors.slice(0, 3) : ['Tim Keller', 'John Mark Comer'];
+      }
       if (!day.morning.scripture_ref) {
         day.morning.scripture_ref = FALLBACK_REFS[i % FALLBACK_REFS.length];
         missingCount++;

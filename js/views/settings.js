@@ -3,6 +3,14 @@
    ============================================================ */
 
 const SettingsView = (() => {
+  function escapeHtml(text = '') {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // Palette definitions for the picker UI
   const PALETTES = [
@@ -21,6 +29,7 @@ const SettingsView = (() => {
     Router.clearHeaderActions();
 
     const state = Store.get();
+    const trustedPastors = Store.getTrustedPastors();
     const tab = new URLSearchParams(params.replace('?', '')).get('tab');
     const currentPalette = state.palette || 'tuscan-sunset';
 
@@ -215,6 +224,31 @@ const SettingsView = (() => {
         </div>
       </div>
 
+      <!-- Trusted Pastors -->
+      <div class="settings-section">
+        <div class="settings-section-title">Trusted Pastors</div>
+        <div class="settings-group">
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+            <div class="settings-row__value">Select who can influence AI-generated devotions.</div>
+            <div id="trusted-pastor-list" style="width:100%;display:flex;flex-direction:column;gap:8px;">
+              ${trustedPastors.map((pastor) => `
+                <div data-pastor-row style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--bg-sunken);">
+                  <label style="display:flex;align-items:center;gap:10px;min-width:0;">
+                    <input class="pastor-enabled" type="checkbox" ${pastor.enabled ? 'checked' : ''} />
+                    <span class="pastor-name" style="font-size:var(--text-sm);line-height:1.4;">${escapeHtml(pastor.name)}</span>
+                  </label>
+                  <button type="button" class="btn btn-ghost btn-sm pastor-remove">Remove</button>
+                </div>
+              `).join('')}
+            </div>
+            <div style="display:flex;gap:8px;width:100%;">
+              <input id="pastor-new-name" class="input" type="text" placeholder="Add a pastor (e.g. Charles Spurgeon)" style="margin:0;" />
+              <button type="button" class="btn btn-secondary btn-sm" id="add-pastor-btn">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Weekly Plan -->
       <div class="settings-section">
         <div class="settings-section-title">Devotion Content</div>
@@ -270,6 +304,8 @@ const SettingsView = (() => {
   }
 
   function setupSettingsListeners(root) {
+    setupPastorListListeners(root);
+
     // Palette picker — instant preview
     root.querySelectorAll('.palette-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -293,6 +329,17 @@ const SettingsView = (() => {
 
       const [mh, mm] = morningTime.split(':').map(Number);
       const [eh, em] = eveningTime.split(':').map(Number);
+      const trustedPastors = Array.from(root.querySelectorAll('[data-pastor-row]'))
+        .map(row => ({
+          name: row.querySelector('.pastor-name')?.textContent?.trim() || '',
+          enabled: !!row.querySelector('.pastor-enabled')?.checked,
+        }))
+        .filter(p => p.name);
+
+      if (!trustedPastors.some(p => p.enabled)) {
+        alert('Enable at least one trusted pastor.');
+        return;
+      }
 
       Store.update({
         userName: name,
@@ -306,6 +353,7 @@ const SettingsView = (() => {
         notificationsEnabled: notifEnabled,
         palette: selectedPalette,
       });
+      Store.setTrustedPastors(trustedPastors);
 
       applyTheme(theme);
 
@@ -359,6 +407,58 @@ const SettingsView = (() => {
       // Auto: time-based
       html.setAttribute('data-theme', DateUtils.isDarkModeTime() ? 'dark' : 'light');
     }
+  }
+
+  function setupPastorListListeners(root) {
+    const list = root.querySelector('#trusted-pastor-list');
+    const addBtn = root.querySelector('#add-pastor-btn');
+    const input = root.querySelector('#pastor-new-name');
+    if (!list || !addBtn || !input) return;
+
+    function bindRemoveHandlers() {
+      list.querySelectorAll('.pastor-remove').forEach(btn => {
+        btn.onclick = () => {
+          const row = btn.closest('[data-pastor-row]');
+          if (row) row.remove();
+        };
+      });
+    }
+
+    function appendPastor(name) {
+      const clean = name.trim();
+      if (!clean) return;
+      const duplicate = Array.from(list.querySelectorAll('.pastor-name'))
+        .some(el => el.textContent?.trim().toLowerCase() === clean.toLowerCase());
+      if (duplicate) return;
+
+      const row = document.createElement('div');
+      row.setAttribute('data-pastor-row', '');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--bg-sunken);';
+      row.innerHTML = `
+        <label style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <input class="pastor-enabled" type="checkbox" checked />
+          <span class="pastor-name" style="font-size:var(--text-sm);line-height:1.4;">${escapeHtml(clean)}</span>
+        </label>
+        <button type="button" class="btn btn-ghost btn-sm pastor-remove">Remove</button>
+      `;
+      list.appendChild(row);
+      bindRemoveHandlers();
+    }
+
+    addBtn.addEventListener('click', () => {
+      appendPastor(input.value);
+      input.value = '';
+      input.focus();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addBtn.click();
+      }
+    });
+
+    bindRemoveHandlers();
   }
 
   return { render, applyTheme };

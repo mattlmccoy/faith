@@ -7,7 +7,8 @@ const DevotionView = (() => {
     Router.setTitle('Devotion');
     Router.clearHeaderActions();
 
-    const devotionData = Store.getTodayDevotionData();
+    const selectedDate = Store.getSelectedDevotionDate();
+    const devotionData = Store.getDevotionData(selectedDate);
     const session = Store.get('_sessionOverride') || DateUtils.session();
     const div = document.createElement('div');
     div.className = 'view-content view-enter';
@@ -32,6 +33,14 @@ const DevotionView = (() => {
       container.appendChild(div);
       return;
     }
+    const dayKeys = Store.getPlanDayKeys();
+    const dayIndex = Math.max(0, dayKeys.indexOf(selectedDate));
+    const hasPrev = dayIndex > 0;
+    const hasNext = dayIndex < dayKeys.length - 1;
+    const isSaved = Store.isSavedDevotion(selectedDate, session);
+    const sourceList = devotionData.sources?.filter(s => s.approved)?.length
+      ? devotionData.sources.filter(s => s.approved)
+      : (sessionData.inspired_by || []).map(name => ({ pastor: name, note: 'Pastoral influence', approved: true }));
 
     div.innerHTML = `
       <!-- Session toggle at top -->
@@ -46,23 +55,29 @@ const DevotionView = (() => {
         </div>
       </div>
 
+      <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <button class="btn btn-secondary btn-sm" ${hasPrev ? '' : 'disabled'} onclick="DevotionView.shiftDay(-1)">← Previous</button>
+        <div class="text-sm text-secondary">Day ${dayIndex + 1} of ${dayKeys.length || 7}</div>
+        <button class="btn btn-secondary btn-sm" ${hasNext ? '' : 'disabled'} onclick="DevotionView.shiftDay(1)">Next →</button>
+      </div>
+
       <!-- Header -->
       <div class="devotion-header">
         <div class="devotion-meta">
           <span class="badge badge-${session === 'morning' ? 'morning' : 'evening'}">${session === 'morning' ? '☀️ Morning' : '🌙 Evening'}</span>
-          <span class="text-sm text-muted">${DateUtils.format(DateUtils.today())}</span>
+          <span class="text-sm text-muted">${DateUtils.format(selectedDate)}</span>
         </div>
         ${devotionData.theme ? `<p class="text-sm text-brand font-medium" style="margin-bottom:8px;">${devotionData.theme}</p>` : ''}
-        <h1 class="devotion-title">${sessionData.title || 'Today\'s Devotion'}</h1>
+        <h1 class="devotion-title">${sessionData.opening_verse?.reference || sessionData.title || 'Today\'s Devotion'}</h1>
       </div>
 
       <!-- Opening verse -->
       ${sessionData.opening_verse ? `
       <div style="margin-bottom:28px;">
-        <div class="scripture-card scripture-card--${session}">
-          <div class="scripture-card__text">${sessionData.opening_verse.text}</div>
-          <div class="scripture-card__reference">${sessionData.opening_verse.reference}</div>
-          <div class="scripture-card__translation">${sessionData.opening_verse.translation || 'WEB'}</div>
+        <div class="scripture-card scripture-card--${session}" data-opening-verse>
+          <div class="scripture-card__text" data-opening-text>${sessionData.opening_verse.text || ''}</div>
+          <div class="scripture-card__reference" data-opening-ref>${sessionData.opening_verse.reference || ''}</div>
+          <div class="scripture-card__translation" data-opening-translation>${API.translationLabel(Store.get('bibleTranslation') || 'web')}</div>
         </div>
       </div>
       ` : ''}
@@ -149,15 +164,23 @@ const DevotionView = (() => {
       ` : ''}
 
       <!-- Sources -->
-      ${devotionData.sources?.filter(s => s.approved)?.length ? `
+      ${sourceList.length ? `
       <div class="divider-text">Sources</div>
-      ${devotionData.sources.filter(s => s.approved).map(s => `
+      ${sourceList.map(s => `
         <div class="text-xs text-muted" style="margin-bottom:4px;">
           ${s.pastor ? `<strong>${s.pastor}</strong> — ` : ''}
-          <a href="${s.url}" target="_blank" rel="noopener" style="color:var(--color-primary);">${s.url}</a>
+          ${s.url
+            ? `<a href="${s.url}" target="_blank" rel="noopener" style="color:var(--color-primary);">${s.url}</a>`
+            : (s.note || 'Referenced influence')}
         </div>
       `).join('')}
       ` : ''}
+
+      <div style="margin:24px 0;">
+        <button class="btn ${isSaved ? 'btn-primary' : 'btn-secondary'} btn-full" id="save-devotion-btn" onclick="DevotionView.toggleSave()">
+          ${isSaved ? 'Saved ✓' : 'Save This Devotion'}
+        </button>
+      </div>
     `;
 
     // Session toggle
@@ -170,6 +193,7 @@ const DevotionView = (() => {
 
     container.innerHTML = '';
     container.appendChild(div);
+    hydrateScripture(div, sessionData, selectedDate);
   }
 
   function renderBody(body) {
@@ -179,9 +203,9 @@ const DevotionView = (() => {
       }
       if (block.type === 'scripture_block') {
         return `
-          <div class="devotion-scripture-block">
-            <div class="devotion-scripture-block__text">"${block.text}"</div>
-            ${block.reference ? `<div class="devotion-scripture-block__ref">— ${block.reference}</div>` : ''}
+          <div class="devotion-scripture-block" data-scripture-block data-ref="${block.reference || ''}">
+            <div class="devotion-scripture-block__text" data-scripture-text>"${block.text || ''}"</div>
+            ${block.reference ? `<div class="devotion-scripture-block__ref" data-scripture-ref>— ${block.reference}</div>` : ''}
           </div>
         `;
       }
@@ -192,7 +216,53 @@ const DevotionView = (() => {
     }).join('');
   }
 
-  return { render };
+  async function hydrateScripture(root, sessionData, selectedDate) {
+    try {
+      const openingRef = sessionData?.opening_verse?.reference;
+      if (openingRef) {
+        const opening = await API.getPassage(openingRef);
+        if (Store.getSelectedDevotionDate() !== selectedDate) return;
+        const text = (opening.text || '').trim();
+        const translation = API.translationLabel(opening.translation_id || Store.get('bibleTranslation'));
+        const textEl = root.querySelector('[data-opening-text]');
+        const translationEl = root.querySelector('[data-opening-translation]');
+        if (textEl && text) textEl.textContent = text;
+        if (translationEl) translationEl.textContent = translation;
+      }
+
+      const blocks = Array.from(root.querySelectorAll('[data-scripture-block][data-ref]'));
+      for (const blockEl of blocks) {
+        const ref = blockEl.getAttribute('data-ref');
+        if (!ref) continue;
+        const passage = await API.getPassage(ref);
+        if (Store.getSelectedDevotionDate() !== selectedDate) return;
+        const textEl = blockEl.querySelector('[data-scripture-text]');
+        const refEl = blockEl.querySelector('[data-scripture-ref]');
+        if (textEl && passage.text) textEl.textContent = `"${passage.text.trim()}"`;
+        if (refEl) refEl.textContent = `— ${ref}`;
+      }
+    } catch (err) {
+      console.warn('Could not hydrate devotion scripture:', err);
+    }
+  }
+
+  function toggleSave() {
+    const date = Store.getSelectedDevotionDate();
+    const session = Store.get('_sessionOverride') || DateUtils.session();
+    const saved = Store.toggleSavedDevotion(date, session);
+    const btn = document.getElementById('save-devotion-btn');
+    if (btn) {
+      btn.className = `btn ${saved ? 'btn-primary' : 'btn-secondary'} btn-full`;
+      btn.textContent = saved ? 'Saved ✓' : 'Save This Devotion';
+    }
+  }
+
+  function shiftDay(offset) {
+    Store.shiftSelectedDevotionDay(offset);
+    render(document.getElementById('view-container'));
+  }
+
+  return { render, toggleSave, shiftDay };
 })();
 
 window.DevotionView = DevotionView;
