@@ -204,6 +204,30 @@ function buildModelCandidates(env, discoveredModels = []) {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// GET /ai/models
+// Returns available Gemini models that support generateContent
+// ---------------------------------------------------------------------------
+export async function handleAIModels(request, url, env, origin, json) {
+  if (request.method !== 'GET') return json({ error: 'GET required' }, 405, origin);
+  if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY is not configured' }, 503, origin);
+
+  try {
+    const discovered = await listGeminiGenerateModels(env);
+    const candidates = buildModelCandidates(env, discovered);
+    return json({
+      ok: true,
+      configuredModel: env.GEMINI_MODEL || null,
+      discoveredCount: discovered.length,
+      discovered,
+      candidates,
+      selected: candidates[0] || null,
+    }, 200, origin);
+  } catch (err) {
+    return json({ ok: false, error: err.message }, 500, origin);
+  }
+}
+
 function parseJsonBlock(raw) {
   try {
     return JSON.parse(raw);
