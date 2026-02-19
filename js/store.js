@@ -4,6 +4,14 @@
 
 const Store = (() => {
   const KEY = 'abide_state';
+  const USAGE_METRICS = [
+    'bibleQueries',
+    'esvQueries',
+    'aiPlanRequests',
+    'aiPhraseQueries',
+    'devotionalSearchQueries',
+    'pushTestRequests',
+  ];
   const DEFAULT_TRUSTED_PASTORS = [
     { name: 'Tim Keller', enabled: true },
     { name: 'John Mark Comer', enabled: true },
@@ -34,6 +42,21 @@ const Store = (() => {
     bibleTranslation: 'web',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby'
     palette: 'tuscan-sunset', // Color palette / theme
     trustedPastors: DEFAULT_TRUSTED_PASTORS,
+    usageStats: {
+      monthKey: '',
+      bibleQueries: 0,
+      esvQueries: 0,
+      aiPlanRequests: 0,
+      aiPhraseQueries: 0,
+      devotionalSearchQueries: 0,
+      pushTestRequests: 0,
+    },
+    usageLimits: {
+      esvQueries: 500,
+      aiPlanRequests: 120,
+      aiPhraseQueries: 400,
+      bibleQueries: 3000,
+    },
   };
 
   let _state = null;
@@ -46,6 +69,8 @@ const Store = (() => {
       if (!_state.savedDevotions || !Array.isArray(_state.savedDevotions)) {
         _state.savedDevotions = [];
       }
+      _state.usageStats = normalizeUsageStats(_state.usageStats);
+      _state.usageLimits = normalizeUsageLimits(_state.usageLimits);
     } catch (e) {
       _state = { ...defaults };
     }
@@ -74,6 +99,38 @@ const Store = (() => {
     return normalized.length ? normalized : DEFAULT_TRUSTED_PASTORS.map(p => ({ ...p }));
   }
 
+  function currentMonthKey() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${m}`;
+  }
+
+  function normalizeUsageStats(input) {
+    const monthKey = currentMonthKey();
+    const base = { ...defaults.usageStats, monthKey };
+    const merged = { ...base, ...(input || {}) };
+
+    if (merged.monthKey !== monthKey) {
+      merged.monthKey = monthKey;
+      USAGE_METRICS.forEach((k) => { merged[k] = 0; });
+    } else {
+      USAGE_METRICS.forEach((k) => {
+        const value = Number(merged[k]);
+        merged[k] = Number.isFinite(value) && value >= 0 ? value : 0;
+      });
+    }
+    return merged;
+  }
+
+  function normalizeUsageLimits(input) {
+    const merged = { ...defaults.usageLimits, ...(input || {}) };
+    Object.keys(defaults.usageLimits).forEach((k) => {
+      const value = Number(merged[k]);
+      merged[k] = Number.isFinite(value) && value > 0 ? Math.round(value) : defaults.usageLimits[k];
+    });
+    return merged;
+  }
+
   function save() {
     try {
       localStorage.setItem(KEY, JSON.stringify(_state));
@@ -82,13 +139,20 @@ const Store = (() => {
     }
   }
 
+  function ensureUsageState() {
+    _state.usageStats = normalizeUsageStats(_state.usageStats);
+    _state.usageLimits = normalizeUsageLimits(_state.usageLimits);
+  }
+
   function get(key) {
     if (!_state) load();
+    ensureUsageState();
     return key ? _state[key] : { ..._state };
   }
 
   function set(key, value) {
     if (!_state) load();
+    ensureUsageState();
     _state[key] = value;
     save();
     return _state[key];
@@ -96,6 +160,7 @@ const Store = (() => {
 
   function update(patch) {
     if (!_state) load();
+    ensureUsageState();
     Object.assign(_state, patch);
     save();
   }
@@ -236,6 +301,40 @@ const Store = (() => {
     save();
   }
 
+  // --- Usage tracking ---
+  function trackUsage(metric, amount = 1) {
+    if (!_state) load();
+    ensureUsageState();
+    if (!USAGE_METRICS.includes(metric)) return;
+    const inc = Number(amount) || 1;
+    _state.usageStats[metric] = Math.max(0, (_state.usageStats[metric] || 0) + inc);
+    save();
+  }
+
+  function getUsageStats() {
+    if (!_state) load();
+    ensureUsageState();
+    return { ..._state.usageStats };
+  }
+
+  function getUsageLimits() {
+    if (!_state) load();
+    ensureUsageState();
+    return { ..._state.usageLimits };
+  }
+
+  function setUsageLimits(limits = {}) {
+    if (!_state) load();
+    _state.usageLimits = normalizeUsageLimits({ ..._state.usageLimits, ...limits });
+    save();
+  }
+
+  function resetUsageStats() {
+    if (!_state) load();
+    _state.usageStats = normalizeUsageStats({ monthKey: '' });
+    save();
+  }
+
   // Initialize
   load();
 
@@ -261,6 +360,11 @@ const Store = (() => {
     isSavedDevotion,
     getTrustedPastors,
     setTrustedPastors,
+    trackUsage,
+    getUsageStats,
+    getUsageLimits,
+    setUsageLimits,
+    resetUsageStats,
     load,
   };
 })();

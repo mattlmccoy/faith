@@ -54,6 +54,11 @@ const API = (() => {
 
     if (data.error) throw new Error(data.error);
 
+    Store.trackUsage('bibleQueries', 1);
+    if (translation === 'esv') {
+      Store.trackUsage('esvQueries', 1);
+    }
+
     Cache.set(cacheKey, data, 7 * 24 * 60 * 60 * 1000); // 7 days
     return data;
   }
@@ -158,6 +163,7 @@ const API = (() => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phrase }),
       });
+      Store.trackUsage('aiPhraseQueries', 1);
       if (!res.ok) return { verses: [], fallback: true };
       const data = await res.json();
       if (!data.fallback && data.verses?.length) {
@@ -172,12 +178,13 @@ const API = (() => {
 
   // --- AI Plan Builder (via Worker → OpenAI) ---
 
-  async function buildAIPlan(topic, pastors = []) {
+  async function buildAIPlan(topic, pastors = [], options = {}) {
     const res = await fetch(`${workerUrl()}/ai/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, pastors }),
+      body: JSON.stringify({ topic, pastors, ...options }),
     });
+    Store.trackUsage('aiPlanRequests', 1);
     if (!res.ok) throw new Error(`AI plan error: ${res.status}`);
     return res.json();
   }
@@ -202,6 +209,7 @@ const API = (() => {
     if (!hasWorker()) throw new Error('NO_WORKER');
     const url = `${workerUrl()}/search?topic=${encodeURIComponent(topic)}&week=${weekKey}`;
     const res = await fetch(url);
+    Store.trackUsage('devotionalSearchQueries', 1);
     if (!res.ok) throw new Error(`Search error: ${res.status}`);
     return res.json();
   }
@@ -222,6 +230,7 @@ const API = (() => {
   async function sendTestPush() {
     if (!hasWorker()) throw new Error('NO_WORKER');
     const res = await fetch(`${workerUrl()}/push/test`, { method: 'POST' });
+    Store.trackUsage('pushTestRequests', 1);
     if (!res.ok) throw new Error(`Test push error: ${res.status}`);
     return res.json();
   }

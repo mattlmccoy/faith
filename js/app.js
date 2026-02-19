@@ -4,6 +4,8 @@
 
 (function () {
   'use strict';
+  const APP_VERSION = '2026.02.19.2';
+  window.__ABIDE_VERSION__ = APP_VERSION;
 
   function getBasePath() {
     const path = window.location.pathname || '/';

@@ -30,6 +30,9 @@ const SettingsView = (() => {
 
     const state = Store.get();
     const trustedPastors = Store.getTrustedPastors();
+    const usageStats = Store.getUsageStats();
+    const usageLimits = Store.getUsageLimits();
+    const appVersion = window.__ABIDE_VERSION__ || 'dev';
     const tab = new URLSearchParams(params.replace('?', '')).get('tab');
     const currentPalette = state.palette || 'tuscan-sunset';
 
@@ -249,6 +252,60 @@ const SettingsView = (() => {
         </div>
       </div>
 
+      <!-- Usage Tracking -->
+      <div class="settings-section">
+        <div class="settings-section-title">Usage & Limits</div>
+        <div class="settings-group">
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+            <div class="settings-row__value">Tracking month: <strong>${usageStats.monthKey || 'n/a'}</strong></div>
+            <div style="width:100%;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);font-size:var(--text-sm);line-height:1.65;">
+              <div>Bible passage queries: <strong>${usageStats.bibleQueries}</strong> / ${usageLimits.bibleQueries}</div>
+              <div>ESV passage queries: <strong>${usageStats.esvQueries}</strong> / ${usageLimits.esvQueries}</div>
+              <div>AI plan builds: <strong>${usageStats.aiPlanRequests}</strong> / ${usageLimits.aiPlanRequests}</div>
+              <div>AI phrase searches: <strong>${usageStats.aiPhraseQueries}</strong> / ${usageLimits.aiPhraseQueries}</div>
+            </div>
+            <div class="text-xs text-muted" style="line-height:1.6;">
+              Limits shown are app-level soft limits for visibility. Provider-side token/quota usage is not exposed by the shared worker endpoint yet.
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Soft Limit: Bible Queries / month</div>
+            </div>
+            <div class="settings-row__action">
+              <input id="limit-bible" class="input" type="number" min="1" step="1" value="${usageLimits.bibleQueries}" />
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Soft Limit: ESV Queries / month</div>
+            </div>
+            <div class="settings-row__action">
+              <input id="limit-esv" class="input" type="number" min="1" step="1" value="${usageLimits.esvQueries}" />
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Soft Limit: AI Plan Builds / month</div>
+            </div>
+            <div class="settings-row__action">
+              <input id="limit-ai-plan" class="input" type="number" min="1" step="1" value="${usageLimits.aiPlanRequests}" />
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Soft Limit: AI Phrase Searches / month</div>
+            </div>
+            <div class="settings-row__action">
+              <input id="limit-ai-phrase" class="input" type="number" min="1" step="1" value="${usageLimits.aiPhraseQueries}" />
+            </div>
+          </div>
+          <div class="settings-row" style="justify-content:flex-end;">
+            <button class="btn btn-ghost btn-sm" id="reset-usage-btn" type="button">Reset Usage Counters</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Weekly Plan -->
       <div class="settings-section">
         <div class="settings-section-title">Devotion Content</div>
@@ -280,10 +337,22 @@ const SettingsView = (() => {
         </div>
       </div>
 
+      <!-- App Data -->
+      <div class="settings-section">
+        <div class="settings-section-title">App Data</div>
+        <div class="settings-group">
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+            <div class="settings-row__value">If Safari feels sluggish, clear this site's local cache/storage and reload.</div>
+            <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
+          </div>
+        </div>
+      </div>
+
       <!-- App info -->
       <div style="text-align:center;padding:var(--space-6) 0 var(--space-4);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
         <p class="text-xs text-muted" style="margin-top:4px;">Scripture: Change translation in Appearance settings above</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Version: ${appVersion}</p>
       </div>
 
       <!-- Save button -->
@@ -354,6 +423,12 @@ const SettingsView = (() => {
         palette: selectedPalette,
       });
       Store.setTrustedPastors(trustedPastors);
+      Store.setUsageLimits({
+        bibleQueries: Number(root.querySelector('#limit-bible')?.value || 0),
+        esvQueries: Number(root.querySelector('#limit-esv')?.value || 0),
+        aiPlanRequests: Number(root.querySelector('#limit-ai-plan')?.value || 0),
+        aiPhraseQueries: Number(root.querySelector('#limit-ai-phrase')?.value || 0),
+      });
 
       applyTheme(theme);
 
@@ -394,6 +469,42 @@ const SettingsView = (() => {
       if (notice) {
         notice.style.display = e.target.value === 'esv' ? 'flex' : 'none';
       }
+    });
+
+    root.querySelector('#reset-usage-btn')?.addEventListener('click', () => {
+      Store.resetUsageStats();
+      render(document.getElementById('view-container'));
+    });
+
+    root.querySelector('#clear-site-data-btn')?.addEventListener('click', async () => {
+      const ok = window.confirm('Clear this site\'s local data (cache, storage, service worker) and reload?');
+      if (!ok) return;
+
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ('indexedDB' in window && indexedDB.databases) {
+          const dbs = await indexedDB.databases();
+          (dbs || []).forEach(db => {
+            if (db?.name) {
+              try { indexedDB.deleteDatabase(db.name); } catch {}
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Could not fully clear site data:', err);
+      }
+
+      try { localStorage.clear(); } catch {}
+      try { sessionStorage.clear(); } catch {}
+      window.location.href = `${window.location.origin}${window.location.pathname}#/settings`;
+      window.location.reload();
     });
   }
 

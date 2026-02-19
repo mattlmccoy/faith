@@ -6,6 +6,10 @@
    ============================================================ */
 
 const PlanView = (() => {
+  const MIN_MORNING_WORDS = 260;
+  const MIN_EVENING_WORDS = 190;
+  const MIN_MORNING_PARAS = 4;
+  const MIN_EVENING_PARAS = 3;
   const SUGGESTED_TOPICS = [
     { label: 'Grace', icon: '🕊️' },
     { label: 'Prayer', icon: '🙏' },
@@ -24,6 +28,53 @@ const PlanView = (() => {
   ];
 
   let selectedTopic = '';
+
+  function textWordCount(text = '') {
+    return String(text).trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function escapeHtml(text = '') {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function paragraphsFromSession(session = {}) {
+    if (Array.isArray(session.body)) {
+      return session.body
+        .filter(b => b?.type === 'paragraph' && b?.content)
+        .map(b => b.content.trim())
+        .filter(Boolean);
+    }
+    const raw = String(session.devotion || '').trim();
+    if (!raw) return [];
+    return raw.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  }
+
+  function validatePlanLength(aiPlan) {
+    const issues = [];
+    const days = aiPlan?.days || [];
+
+    days.forEach((day, i) => {
+      const dayNum = i + 1;
+      const mParas = paragraphsFromSession(day?.morning || {});
+      const eParas = paragraphsFromSession(day?.evening || {});
+      const mWords = textWordCount(mParas.join(' '));
+      const eWords = textWordCount(eParas.join(' '));
+
+      if (mParas.length < MIN_MORNING_PARAS || mWords < MIN_MORNING_WORDS) {
+        issues.push(`Day ${dayNum} morning too short (${mWords} words / ${mParas.length} paragraphs)`);
+      }
+      if (eParas.length < MIN_EVENING_PARAS || eWords < MIN_EVENING_WORDS) {
+        issues.push(`Day ${dayNum} evening too short (${eWords} words / ${eParas.length} paragraphs)`);
+      }
+    });
+
+    return issues;
+  }
 
   function render(container) {
     Router.setTitle('Build This Week');
@@ -166,31 +217,48 @@ const PlanView = (() => {
     `;
 
     try {
-      // Try AI-generated plan first
-      const aiPlan = await API.buildAIPlan(topic, trustedPastors);
+      let aiPlan = null;
+      let lastLengthIssue = '';
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        aiPlan = await API.buildAIPlan(topic, trustedPastors, {
+          minMorningWords: MIN_MORNING_WORDS,
+          minEveningWords: MIN_EVENING_WORDS,
+          minMorningParagraphs: MIN_MORNING_PARAS,
+          minEveningParagraphs: MIN_EVENING_PARAS,
+          attempt,
+          retryReason: lastLengthIssue,
+        });
+        if (!aiPlan?.days?.length) continue;
+
+        const lengthIssues = validatePlanLength(aiPlan);
+        if (!lengthIssues.length) break;
+        lastLengthIssue = lengthIssues.slice(0, 2).join('; ');
+        aiPlan = null;
+      }
 
       if (aiPlan && aiPlan.days && aiPlan.days.length > 0) {
-        // Convert AI plan format to the app's internal format
         const plan = convertAIPlanToAppFormat(topic, aiPlan, trustedPastors);
         Store.savePlan(plan);
         showSuccess(results, topic, true);
       } else {
-        throw new Error('AI returned empty plan');
+        throw new Error('AI returned short content repeatedly');
       }
 
     } catch (err) {
       console.error('AI plan failed:', err);
+      const reason = escapeHtml(err?.message || 'generation error');
 
       // Fall back to seed plan with an in-app message
       results.innerHTML = `
         <div style="background:var(--color-accent-warm);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);text-align:center;">
           <p class="text-sm" style="margin-bottom:var(--space-3);line-height:1.6;">
-            <strong>AI plan builder needs the Cloudflare Worker to be deployed.</strong><br>
-            Loading a sample week on Grace in the meantime.
+            <strong>AI plan generation did not return long-form content yet.</strong><br>
+            Reason: ${reason}
           </p>
           <p class="text-xs text-muted" style="margin-bottom:var(--space-3);line-height:1.5;">
-            See <code>worker/README.md</code> to set up the worker once and unlock AI plans for any topic.
+            You can retry, or load a longer built-in sample week.
           </p>
+          <button class="btn btn-secondary btn-sm" style="margin-right:8px;" onclick="PlanView.startBuild()">Retry AI Build</button>
           <button class="btn btn-primary btn-sm" onclick="PlanView.loadSeedPlan()">Load Sample Week</button>
         </div>
       `;
@@ -312,7 +380,11 @@ const PlanView = (() => {
         morning: {
           title: `${topic} — Day ${i + 1}`,
           opening_verse: { reference: 'Lamentations 3:22-23', text: 'The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning; great is your faithfulness.', translation: 'WEB' },
-          body: [{ type: 'paragraph', content: `Today we explore the theme of ${topic}. Take a moment to sit quietly and ask God what he wants to show you today.` }],
+          body: [
+            { type: 'paragraph', content: `Today we explore the theme of ${topic}, not as an abstract idea but as lived discipleship. Begin by slowing down and naming where your attention has been shaped this week. Much of our spiritual fatigue comes from reacting to everything and reflecting on very little. Before you move into tasks, ask God for clarity: what one truth do I need to receive today so I can walk faithfully rather than anxiously?` },
+            { type: 'paragraph', content: `Scripture invites us to form a deeper interior life, where obedience grows from trust. As you read, notice which phrase confronts your assumptions. The goal is not information alone, but transformation through surrender. Consider where resistance appears in you: fear of change, fear of loss, or simply distraction. Bring that resistance into prayer directly and specifically. God does not shame honest confession; he meets it with grace and direction.` },
+            { type: 'paragraph', content: `Before ending this morning, translate conviction into one concrete step. Choose something measurable and practical: one conversation to begin, one habit to pause, one act of mercy to offer, one apology to make, or one person to encourage. Small faithfulness, repeated daily, is how character forms over time. Ask the Spirit to keep your heart attentive through the day so this devotion becomes embodied rather than forgotten.` },
+          ],
           reflection_prompts: [`What does ${topic} mean to you personally?`, `Where do you most need to experience ${topic} right now?`],
           prayer: `Lord, open my heart to ${topic} today. Amen.`,
           midday_prompt: `How has ${topic} shown up in your morning?`,
@@ -320,7 +392,10 @@ const PlanView = (() => {
         evening: {
           title: `Evening Reflection`,
           opening_verse: { reference: 'Psalm 63:6', text: 'When I remember you on my bed, and meditate on you in the night watches.', translation: 'WEB' },
-          body: [{ type: 'paragraph', content: 'End your day by returning to what you explored this morning.' }],
+          body: [
+            { type: 'paragraph', content: `End your day by returning to what you explored this morning. Review your day with honesty and mercy: where did you respond in faith, and where did you drift into hurry, defensiveness, or self-reliance? Don’t flatten the day into success or failure. Instead, trace moments of grace and moments of need. This kind of reflection trains your heart to notice God’s presence in ordinary hours.` },
+            { type: 'paragraph', content: `Now release what you are still carrying. Name unresolved tensions, undone tasks, and emotional residue from difficult interactions. Offer them to God without pretending they are small. Christian rest is not denial; it is trust. Ask for peace that is deeper than immediate resolution, and for renewed desire to follow Jesus tomorrow with humility, courage, and attentiveness.` },
+          ],
           reflection_prompts: [`How did ${topic} show up today?`, 'What do you want to carry into tomorrow?'],
           prayer: 'Father, thank you for today. I give back to you what I cannot carry. Amen.',
         },

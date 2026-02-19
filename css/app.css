@@ -52,6 +52,7 @@
   /* --- Layout --- */
   --header-height: 56px;
   --tab-bar-height: 56px;
+  --tab-total-height: calc(var(--tab-bar-height) + var(--safe-bottom-ui));
   --content-max-width: 680px;
 
   /* --- Safe Area (iOS) --- */
@@ -666,13 +667,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   scroll-padding-bottom: var(--space-4);
 }
 
+[data-standalone="true"] .view-container {
+  padding-bottom: var(--tab-total-height);
+}
+
 /* ============================================================
    TAB BAR — fixed iOS PWA bottom positioning
    ============================================================ */
 .tab-bar {
   flex-shrink: 0;
   /* Total height: visual bar + safe-area below home indicator */
-  height: calc(var(--tab-bar-height) + var(--safe-bottom-ui));
+  height: var(--tab-total-height);
   /* Pad the bottom so the home indicator area is just background */
   padding-bottom: var(--safe-bottom-ui);
   background: var(--glass-fill);
@@ -686,6 +691,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   position: relative;
   z-index: 10;
   transition: background var(--transition-theme), border-color var(--transition-theme);
+}
+
+[data-standalone="true"] .tab-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: min(100%, var(--content-max-width));
 }
 
 .tab-item {
