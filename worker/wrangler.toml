@@ -26,7 +26,26 @@ crons = ["*/30 * * * *"]
 #   → paste your Gemini API key
 # Optional:
 #   wrangler secret put GEMINI_MODEL
+#   wrangler secret put GEMINI_PLAN_MODEL
 #   → e.g. gemini-1.5-flash
+#
+# Optional backup provider 1 (OpenRouter):
+#   wrangler secret put OPENROUTER_API_KEY
+# Optional:
+#   wrangler secret put OPENROUTER_MODEL
+#   wrangler secret put OPENROUTER_PLAN_MODEL
+#   wrangler secret put OPENROUTER_HTTP_REFERER
+#   wrangler secret put OPENROUTER_APP_TITLE
+#
+# Optional backup provider 2 (Groq):
+#   wrangler secret put GROQ_API_KEY
+# Optional:
+#   wrangler secret put GROQ_MODEL
+#   wrangler secret put GROQ_PLAN_MODEL
+#
+# Optional provider order for plan generation:
+#   wrangler secret put PLAN_AI_PROVIDER_ORDER
+#   → e.g. "gemini,openrouter,groq"
 #
 # Phrase search prefers Cloudflare AI via `env.AI` binding above
 # and falls back to Gemini if needed.

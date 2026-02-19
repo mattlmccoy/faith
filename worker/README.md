@@ -88,13 +88,36 @@ Secrets are stored encrypted in Cloudflare — never in your code or repo.
 wrangler secret put SERPER_API_KEY
 # Paste your key when prompted
 
-# Gemini API key (for /ai/plan and /ai/phrase)
+# Gemini API key (primary for /ai/plan and fallback for /ai/phrase)
 wrangler secret put GEMINI_API_KEY
 # Paste your Gemini key when prompted
 
 # Optional: choose Gemini model (defaults to gemini-1.5-flash)
 wrangler secret put GEMINI_MODEL
 # Example value: gemini-1.5-flash
+
+# Optional: force a dedicated Gemini model for plan generation
+wrangler secret put GEMINI_PLAN_MODEL
+# Example: gemini-1.5-flash-latest
+
+# Optional backup provider: OpenRouter
+wrangler secret put OPENROUTER_API_KEY
+# Optional model controls
+wrangler secret put OPENROUTER_MODEL
+wrangler secret put OPENROUTER_PLAN_MODEL
+# Optional request metadata (recommended by OpenRouter)
+wrangler secret put OPENROUTER_HTTP_REFERER
+wrangler secret put OPENROUTER_APP_TITLE
+
+# Optional backup provider: Groq
+wrangler secret put GROQ_API_KEY
+# Optional model controls
+wrangler secret put GROQ_MODEL
+wrangler secret put GROQ_PLAN_MODEL
+
+# Optional provider order for /ai/plan
+wrangler secret put PLAN_AI_PROVIDER_ORDER
+# Example value: gemini,openrouter,groq
 
 # VAPID public key (from step 5)
 wrangler secret put VAPID_PUBLIC_KEY

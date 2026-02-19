@@ -1,10 +1,10 @@
 /**
- * ABIDE Worker - AI handlers using Gemini API.
+ * ABIDE Worker - AI handlers.
  *
- * Required secret:
- *   GEMINI_API_KEY
- * Optional:
- *   GEMINI_MODEL (default: gemini-1.5-flash)
+ * Plan generation provider order (if configured):
+ *   1) Gemini
+ *   2) OpenRouter
+ *   3) Groq
  */
 
 const PLAN_CACHE_TTL = 24 * 60 * 60; // 24 hours (seconds, for KV)
@@ -14,6 +14,15 @@ const DEFAULT_MIN_EVENING_WORDS = 130;
 const DEFAULT_MIN_MORNING_PARAGRAPHS = 3;
 const DEFAULT_MIN_EVENING_PARAGRAPHS = 2;
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
+const DEFAULT_OPENROUTER_MODELS = [
+  'meta-llama/llama-3.1-8b-instruct:free',
+  'google/gemma-2-9b-it:free',
+  'mistralai/mistral-7b-instruct:free',
+];
+const DEFAULT_GROQ_MODELS = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+];
 const MODEL_LIST_CACHE_MS = 15 * 60 * 1000;
 let _modelListCache = null;
 let _modelListCachedAt = 0;
@@ -181,6 +190,139 @@ async function runCloudflareAI(env, { systemPrompt, userPrompt, temperature = 0.
   }
 
   throw lastErr || new Error('Cloudflare AI failed for all candidate models');
+}
+
+function extractTextFromOpenAIChoice(content) {
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map(c => {
+        if (typeof c === 'string') return c;
+        if (c?.type === 'text') return c.text || '';
+        return '';
+      })
+      .join('\n')
+      .trim();
+  }
+  return '';
+}
+
+async function runOpenRouter(env, {
+  systemPrompt,
+  userPrompt,
+  temperature = 0.65,
+  maxOutputTokens = 4096,
+  jsonMode = false,
+  preferredModel = '',
+}) {
+  if (!env.OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY is not configured');
+  }
+
+  const candidates = [
+    preferredModel,
+    env.OPENROUTER_MODEL,
+    ...DEFAULT_OPENROUTER_MODELS,
+  ].filter(Boolean);
+
+  let lastError = null;
+  for (const model of [...new Set(candidates)]) {
+    const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+        ...(env.OPENROUTER_HTTP_REFERER ? { 'HTTP-Referer': env.OPENROUTER_HTTP_REFERER } : {}),
+        ...(env.OPENROUTER_APP_TITLE ? { 'X-Title': env.OPENROUTER_APP_TITLE } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature,
+        max_tokens: maxOutputTokens,
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      lastError = new Error(`OpenRouter(${model}) error ${res.status}: ${body.slice(0, 320)}`);
+      if ([400, 404, 429, 500, 503].includes(res.status)) continue;
+      throw lastError;
+    }
+
+    const data = await res.json();
+    const text = extractTextFromOpenAIChoice(data?.choices?.[0]?.message?.content);
+    if (!text) {
+      lastError = new Error(`OpenRouter(${model}) returned empty response`);
+      continue;
+    }
+    return { text, model, provider: 'openrouter' };
+  }
+
+  throw lastError || new Error('OpenRouter request failed for all candidate models');
+}
+
+async function runGroq(env, {
+  systemPrompt,
+  userPrompt,
+  temperature = 0.65,
+  maxOutputTokens = 4096,
+  jsonMode = false,
+  preferredModel = '',
+}) {
+  if (!env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY is not configured');
+  }
+
+  const candidates = [
+    preferredModel,
+    env.GROQ_MODEL,
+    ...DEFAULT_GROQ_MODELS,
+  ].filter(Boolean);
+
+  let lastError = null;
+  for (const model of [...new Set(candidates)]) {
+    const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature,
+        max_tokens: maxOutputTokens,
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      lastError = new Error(`Groq(${model}) error ${res.status}: ${body.slice(0, 320)}`);
+      if ([400, 404, 429, 500, 503].includes(res.status)) continue;
+      throw lastError;
+    }
+
+    const data = await res.json();
+    const text = extractTextFromOpenAIChoice(data?.choices?.[0]?.message?.content);
+    if (!text) {
+      lastError = new Error(`Groq(${model}) returned empty response`);
+      continue;
+    }
+    return { text, model, provider: 'groq' };
+  }
+
+  throw lastError || new Error('Groq request failed for all candidate models');
 }
 
 async function listGeminiGenerateModels(env) {
@@ -359,6 +501,20 @@ function normalizeVerseList(data) {
     .slice(0, 6);
 }
 
+function buildPlanProviderOrder(env) {
+  const raw = String(env.PLAN_AI_PROVIDER_ORDER || 'gemini,openrouter,groq').trim();
+  const allowed = new Set(['gemini', 'openrouter', 'groq']);
+  const parsed = raw
+    .split(',')
+    .map(p => p.trim().toLowerCase())
+    .filter(Boolean)
+    .filter(p => allowed.has(p));
+
+  const unique = [...new Set(parsed)];
+  if (!unique.length) return ['gemini', 'openrouter', 'groq'];
+  return unique;
+}
+
 async function repairJsonWithGemini(env, malformedJson, schemaHint = '') {
   const systemPrompt = 'You repair malformed JSON. Return valid JSON only. No markdown, no explanation.';
   const userPrompt = `Fix this malformed JSON so it is valid and complete.
@@ -528,6 +684,8 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
     ];
     const days = [];
     const modelUsage = [];
+    const providerUsage = [];
+    const providerOrder = buildPlanProviderOrder(env);
 
     for (let dayIndex = 0; dayIndex < daysCount; dayIndex++) {
       const dayCacheKey = `plan-day:ai:v2:${topic.toLowerCase().trim()}:${pastorKey}:${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}:d${dayIndex + 1}`;
@@ -535,7 +693,8 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
         const cachedDay = await env.ABIDE_KV.get(dayCacheKey, 'json');
         if (cachedDay && typeof cachedDay === 'object') {
           days.push(normalizeDay(cachedDay.day || cachedDay, dayIndex, FALLBACK_REFS));
-          if (cachedDay.meta?.model) modelUsage.push(cachedDay.meta.model);
+          if (cachedDay.meta?.model) modelUsage.push(`${cachedDay.meta.provider || 'unknown'}:${cachedDay.meta.model}`);
+          if (cachedDay.meta?.provider) providerUsage.push(cachedDay.meta.provider);
           continue;
         }
       }
@@ -547,16 +706,50 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
 
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const gemini = await runGemini(env, {
-            systemPrompt,
-            userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
-            temperature: 0.6,
-            maxOutputTokens: 4096,
-            jsonMode: true,
-            preferredModel: env.GEMINI_PLAN_MODEL || env.GEMINI_MODEL || '',
-          });
-          dayModel = gemini.model || dayModel;
-          dayData = parseJsonBlock(gemini.text);
+          let lastProviderErr = null;
+          let response = null;
+          for (const provider of providerOrder) {
+            try {
+              if (provider === 'gemini') {
+                response = await runGemini(env, {
+                  systemPrompt,
+                  userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
+                  temperature: 0.6,
+                  maxOutputTokens: 4096,
+                  jsonMode: true,
+                  preferredModel: env.GEMINI_PLAN_MODEL || env.GEMINI_MODEL || '',
+                });
+              } else if (provider === 'openrouter') {
+                response = await runOpenRouter(env, {
+                  systemPrompt,
+                  userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
+                  temperature: 0.6,
+                  maxOutputTokens: 4096,
+                  jsonMode: true,
+                  preferredModel: env.OPENROUTER_PLAN_MODEL || env.OPENROUTER_MODEL || '',
+                });
+              } else if (provider === 'groq') {
+                response = await runGroq(env, {
+                  systemPrompt,
+                  userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
+                  temperature: 0.6,
+                  maxOutputTokens: 4096,
+                  jsonMode: true,
+                  preferredModel: env.GROQ_PLAN_MODEL || env.GROQ_MODEL || '',
+                });
+              }
+              if (response?.text) break;
+            } catch (providerErr) {
+              lastProviderErr = providerErr;
+            }
+          }
+
+          if (!response?.text) {
+            throw lastProviderErr || new Error('No configured AI providers are available for plan generation');
+          }
+
+          dayModel = `${response.provider}:${response.model}` || dayModel;
+          dayData = parseJsonBlock(response.text);
 
           dayData = normalizeDay(dayData, dayIndex, FALLBACK_REFS);
           const dayLengthIssues = validatePlanLength({ days: [dayData] }, cfg);
@@ -565,10 +758,11 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
           }
           days.push(dayData);
           if (dayModel) modelUsage.push(dayModel);
+          providerUsage.push(response.provider);
           if (env.ABIDE_KV) {
             await env.ABIDE_KV.put(dayCacheKey, JSON.stringify({
               day: dayData,
-              meta: { provider: 'gemini', model: dayModel, cachedAt: Date.now() },
+              meta: { provider: response.provider, model: response.model, cachedAt: Date.now() },
             }), { expirationTtl: PLAN_CACHE_TTL });
           }
           break;
@@ -610,12 +804,13 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
     });
 
     const uniqueModels = [...new Set(modelUsage.filter(Boolean))];
+    const uniqueProviders = [...new Set(providerUsage.filter(Boolean))];
     const result = {
       theme: topic,
       days: planData.days.slice(0, daysCount),
       ai_meta: {
-        provider: 'gemini',
-        providers: ['gemini'],
+        provider: uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed',
+        providers: uniqueProviders,
         models: uniqueModels,
         chunked: true,
         daysCount,
