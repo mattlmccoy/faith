@@ -10,9 +10,61 @@
 
 const PLAN_CACHE_TTL = 24 * 60 * 60; // 24 hours (seconds, for KV)
 const PHRASE_CACHE_TTL = 60 * 60;    // 1 hour
+const MIN_MORNING_WORDS = 170;
+const MIN_EVENING_WORDS = 130;
 
 // Fast, free, structured-output-capable model on Cloudflare
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+
+function wordCount(text = '') {
+  return String(text)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+function devotionalText(session = {}) {
+  if (Array.isArray(session.body)) {
+    return session.body
+      .filter(b => b?.type === 'paragraph' && b?.content)
+      .map(b => b.content.trim())
+      .join('\n\n');
+  }
+  return String(session.devotion || '').trim();
+}
+
+function devotionalParagraphs(session = {}) {
+  if (Array.isArray(session.body)) {
+    return session.body.filter(b => b?.type === 'paragraph' && b?.content).length;
+  }
+  const txt = String(session.devotion || '').trim();
+  if (!txt) return 0;
+  return txt.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).length;
+}
+
+function validatePlanLength(planData) {
+  const issues = [];
+
+  planData.days.forEach((day, i) => {
+    const morningText = devotionalText(day.morning);
+    const eveningText = devotionalText(day.evening);
+    const morningWords = wordCount(morningText);
+    const eveningWords = wordCount(eveningText);
+    const morningParas = devotionalParagraphs(day.morning);
+    const eveningParas = devotionalParagraphs(day.evening);
+    const dayNum = i + 1;
+
+    if (morningWords < MIN_MORNING_WORDS || morningParas < 3) {
+      issues.push(`Day ${dayNum} morning too short (${morningWords} words, ${morningParas} paragraphs)`);
+    }
+    if (eveningWords < MIN_EVENING_WORDS || eveningParas < 2) {
+      issues.push(`Day ${dayNum} evening too short (${eveningWords} words, ${eveningParas} paragraphs)`);
+    }
+  });
+
+  return issues;
+}
 
 // ---------------------------------------------------------------------------
 // POST /ai/plan  { topic: string, pastors?: string[] }
@@ -31,7 +83,7 @@ export async function handleAIPlan(request, url, env, origin, json) {
   } catch {}
 
   const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
-  const cacheKey = `plan:cf:${topic.toLowerCase().trim()}:${pastorKey}`;
+  const cacheKey = `plan:cf:v2:${topic.toLowerCase().trim()}:${pastorKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -47,7 +99,7 @@ You MUST respond with valid JSON only — no markdown, no code blocks, no extra 
     ? `\nTrusted pastors to draw from: ${pastors.join(', ')}.`
     : '\nTrusted pastors to draw from: Tim Keller, John Mark Comer, Jon Pokluda, Louie Giglio, John Piper, Ben Stuart.';
 
-  const userPrompt = `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${pastorLine}
+  const buildUserPrompt = (retryNote = '') => `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${pastorLine}
 
 Return ONLY this exact JSON structure (no markdown fences, no explanation, just raw JSON):
 {
@@ -59,13 +111,20 @@ Return ONLY this exact JSON structure (no markdown fences, no explanation, just 
       "inspired_by": ["Pastor Name 1", "Pastor Name 2"],
       "morning": {
         "scripture_ref": "Book Chapter:Verse",
-        "devotion": "4-5 paragraph devotional (280-380 words). Gospel-centered, personal, warm.",
+        "body": [
+          { "type": "paragraph", "content": "Paragraph 1..." },
+          { "type": "paragraph", "content": "Paragraph 2..." },
+          { "type": "paragraph", "content": "Paragraph 3..." }
+        ],
         "reflection_prompts": ["Question 1?", "Question 2?", "Question 3?"],
         "prayer": "A 2-3 sentence personal prayer."
       },
       "evening": {
         "scripture_ref": "Book Chapter:Verse",
-        "devotion": "3-4 paragraph evening reflection (220-300 words). Quieter, reflective tone.",
+        "body": [
+          { "type": "paragraph", "content": "Paragraph 1..." },
+          { "type": "paragraph", "content": "Paragraph 2..." }
+        ],
         "reflection_prompts": ["Question 1?", "Question 2?"],
         "prayer": "A 1-2 sentence evening prayer."
       },
@@ -77,71 +136,92 @@ Return ONLY this exact JSON structure (no markdown fences, no explanation, just 
   ]
 }
 
-Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day. Ensure valid JSON.`;
+Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day. Ensure valid JSON.
+Devotional body content must be substantial. Scripture references do NOT count toward body length.
+For each day:
+- Morning body: at least 3 paragraphs and at least ${MIN_MORNING_WORDS} words of devotional explanation/application.
+- Evening body: at least 2 paragraphs and at least ${MIN_EVENING_WORDS} words of devotional reflection.
+Do not pad with repeated filler sentences.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}`;
 
   try {
-    const response = await env.AI.run(MODEL, {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 4000,
-      temperature: 0.7,
-    });
+    let retryNote = '';
+    let lastErr = null;
 
-    const raw = (response.response || '').trim();
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await env.AI.run(MODEL, {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: buildUserPrompt(retryNote) },
+          ],
+          max_tokens: 7000,
+          temperature: 0.65,
+        });
 
-    // Extract JSON — Llama sometimes wraps with commentary or markdown
-    let planData;
-    try {
-      planData = JSON.parse(raw);
-    } catch {
-      const start = raw.indexOf('{');
-      const end = raw.lastIndexOf('}');
-      if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
-      planData = JSON.parse(raw.slice(start, end + 1));
-    }
+        const raw = (response.response || '').trim();
 
-    if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
-      throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);
-    }
+        // Extract JSON — Llama sometimes wraps with commentary or markdown
+        let planData;
+        try {
+          planData = JSON.parse(raw);
+        } catch {
+          const start = raw.indexOf('{');
+          const end = raw.lastIndexOf('}');
+          if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
+          planData = JSON.parse(raw.slice(start, end + 1));
+        }
 
-    // Fallback scripture refs if model omits them
-    const FALLBACK_REFS = [
-      'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
-      'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
-      'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
-    ];
+        if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
+          throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);
+        }
 
-    let missingCount = 0;
-    planData.days.forEach((day, i) => {
-      if (!day.morning) day.morning = {};
-      if (!day.evening) day.evening = {};
-      if (!Array.isArray(day.inspired_by) || !day.inspired_by.length) {
-        day.inspired_by = pastors.length ? pastors.slice(0, 3) : ['Tim Keller', 'John Mark Comer'];
+        // Fallback scripture refs if model omits them
+        const FALLBACK_REFS = [
+          'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
+          'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
+          'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
+        ];
+
+        let missingCount = 0;
+        planData.days.forEach((day, i) => {
+          if (!day.morning) day.morning = {};
+          if (!day.evening) day.evening = {};
+          if (!Array.isArray(day.inspired_by) || !day.inspired_by.length) {
+            day.inspired_by = pastors.length ? pastors.slice(0, 3) : ['Tim Keller', 'John Mark Comer'];
+          }
+          if (!day.morning.scripture_ref) {
+            day.morning.scripture_ref = FALLBACK_REFS[i % FALLBACK_REFS.length];
+            missingCount++;
+          }
+          if (!day.evening.scripture_ref) {
+            day.evening.scripture_ref = FALLBACK_REFS[(i + 4) % FALLBACK_REFS.length];
+            missingCount++;
+          }
+        });
+
+        if (missingCount >= 7) {
+          throw new Error(`Plan missing too many scripture refs (${missingCount})`);
+        }
+
+        const lengthIssues = validatePlanLength(planData);
+        if (lengthIssues.length) {
+          throw new Error(`Plan too short: ${lengthIssues.slice(0, 4).join('; ')}`);
+        }
+
+        const result = { theme: planData.theme || topic, days: planData.days.slice(0, 7) };
+
+        if (env.ABIDE_KV) {
+          await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
+        }
+
+        return json(result, 200, origin);
+      } catch (attemptErr) {
+        lastErr = attemptErr;
+        retryNote = attemptErr.message;
       }
-      if (!day.morning.scripture_ref) {
-        day.morning.scripture_ref = FALLBACK_REFS[i % FALLBACK_REFS.length];
-        missingCount++;
-      }
-      if (!day.evening.scripture_ref) {
-        day.evening.scripture_ref = FALLBACK_REFS[(i + 4) % FALLBACK_REFS.length];
-        missingCount++;
-      }
-    });
-
-    // If more than half the days are missing scripture, regenerate
-    if (missingCount >= 7) {
-      throw new Error(`Plan missing too many scripture refs (${missingCount}), rejecting for retry`);
     }
 
-    const result = { theme: planData.theme || topic, days: planData.days };
-
-    if (env.ABIDE_KV) {
-      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
-    }
-
-    return json(result, 200, origin);
+    throw lastErr || new Error('Unknown AI generation failure');
   } catch (err) {
     console.error('CF AI plan error:', err.message);
     return json({ error: `AI plan failed: ${err.message}` }, 502, origin);
