@@ -74,13 +74,13 @@ function validatePlanLength(planData, cfg) {
   return issues;
 }
 
-async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 8192, jsonMode = false }) {
+async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 8192, jsonMode = false, preferredModel = '' }) {
   if (!env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
   const discoveredModels = await listGeminiGenerateModels(env);
-  const modelCandidates = buildModelCandidates(env, discoveredModels);
+  const modelCandidates = buildModelCandidates(env, discoveredModels, preferredModel);
 
   let lastError = null;
 
@@ -115,8 +115,8 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
       const message = `Gemini(${model}) error ${res.status}: ${body.slice(0, 300)}`;
       lastError = new Error(message);
 
-      // Try next model for model-related failures
-      if (res.status === 404 || res.status === 400) continue;
+      // Try next model for model-related/transient failures.
+      if ([400, 404, 429, 500, 503].includes(res.status)) continue;
       throw lastError;
     }
 
@@ -211,10 +211,13 @@ async function listGeminiGenerateModels(env) {
   return models;
 }
 
-function buildModelCandidates(env, discoveredModels = []) {
+function buildModelCandidates(env, discoveredModels = [], preferredOverride = '') {
   const preferred = [
+    preferredOverride,
+    env.GEMINI_PLAN_MODEL,
     env.GEMINI_MODEL,
     'gemini-2.5-flash-lite',
+    'gemini-2.0-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -409,7 +412,7 @@ export async function handleAIPlan(request, url, env, origin, json) {
 
   const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
   const lengthKey = `${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}-${daysCount}`;
-  const cacheKey = `plan:gemini:v4:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
+  const cacheKey = `plan:ai:v5:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -527,7 +530,7 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
     const modelUsage = [];
 
     for (let dayIndex = 0; dayIndex < daysCount; dayIndex++) {
-      const dayCacheKey = `plan-day:gemini:v1:${topic.toLowerCase().trim()}:${pastorKey}:${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}:d${dayIndex + 1}`;
+      const dayCacheKey = `plan-day:ai:v2:${topic.toLowerCase().trim()}:${pastorKey}:${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}:d${dayIndex + 1}`;
       if (env.ABIDE_KV) {
         const cachedDay = await env.ABIDE_KV.get(dayCacheKey, 'json');
         if (cachedDay && typeof cachedDay === 'object') {
@@ -550,18 +553,10 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
             temperature: 0.6,
             maxOutputTokens: 4096,
             jsonMode: true,
+            preferredModel: env.GEMINI_PLAN_MODEL || env.GEMINI_MODEL || '',
           });
           dayModel = gemini.model || dayModel;
-
-          try {
-            dayData = parseJsonBlock(gemini.text);
-          } catch {
-            dayData = await repairJsonWithGemini(
-              env,
-              gemini.text,
-              'Object with dayIndex,title,inspired_by,morning,evening,faith_stretch'
-            );
-          }
+          dayData = parseJsonBlock(gemini.text);
 
           dayData = normalizeDay(dayData, dayIndex, FALLBACK_REFS);
           const dayLengthIssues = validatePlanLength({ days: [dayData] }, cfg);
@@ -620,6 +615,7 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
       days: planData.days.slice(0, daysCount),
       ai_meta: {
         provider: 'gemini',
+        providers: ['gemini'],
         models: uniqueModels,
         chunked: true,
         daysCount,
@@ -632,7 +628,7 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
 
     return json(result, 200, origin);
   } catch (err) {
-    console.error('Gemini plan error:', err.message);
+    console.error('AI plan error:', err.message);
     return json({ error: `AI plan failed: ${err.message}` }, 502, origin);
   }
 }
