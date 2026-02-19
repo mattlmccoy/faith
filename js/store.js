@@ -34,6 +34,7 @@ const Store = (() => {
     journalEntries: {},       // { 'YYYY-MM-DD': { prompt, text, savedAt } }
     completedDevotions: [],   // ['YYYY-MM-DD-morning', 'YYYY-MM-DD-evening']
     savedDevotions: [],       // ['YYYY-MM-DD-morning', 'YYYY-MM-DD-evening']
+    savedDevotionLibrary: {}, // { id: { ...devotion snapshot... } }
     selectedDevotionDate: null,
     currentStreak: 0,
     lastOpenedDate: null,
@@ -59,6 +60,9 @@ const Store = (() => {
     },
     lastAIPlanMeta: null,
     lastAIPhraseMeta: null,
+    googleClientId: '',
+    googleDriveFileId: '',
+    lastDriveSyncAt: null,
   };
 
   let _state = null;
@@ -70,6 +74,9 @@ const Store = (() => {
       _state.trustedPastors = normalizeTrustedPastors(_state.trustedPastors);
       if (!_state.savedDevotions || !Array.isArray(_state.savedDevotions)) {
         _state.savedDevotions = [];
+      }
+      if (!_state.savedDevotionLibrary || typeof _state.savedDevotionLibrary !== 'object') {
+        _state.savedDevotionLibrary = {};
       }
       _state.usageStats = normalizeUsageStats(_state.usageStats);
       _state.usageLimits = normalizeUsageLimits(_state.usageLimits);
@@ -282,15 +289,93 @@ const Store = (() => {
   function toggleSavedDevotion(dateKey, session) {
     const id = `${dateKey}-${session}`;
     const has = _state.savedDevotions.includes(id);
-    _state.savedDevotions = has
-      ? _state.savedDevotions.filter(x => x !== id)
-      : [..._state.savedDevotions, id];
+    if (has) {
+      _state.savedDevotions = _state.savedDevotions.filter(x => x !== id);
+      if (_state.savedDevotionLibrary && _state.savedDevotionLibrary[id]) {
+        delete _state.savedDevotionLibrary[id];
+      }
+    } else {
+      _state.savedDevotions = [..._state.savedDevotions, id];
+      const day = getDevotionData(dateKey) || {};
+      const sessionData = day?.[session] || null;
+      if (sessionData) {
+        _state.savedDevotionLibrary[id] = {
+          id,
+          dateKey,
+          session,
+          savedAt: new Date().toISOString(),
+          theme: day.theme || '',
+          title: sessionData.title || '',
+          openingVerse: sessionData.opening_verse || null,
+          body: Array.isArray(sessionData.body) ? sessionData.body : [],
+          reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
+          prayer: sessionData.prayer || '',
+          inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
+        };
+      }
+    }
     save();
     return !has;
   }
 
   function isSavedDevotion(dateKey, session) {
     return _state.savedDevotions.includes(`${dateKey}-${session}`);
+  }
+
+  function getSavedDevotionLibrary() {
+    const lib = _state.savedDevotionLibrary || {};
+    return Object.values(lib)
+      .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
+  }
+
+  function exportSavedDevotionsSnapshot() {
+    const list = Array.isArray(_state.savedDevotions) ? _state.savedDevotions : [];
+    const lib = { ...(_state.savedDevotionLibrary || {}) };
+
+    list.forEach((id) => {
+      if (lib[id]) return;
+      const parts = String(id).split('-');
+      const session = parts.pop();
+      const dateKey = parts.join('-');
+      if (!dateKey || !session) return;
+      const day = getDevotionData(dateKey) || {};
+      const sessionData = day?.[session];
+      if (!sessionData) return;
+      lib[id] = {
+        id,
+        dateKey,
+        session,
+        savedAt: new Date().toISOString(),
+        theme: day.theme || '',
+        title: sessionData.title || '',
+        openingVerse: sessionData.opening_verse || null,
+        body: Array.isArray(sessionData.body) ? sessionData.body : [],
+        reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
+        prayer: sessionData.prayer || '',
+        inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
+      };
+    });
+
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      savedDevotions: list,
+      savedDevotionLibrary: lib,
+    };
+  }
+
+  function importSavedDevotionsSnapshot(snapshot = {}) {
+    const list = Array.isArray(snapshot.savedDevotions) ? snapshot.savedDevotions : [];
+    const lib = snapshot.savedDevotionLibrary && typeof snapshot.savedDevotionLibrary === 'object'
+      ? snapshot.savedDevotionLibrary
+      : {};
+
+    const mergedIds = new Set([...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []), ...list]);
+    _state.savedDevotions = [...mergedIds];
+    _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
+    _state.lastDriveSyncAt = new Date().toISOString();
+    save();
+    return { count: _state.savedDevotions.length };
   }
 
   // --- Pastors ---
@@ -360,6 +445,9 @@ const Store = (() => {
     getTodayDevotionData,
     toggleSavedDevotion,
     isSavedDevotion,
+    getSavedDevotionLibrary,
+    exportSavedDevotionsSnapshot,
+    importSavedDevotionsSnapshot,
     getTrustedPastors,
     setTrustedPastors,
     trackUsage,

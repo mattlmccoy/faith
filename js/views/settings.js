@@ -1,5 +1,5 @@
 /* ============================================================
-   ABIDE - Settings View
+   ABIDE - Settings View (Primary)
    ============================================================ */
 
 const SettingsView = (() => {
@@ -12,7 +12,6 @@ const SettingsView = (() => {
       .replace(/'/g, '&#39;');
   }
 
-  // Palette definitions for the picker UI
   const PALETTES = [
     { id: 'tuscan-sunset',   name: 'Tuscan',    dots: ['#E35336', '#FFD3AC', '#9988A1'] },
     { id: 'desert-dusk',     name: 'Desert',    dots: ['#E68057', '#993A8B', '#BF7587'] },
@@ -24,214 +23,36 @@ const SettingsView = (() => {
     { id: 'mono',            name: 'Mono',      dots: ['#6B7280', '#9CA3AF', '#D1D5DB'] },
   ];
 
-  function render(container, params = '') {
+  function render(container) {
     Router.setTitle('Settings');
     Router.clearHeaderActions();
 
     const state = Store.get();
     const trustedPastors = Store.getTrustedPastors();
-    const usageStats = Store.getUsageStats();
-    const usageLimits = Store.getUsageLimits();
-    const lastAIPlanMeta = state.lastAIPlanMeta || null;
-    const lastAIPhraseMeta = state.lastAIPhraseMeta || null;
     const appVersion = window.__ABIDE_VERSION__ || 'dev';
-    const tab = new URLSearchParams(params.replace('?', '')).get('tab');
     const currentPalette = state.palette || 'tuscan-sunset';
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
 
     div.innerHTML = `
-      <!-- Profile -->
       <div class="settings-section">
-        <div class="settings-section-title">Profile</div>
+        <div class="settings-section-title">1) Your Name</div>
         <div class="settings-group">
           <div class="settings-row">
             <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Your Name</div>
-              <input
-                id="settings-name"
-                class="input"
-                type="text"
-                placeholder="What's your name?"
-                value="${state.userName || ''}"
-                style="margin-top:8px;"
-              />
+              <input id="settings-name" class="input" type="text" placeholder="What's your name?" value="${escapeHtml(state.userName || '')}" style="margin-top:8px;" />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Appearance -->
       <div class="settings-section">
-        <div class="settings-section-title">Appearance</div>
-        <div class="settings-group">
-
-          <!-- Light/Dark mode -->
-          <div class="settings-row">
-            <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            </div>
-            <div class="settings-row__content">
-              <div class="settings-row__label">Mode</div>
-            </div>
-            <div class="settings-row__action">
-              <select id="theme-select" class="input" style="width:auto;padding:6px 12px;">
-                <option value="auto" ${state.theme === 'auto' ? 'selected' : ''}>Auto (time-based)</option>
-                <option value="light" ${state.theme === 'light' ? 'selected' : ''}>Light</option>
-                <option value="dark" ${state.theme === 'dark' ? 'selected' : ''}>Dark</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Color palette -->
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
-            <div style="display:flex;align-items:center;gap:var(--space-3);width:100%;margin-bottom:var(--space-3);">
-              <div class="settings-row__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-              </div>
-              <div class="settings-row__label">Color Theme</div>
-            </div>
-            <div class="palette-grid" id="palette-grid">
-              ${PALETTES.map(p => `
-                <button class="palette-card ${currentPalette === p.id ? 'selected' : ''}" data-palette="${p.id}" type="button" aria-label="${p.name} theme">
-                  <div class="palette-dots">
-                    ${p.dots.map(c => `<span style="background:${c}"></span>`).join('')}
-                  </div>
-                  <span class="palette-name">${p.name}</span>
-                </button>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Bible translation -->
-          <div class="settings-row">
-            <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            </div>
-            <div class="settings-row__content">
-              <div class="settings-row__label">Bible Translation</div>
-              <div class="settings-row__value">Used for scripture search &amp; passages</div>
-            </div>
-            <div class="settings-row__action">
-              <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
-                <option value="web"   ${(state.bibleTranslation || 'web') === 'web'   ? 'selected' : ''}>WEB – World English Bible</option>
-                <option value="asv"   ${state.bibleTranslation === 'asv'   ? 'selected' : ''}>ASV – American Standard Version</option>
-                <option value="bbe"   ${state.bibleTranslation === 'bbe'   ? 'selected' : ''}>BBE – Bible in Basic English</option>
-                <option value="kjv"   ${state.bibleTranslation === 'kjv'   ? 'selected' : ''}>KJV – King James Version</option>
-                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>Darby Translation</option>
-                <option value="esv"   ${state.bibleTranslation === 'esv'   ? 'selected' : ''}>ESV – English Standard Version ⚠️</option>
-              </select>
-            </div>
-          </div>
-          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
-            <div style="display:flex;flex-direction:column;gap:4px;">
-              <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-primary);">⚠️ Copyrighted Translation</div>
-              <div style="font-size:var(--text-xs);line-height:1.6;color:var(--text-secondary);">
-                ESV is copyrighted. Passages are displayed for personal devotional use with full attribution.
-                ESV® Bible © Crossway. Requires Worker to be deployed.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Notifications -->
-      <div class="settings-section">
-        <div class="settings-section-title">Notifications</div>
-        <div class="settings-group">
-          <div class="settings-row">
-            <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            </div>
-            <div class="settings-row__content">
-              <div class="settings-row__label">Morning &amp; Evening Reminders</div>
-              <div class="settings-row__value" id="notif-status-msg">
-                ${/iPhone|iPad|iPod/.test(navigator.userAgent) && !window.navigator.standalone
-                  ? '📲 Add to Home Screen first — open in Safari → Share → Add to Home Screen'
-                  : 'Sends reminders at your chosen times'}
-              </div>
-            </div>
-            <div class="settings-row__action">
-              <label class="toggle__switch">
-                <input type="checkbox" id="notif-toggle" ${state.notificationsEnabled ? 'checked' : ''} />
-                <div class="toggle__track"></div>
-              </label>
-            </div>
-          </div>
-          <!-- Morning time — stacked so time input doesn't overflow on narrow screens -->
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <div class="settings-row__content">
-              <div class="settings-row__label">Morning Reminder</div>
-              <div class="settings-row__value">What time should we nudge you?</div>
-            </div>
-            <div class="settings-row__action">
-              <input type="time" id="morning-time" class="settings-time-input"
-                value="${String(state.morningHour).padStart(2,'0')}:${String(state.morningMinute).padStart(2,'0')}"
-              />
-            </div>
-          </div>
-          <!-- Evening time — stacked -->
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </div>
-            <div class="settings-row__content">
-              <div class="settings-row__label">Evening Reminder</div>
-              <div class="settings-row__value">End the day with reflection</div>
-            </div>
-            <div class="settings-row__action">
-              <input type="time" id="evening-time" class="settings-time-input"
-                value="${String(state.eveningHour).padStart(2,'0')}:${String(state.eveningMinute).padStart(2,'0')}"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Worker / Advanced -->
-      <div class="settings-section">
-        <div class="settings-section-title">Advanced</div>
-        <div class="settings-group">
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
-            <div style="display:flex;align-items:center;gap:12px;width:100%;">
-              <div class="settings-row__icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              </div>
-              <div class="settings-row__content">
-                <div class="settings-row__label">Cloudflare Worker</div>
-                <div class="settings-row__value">Powers AI devotional search &amp; push notifications</div>
-              </div>
-            </div>
-            <div style="width:100%;padding:var(--space-2) var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);">
-              <p class="text-xs" style="color:var(--text-secondary);line-height:1.6;">
-                Default: <code style="font-size:0.7rem;word-break:break-all;">https://abide-worker.mattlmccoy.workers.dev</code>
-              </p>
-              <p class="text-xs text-muted" style="margin-top:4px;line-height:1.6;">
-                The worker is shared — no setup needed. Override below only if self-hosting.
-              </p>
-            </div>
-            <input
-              id="worker-url"
-              class="input"
-              type="url"
-              placeholder="Override URL (leave blank to use default)"
-              value="${state.workerUrl || ''}"
-              style="margin-top:0;"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Trusted Pastors -->
-      <div class="settings-section">
-        <div class="settings-section-title">Trusted Pastors</div>
+        <div class="settings-section-title">2) Trusted Pastors & Teachers</div>
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
             <div class="settings-row__value">Select who can influence AI-generated devotions.</div>
@@ -247,170 +68,194 @@ const SettingsView = (() => {
               `).join('')}
             </div>
             <div style="display:flex;gap:8px;width:100%;">
-              <input id="pastor-new-name" class="input" type="text" placeholder="Add a pastor (e.g. Charles Spurgeon)" style="margin:0;" />
+              <input id="pastor-new-name" class="input" type="text" placeholder="Add a pastor/teacher" style="margin:0;" />
               <button type="button" class="btn btn-secondary btn-sm" id="add-pastor-btn">Add</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Usage Tracking -->
       <div class="settings-section">
-        <div class="settings-section-title">Usage & Limits</div>
-        <div class="settings-group">
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
-            <div class="settings-row__value">Tracking month: <strong>${usageStats.monthKey || 'n/a'}</strong></div>
-            <div style="width:100%;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);font-size:var(--text-sm);line-height:1.65;">
-              <div>Bible passage queries: <strong>${usageStats.bibleQueries}</strong> / ${usageLimits.bibleQueries}</div>
-              <div>ESV passage queries: <strong>${usageStats.esvQueries}</strong> / ${usageLimits.esvQueries}</div>
-              <div>AI plan builds: <strong>${usageStats.aiPlanRequests}</strong> / ${usageLimits.aiPlanRequests}</div>
-              <div>AI phrase searches: <strong>${usageStats.aiPhraseQueries}</strong> / ${usageLimits.aiPhraseQueries}</div>
-            </div>
-            <div class="text-xs text-muted" style="line-height:1.6;">
-              Limits shown are app-level soft limits for visibility. Provider-side token/quota usage is not exposed by the shared worker endpoint yet.
-            </div>
-            <div style="width:100%;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);font-size:var(--text-sm);line-height:1.6;">
-              <div style="font-weight:600;margin-bottom:4px;">Latest AI Model Info</div>
-              <div>
-                Plan build:
-                <strong>${lastAIPlanMeta?.provider || 'n/a'}</strong>
-                ${Array.isArray(lastAIPlanMeta?.models) && lastAIPlanMeta.models.length ? `(${lastAIPlanMeta.models.join(', ')})` : ''}
-              </div>
-              <div>
-                Scripture phrase search:
-                <strong>${lastAIPhraseMeta?.provider || 'n/a'}</strong>
-                ${lastAIPhraseMeta?.model ? `(${lastAIPhraseMeta.model})` : ''}
-              </div>
-            </div>
-          </div>
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__content">
-              <div class="settings-row__label">Soft Limit: Bible Queries / month</div>
-            </div>
-            <div class="settings-row__action">
-              <input id="limit-bible" class="input" type="number" min="1" step="1" value="${usageLimits.bibleQueries}" />
-            </div>
-          </div>
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__content">
-              <div class="settings-row__label">Soft Limit: ESV Queries / month</div>
-            </div>
-            <div class="settings-row__action">
-              <input id="limit-esv" class="input" type="number" min="1" step="1" value="${usageLimits.esvQueries}" />
-            </div>
-          </div>
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__content">
-              <div class="settings-row__label">Soft Limit: AI Plan Builds / month</div>
-            </div>
-            <div class="settings-row__action">
-              <input id="limit-ai-plan" class="input" type="number" min="1" step="1" value="${usageLimits.aiPlanRequests}" />
-            </div>
-          </div>
-          <div class="settings-row settings-row--stacked">
-            <div class="settings-row__content">
-              <div class="settings-row__label">Soft Limit: AI Phrase Searches / month</div>
-            </div>
-            <div class="settings-row__action">
-              <input id="limit-ai-phrase" class="input" type="number" min="1" step="1" value="${usageLimits.aiPhraseQueries}" />
-            </div>
-          </div>
-          <div class="settings-row" style="justify-content:flex-end;">
-            <button class="btn btn-ghost btn-sm" id="reset-usage-btn" type="button">Reset Usage Counters</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Weekly Plan -->
-      <div class="settings-section">
-        <div class="settings-section-title">Devotion Content</div>
+        <div class="settings-section-title">3) Devotion Content</div>
         <div class="settings-group">
           <div class="settings-row" style="cursor:pointer;" onclick="Router.navigate('/plan')">
             <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Build This Week's Plan</div>
-              <div class="settings-row__value">Choose a theme and search for devotional content</div>
-            </div>
-            <div class="settings-row__action">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              <div class="settings-row__value">Choose a theme and generate this week</div>
             </div>
           </div>
           <div class="settings-row" style="cursor:pointer;" onclick="PlanView.loadSeedPlan()">
             <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Load Sample Week</div>
-              <div class="settings-row__value">Start with a pre-built week on Grace</div>
-            </div>
-            <div class="settings-row__action">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              <div class="settings-row__value">Fallback if providers are rate limited</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- App Data -->
       <div class="settings-section">
-        <div class="settings-section-title">App Data</div>
+        <div class="settings-section-title">4) Appearance</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+            </div>
+            <div class="settings-row__content"><div class="settings-row__label">Mode</div></div>
+            <div class="settings-row__action">
+              <select id="theme-select" class="input" style="width:auto;padding:6px 12px;">
+                <option value="auto" ${state.theme === 'auto' ? 'selected' : ''}>Auto</option>
+                <option value="light" ${state.theme === 'light' ? 'selected' : ''}>Light</option>
+                <option value="dark" ${state.theme === 'dark' ? 'selected' : ''}>Dark</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+            <div style="display:flex;align-items:center;gap:var(--space-3);width:100%;margin-bottom:var(--space-3);">
+              <div class="settings-row__label">Color Theme</div>
+            </div>
+            <div class="palette-grid" id="palette-grid">
+              ${PALETTES.map(p => `
+                <button class="palette-card ${currentPalette === p.id ? 'selected' : ''}" data-palette="${p.id}" type="button" aria-label="${p.name} theme">
+                  <div class="palette-dots">${p.dots.map(c => `<span style="background:${c}"></span>`).join('')}</div>
+                  <span class="palette-name">${p.name}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Bible Translation</div>
+            </div>
+            <div class="settings-row__action">
+              <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
+                <option value="web" ${(state.bibleTranslation || 'web') === 'web' ? 'selected' : ''}>WEB</option>
+                <option value="asv" ${state.bibleTranslation === 'asv' ? 'selected' : ''}>ASV</option>
+                <option value="bbe" ${state.bibleTranslation === 'bbe' ? 'selected' : ''}>BBE</option>
+                <option value="kjv" ${state.bibleTranslation === 'kjv' ? 'selected' : ''}>KJV</option>
+                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>DARBY</option>
+                <option value="esv" ${state.bibleTranslation === 'esv' ? 'selected' : ''}>ESV</option>
+              </select>
+            </div>
+          </div>
+          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+            <div style="font-size:var(--text-xs);line-height:1.6;color:var(--text-secondary);">
+              ESV is copyrighted. Display is for personal devotional use with attribution.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">5) Notifications</div>
+        <div class="settings-group">
+          <div class="settings-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Morning & Evening Reminders</div>
+              <div class="settings-row__value" id="notif-status-msg">${/iPhone|iPad|iPod/.test(navigator.userAgent) && !window.navigator.standalone ? 'Install to Home Screen first to enable iOS push.' : 'Sends reminders at your chosen times'}</div>
+            </div>
+            <div class="settings-row__action settings-row__action--toggle">
+              <label class="toggle__switch">
+                <input type="checkbox" id="notif-toggle" ${state.notificationsEnabled ? 'checked' : ''} />
+                <div class="toggle__track"></div>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Morning Reminder</div>
+            </div>
+            <div class="settings-row__action settings-row__action--time">
+              <input type="time" id="morning-time" class="settings-time-input" value="${String(state.morningHour).padStart(2, '0')}:${String(state.morningMinute).padStart(2, '0')}" />
+            </div>
+          </div>
+          <div class="settings-row settings-row--stacked">
+            <div class="settings-row__content">
+              <div class="settings-row__label">Evening Reminder</div>
+            </div>
+            <div class="settings-row__action settings-row__action--time">
+              <input type="time" id="evening-time" class="settings-time-input" value="${String(state.eveningHour).padStart(2, '0')}:${String(state.eveningMinute).padStart(2, '0')}" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">6) App Data</div>
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
-            <div class="settings-row__value">If Safari feels sluggish, clear this site's local cache/storage and reload.</div>
+            <div class="settings-row__value">
+              Saved devotions are currently stored locally on this device in browser storage. Use Advanced to sync to Google Drive for cross-device access.
+            </div>
             <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
           </div>
         </div>
       </div>
 
-      <!-- App info -->
-      <div style="text-align:center;padding:var(--space-6) 0 var(--space-4);">
+      <div class="settings-section">
+        <div class="settings-section-title">7) Advanced</div>
+        <div class="settings-group">
+          <div class="settings-row" style="cursor:pointer;" onclick="Router.navigate('/settings-advanced')">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Open Advanced Settings</div>
+              <div class="settings-row__value">Usage, provider routing checks, worker URL, Google Drive sync</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;padding:var(--space-5) 0 var(--space-3);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
-        <p class="text-xs text-muted" style="margin-top:4px;">Scripture: Change translation in Appearance settings above</p>
         <p class="text-xs text-muted" style="margin-top:4px;">Version: ${appVersion}</p>
       </div>
 
-      <!-- Save button -->
-      <button class="btn btn-primary btn-full" id="save-settings" style="margin-bottom:var(--space-6);">
-        Save Settings
-      </button>
+      <button class="btn btn-primary btn-full" id="save-settings" style="margin-bottom:var(--space-6);">Save Settings</button>
     `;
 
     container.innerHTML = '';
     container.appendChild(div);
-
     setupSettingsListeners(div);
-
-    // If tab=plan, navigate to plan
-    if (tab === 'plan') {
-      setTimeout(() => Router.navigate('/plan'), 100);
-    }
   }
 
   function setupSettingsListeners(root) {
     setupPastorListListeners(root);
 
-    // Palette picker — instant preview
     root.querySelectorAll('.palette-card').forEach(card => {
       card.addEventListener('click', () => {
         const palette = card.dataset.palette;
-        // Update selection UI
         root.querySelectorAll('.palette-card').forEach(c => c.classList.toggle('selected', c.dataset.palette === palette));
-        // Live preview — apply immediately
         document.documentElement.dataset.palette = palette;
       });
     });
 
-    root.querySelector('#save-settings')?.addEventListener('click', () => {
+    root.querySelector('#theme-select')?.addEventListener('change', (e) => applyTheme(e.target.value));
+    root.querySelector('#translation-select')?.addEventListener('change', (e) => {
+      const notice = root.querySelector('#translation-notice');
+      if (notice) notice.style.display = e.target.value === 'esv' ? 'flex' : 'none';
+    });
+
+    root.querySelector('#save-settings')?.addEventListener('click', async () => {
       const name = root.querySelector('#settings-name')?.value?.trim() || '';
       const theme = root.querySelector('#theme-select')?.value || 'auto';
       const bibleTranslation = root.querySelector('#translation-select')?.value || 'web';
-      const workerUrl = root.querySelector('#worker-url')?.value?.trim() || '';
       const notifEnabled = root.querySelector('#notif-toggle')?.checked || false;
       const morningTime = root.querySelector('#morning-time')?.value || '06:30';
       const eveningTime = root.querySelector('#evening-time')?.value || '20:00';
       const selectedPalette = document.documentElement.dataset.palette || 'tuscan-sunset';
-
       const [mh, mm] = morningTime.split(':').map(Number);
       const [eh, em] = eveningTime.split(':').map(Number);
       const trustedPastors = Array.from(root.querySelectorAll('[data-pastor-row]'))
@@ -421,7 +266,7 @@ const SettingsView = (() => {
         .filter(p => p.name);
 
       if (!trustedPastors.some(p => p.enabled)) {
-        alert('Enable at least one trusted pastor.');
+        alert('Enable at least one trusted pastor/teacher.');
         return;
       }
 
@@ -429,7 +274,6 @@ const SettingsView = (() => {
         userName: name,
         theme,
         bibleTranslation,
-        workerUrl,
         morningHour: mh,
         morningMinute: mm,
         eveningHour: eh,
@@ -438,29 +282,16 @@ const SettingsView = (() => {
         palette: selectedPalette,
       });
       Store.setTrustedPastors(trustedPastors);
-      Store.setUsageLimits({
-        bibleQueries: Number(root.querySelector('#limit-bible')?.value || 0),
-        esvQueries: Number(root.querySelector('#limit-esv')?.value || 0),
-        aiPlanRequests: Number(root.querySelector('#limit-ai-plan')?.value || 0),
-        aiPhraseQueries: Number(root.querySelector('#limit-ai-phrase')?.value || 0),
-      });
-
       applyTheme(theme);
 
-      // Handle notification toggle
       if (notifEnabled) {
-        Notifications.subscribeToPush().then(sub => {
+        try {
+          const sub = await Notifications.subscribeToPush();
           const msgEl = root.querySelector('#notif-status-msg');
-          if (sub) {
-            if (msgEl) msgEl.textContent = '✅ Reminders active!';
-          } else {
-            Notifications.getStatusMessage().then(msg => {
-              if (msgEl) msgEl.textContent = msg || 'Enable when app is installed to Home Screen';
-            });
-          }
-        }).catch(err => {
-          console.warn('Notification setup error (preference still saved):', err);
-        });
+          if (msgEl) msgEl.textContent = sub ? 'Reminders active.' : 'Could not fully enable reminders on this device.';
+        } catch (err) {
+          console.warn('Notification setup error:', err);
+        }
       } else {
         Notifications.unsubscribe().catch(console.error);
       }
@@ -469,32 +300,16 @@ const SettingsView = (() => {
       if (btn) {
         btn.textContent = 'Saved ✓';
         btn.style.background = 'var(--color-success)';
-        setTimeout(() => { if (btn) { btn.textContent = 'Save Settings'; btn.style.background = ''; } }, 2000);
+        setTimeout(() => {
+          btn.textContent = 'Save Settings';
+          btn.style.background = '';
+        }, 1400);
       }
-    });
-
-    // Live theme preview
-    root.querySelector('#theme-select')?.addEventListener('change', (e) => {
-      applyTheme(e.target.value);
-    });
-
-    // Show copyright warning for ESV
-    root.querySelector('#translation-select')?.addEventListener('change', (e) => {
-      const notice = root.querySelector('#translation-notice');
-      if (notice) {
-        notice.style.display = e.target.value === 'esv' ? 'flex' : 'none';
-      }
-    });
-
-    root.querySelector('#reset-usage-btn')?.addEventListener('click', () => {
-      Store.resetUsageStats();
-      render(document.getElementById('view-container'));
     });
 
     root.querySelector('#clear-site-data-btn')?.addEventListener('click', async () => {
-      const ok = window.confirm('Clear this site\'s local data (cache, storage, service worker) and reload?');
+      const ok = window.confirm('Clear local app data on this device and reload?');
       if (!ok) return;
-
       try {
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
@@ -504,35 +319,20 @@ const SettingsView = (() => {
           const keys = await caches.keys();
           await Promise.all(keys.map(k => caches.delete(k)));
         }
-        if ('indexedDB' in window && indexedDB.databases) {
-          const dbs = await indexedDB.databases();
-          (dbs || []).forEach(db => {
-            if (db?.name) {
-              try { indexedDB.deleteDatabase(db.name); } catch {}
-            }
-          });
-        }
       } catch (err) {
         console.warn('Could not fully clear site data:', err);
       }
-
       try { localStorage.clear(); } catch {}
       try { sessionStorage.clear(); } catch {}
-      window.location.href = `${window.location.origin}${window.location.pathname}#/settings`;
       window.location.reload();
     });
   }
 
   function applyTheme(theme) {
     const html = document.documentElement;
-    if (theme === 'dark') {
-      html.setAttribute('data-theme', 'dark');
-    } else if (theme === 'light') {
-      html.setAttribute('data-theme', 'light');
-    } else {
-      // Auto: time-based
-      html.setAttribute('data-theme', DateUtils.isDarkModeTime() ? 'dark' : 'light');
-    }
+    if (theme === 'dark') html.setAttribute('data-theme', 'dark');
+    else if (theme === 'light') html.setAttribute('data-theme', 'light');
+    else html.setAttribute('data-theme', DateUtils.isDarkModeTime() ? 'dark' : 'light');
   }
 
   function setupPastorListListeners(root) {
@@ -551,7 +351,7 @@ const SettingsView = (() => {
     }
 
     function appendPastor(name) {
-      const clean = name.trim();
+      const clean = String(name || '').trim();
       if (!clean) return;
       const duplicate = Array.from(list.querySelectorAll('.pastor-name'))
         .some(el => el.textContent?.trim().toLowerCase() === clean.toLowerCase());

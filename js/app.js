@@ -82,9 +82,12 @@
 
     Router.register('/settings', (container) => {
       Router.setTitle('Settings');
-      const hash = window.location.hash;
-      const params = hash.includes('?') ? hash.slice(hash.indexOf('?')) : '';
-      SettingsView.render(container, params);
+      SettingsView.render(container);
+    });
+
+    Router.register('/settings-advanced', (container) => {
+      Router.setTitle('Advanced');
+      SettingsAdvancedView.render(container);
     });
   }
 

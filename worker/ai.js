@@ -9,6 +9,8 @@
 
 const PLAN_CACHE_TTL = 24 * 60 * 60; // 24 hours (seconds, for KV)
 const PHRASE_CACHE_TTL = 60 * 60;    // 1 hour
+const ROUTING_STATE_TTL = 14 * 24 * 60 * 60; // 14 days
+const ROUTING_STATE_KEY = 'ai:routing:v1';
 const DEFAULT_MIN_MORNING_WORDS = 170;
 const DEFAULT_MIN_EVENING_WORDS = 130;
 const DEFAULT_MIN_MORNING_PARAGRAPHS = 3;
@@ -448,6 +450,123 @@ export async function handleAIProviders(request, url, env, origin, json) {
   }, 200, origin);
 }
 
+// ---------------------------------------------------------------------------
+// GET /ai/routing
+// Returns routing health/cooldowns/scores for plan providers
+// ---------------------------------------------------------------------------
+export async function handleAIRouting(request, url, env, origin, json) {
+  if (request.method !== 'GET') return json({ error: 'GET required' }, 405, origin);
+  const providerOrder = buildPlanProviderOrder(env);
+  const state = await loadRoutingState(env);
+  const ranked = rankProvidersWithState(providerOrder, state, env);
+
+  const providers = {};
+  providerOrder.forEach((provider) => {
+    const entry = state.providers?.[provider] || {};
+    providers[provider] = {
+      configured: providerConfigured(env, provider),
+      preferredModel: providerPreferredModel(env, provider),
+      attempts: Number(entry.attempts || 0),
+      successes: Number(entry.successes || 0),
+      failures: Number(entry.failures || 0),
+      lastLatencyMs: Number(entry.lastLatencyMs || 0),
+      consecutive429: Number(entry.consecutive429 || 0),
+      cooldownUntil: Number(entry.cooldownUntil || 0) || null,
+      coolingDown: isCoolingDown(entry),
+      score: providerScore(entry),
+      lastError: entry.lastError || '',
+      lastSuccessAt: Number(entry.lastSuccessAt || 0) || null,
+      lastErrorAt: Number(entry.lastErrorAt || 0) || null,
+    };
+  });
+
+  return json({
+    ok: true,
+    updatedAt: state.updatedAt,
+    providerOrder,
+    rankedProviders: ranked,
+    bestProvider: ranked[0] || null,
+    providers,
+  }, 200, origin);
+}
+
+// ---------------------------------------------------------------------------
+// POST /ai/probe
+// Tiny probe prompt per configured provider; updates routing stats
+// ---------------------------------------------------------------------------
+export async function handleAIProbe(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  const providers = buildPlanProviderOrder(env).filter(p => providerConfigured(env, p));
+  const state = await loadRoutingState(env);
+  const results = [];
+
+  const systemPrompt = 'Respond with valid JSON only.';
+  const userPrompt = 'Return {"ok":true}.';
+
+  for (const provider of providers) {
+    const startedAt = Date.now();
+    try {
+      let response = null;
+      if (provider === 'gemini') {
+        response = await runGemini(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.0,
+          maxOutputTokens: 120,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      } else if (provider === 'openrouter') {
+        response = await runOpenRouter(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.0,
+          maxOutputTokens: 120,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      } else if (provider === 'groq') {
+        response = await runGroq(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.0,
+          maxOutputTokens: 120,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      }
+
+      const parsed = parseJsonBlock(response?.text || '');
+      if (!parsed || parsed.ok !== true) throw new Error('Probe response must include {"ok":true}');
+
+      const latencyMs = Date.now() - startedAt;
+      updateRoutingState(state, provider, { ok: true, latencyMs, probe: true });
+      results.push({ provider, ok: true, model: response?.model || null, latencyMs });
+    } catch (err) {
+      const latencyMs = Date.now() - startedAt;
+      const statusCode = parseStatusCodeFromError(err);
+      updateRoutingState(state, provider, {
+        ok: false,
+        latencyMs,
+        probe: true,
+        statusCode,
+        error: err.message,
+      });
+      results.push({
+        provider,
+        ok: false,
+        statusCode: statusCode || null,
+        error: String(err.message || '').slice(0, 200),
+        latencyMs,
+      });
+    }
+  }
+
+  await saveRoutingState(env, state);
+  return json({ ok: true, results }, 200, origin);
+}
+
 function extractFirstJsonObject(input) {
   const text = String(input || '');
   let inString = false;
@@ -547,6 +666,126 @@ function buildPlanProviderOrder(env) {
   const unique = [...new Set(parsed)];
   if (!unique.length) return ['gemini', 'openrouter', 'groq'];
   return unique;
+}
+
+function defaultRoutingState() {
+  return {
+    version: 1,
+    updatedAt: Date.now(),
+    providers: {},
+  };
+}
+
+function parseStatusCodeFromError(err) {
+  const msg = String(err?.message || '');
+  const match = msg.match(/\berror\s+(\d{3})\b/i) || msg.match(/\b(\d{3})\b/);
+  if (!match) return 0;
+  const code = Number(match[1]);
+  return Number.isFinite(code) ? code : 0;
+}
+
+function cooldownMsForConsecutive429(n) {
+  const x = Math.max(1, Math.min(6, Number(n) || 1));
+  return Math.min(60, 5 * (2 ** (x - 1))) * 60 * 1000;
+}
+
+function providerConfigured(env, provider) {
+  if (provider === 'gemini') return !!env.GEMINI_API_KEY;
+  if (provider === 'openrouter') return !!env.OPENROUTER_API_KEY;
+  if (provider === 'groq') return !!env.GROQ_API_KEY;
+  return false;
+}
+
+function providerPreferredModel(env, provider) {
+  if (provider === 'gemini') return env.GEMINI_PLAN_MODEL || env.GEMINI_MODEL || null;
+  if (provider === 'openrouter') return env.OPENROUTER_PLAN_MODEL || env.OPENROUTER_MODEL || null;
+  if (provider === 'groq') return env.GROQ_PLAN_MODEL || env.GROQ_MODEL || null;
+  return null;
+}
+
+async function loadRoutingState(env) {
+  if (!env.ABIDE_KV) return defaultRoutingState();
+  const loaded = await env.ABIDE_KV.get(ROUTING_STATE_KEY, 'json');
+  if (!loaded || typeof loaded !== 'object') return defaultRoutingState();
+  return {
+    version: 1,
+    updatedAt: Number(loaded.updatedAt) || Date.now(),
+    providers: (loaded.providers && typeof loaded.providers === 'object') ? loaded.providers : {},
+  };
+}
+
+async function saveRoutingState(env, state) {
+  if (!env.ABIDE_KV) return;
+  state.updatedAt = Date.now();
+  await env.ABIDE_KV.put(ROUTING_STATE_KEY, JSON.stringify(state), { expirationTtl: ROUTING_STATE_TTL });
+}
+
+function isCoolingDown(entry = {}) {
+  return Number(entry.cooldownUntil || 0) > Date.now();
+}
+
+function providerScore(entry = {}) {
+  const attempts = Number(entry.attempts || 0);
+  const successes = Number(entry.successes || 0);
+  const failures = Number(entry.failures || 0);
+  const total = Math.max(1, attempts);
+  const successRate = successes / total;
+  const avgLatencyMs = Number(entry.totalLatencyMs || 0) / Math.max(1, successes + failures);
+  const penalty429 = Number(entry.consecutive429 || 0) * 0.25;
+  const latencyPenalty = Math.min(1.2, avgLatencyMs / 8000);
+  const failurePenalty = Math.min(0.7, failures / total);
+  return (successRate * 2.0) - penalty429 - latencyPenalty - failurePenalty;
+}
+
+function rankProvidersWithState(order, state, env) {
+  const configured = order.filter(p => providerConfigured(env, p));
+  const live = configured.filter(p => !isCoolingDown(state.providers?.[p]));
+  const cooling = configured.filter(p => isCoolingDown(state.providers?.[p]));
+  const sortByScore = (a, b) => providerScore(state.providers?.[b] || {}) - providerScore(state.providers?.[a] || {});
+  if (live.length) return live.sort(sortByScore);
+  return cooling.sort(sortByScore);
+}
+
+function updateRoutingState(state, provider, outcome) {
+  if (!state.providers[provider]) {
+    state.providers[provider] = {
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      totalLatencyMs: 0,
+      lastLatencyMs: 0,
+      lastError: '',
+      lastErrorAt: 0,
+      lastSuccessAt: 0,
+      consecutive429: 0,
+      cooldownUntil: 0,
+      probes: 0,
+    };
+  }
+
+  const entry = state.providers[provider];
+  entry.attempts += 1;
+  entry.totalLatencyMs += Math.max(0, Number(outcome.latencyMs || 0));
+  entry.lastLatencyMs = Math.max(0, Number(outcome.latencyMs || 0));
+  if (outcome.probe) entry.probes += 1;
+
+  if (outcome.ok) {
+    entry.successes += 1;
+    entry.lastSuccessAt = Date.now();
+    entry.lastError = '';
+    entry.lastErrorAt = 0;
+    entry.consecutive429 = 0;
+    entry.cooldownUntil = 0;
+    return;
+  }
+
+  entry.failures += 1;
+  entry.lastError = String(outcome.error || '').slice(0, 240);
+  entry.lastErrorAt = Date.now();
+  if (Number(outcome.statusCode || 0) === 429) {
+    entry.consecutive429 += 1;
+    entry.cooldownUntil = Date.now() + cooldownMsForConsecutive429(entry.consecutive429);
+  }
 }
 
 async function repairJsonWithGemini(env, malformedJson, schemaHint = '') {
@@ -720,6 +959,7 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
     const modelUsage = [];
     const providerUsage = [];
     const providerOrder = buildPlanProviderOrder(env);
+    const routingState = await loadRoutingState(env);
 
     for (let dayIndex = 0; dayIndex < daysCount; dayIndex++) {
       const dayCacheKey = `plan-day:ai:v2:${topic.toLowerCase().trim()}:${pastorKey}:${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}:d${dayIndex + 1}`;
@@ -742,7 +982,9 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
         try {
           let lastProviderErr = null;
           let response = null;
-          for (const provider of providerOrder) {
+          const rankedProviders = rankProvidersWithState(providerOrder, routingState, env);
+          for (const provider of rankedProviders) {
+            const startedAt = Date.now();
             try {
               if (provider === 'gemini') {
                 response = await runGemini(env, {
@@ -772,8 +1014,20 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
                   preferredModel: env.GROQ_PLAN_MODEL || env.GROQ_MODEL || '',
                 });
               }
-              if (response?.text) break;
+              if (response?.text) {
+                updateRoutingState(routingState, provider, {
+                  ok: true,
+                  latencyMs: Date.now() - startedAt,
+                });
+                break;
+              }
             } catch (providerErr) {
+              updateRoutingState(routingState, provider, {
+                ok: false,
+                latencyMs: Date.now() - startedAt,
+                statusCode: parseStatusCodeFromError(providerErr),
+                error: providerErr.message,
+              });
               lastProviderErr = providerErr;
             }
           }
@@ -810,6 +1064,8 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
         throw lastDayErr || new Error(`Day ${dayIndex + 1}: generation failed`);
       }
     }
+
+    await saveRoutingState(env, routingState);
 
     days.sort((a, b) => (a.dayIndex || 0) - (b.dayIndex || 0));
 

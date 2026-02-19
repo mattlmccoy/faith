@@ -78,7 +78,7 @@ const HomeView = (() => {
         Store.set('userName', nameInput.value.trim());
       }
       Store.set('onboardingDone', true);
-      Router.navigate('/settings?tab=plan');
+      Router.navigate('/plan');
     });
   }
 

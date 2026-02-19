@@ -721,13 +721,13 @@
 
 .settings-row__action {
   flex-shrink: 0;
-  max-width: 160px;  /* cap width so select can't overflow the row */
+  max-width: none;
   color: var(--text-secondary);
 }
 
 /* Select elements inside settings rows */
 .settings-row__action .input {
-  max-width: 100%;
+  max-width: 220px;
   font-size: var(--text-sm);
 }
 
@@ -743,7 +743,7 @@
 .settings-row--stacked .settings-row__action {
   flex: 0 0 auto;
   max-width: none;
-  margin-left: var(--space-8);
+  margin-left: 0;
   padding-top: var(--space-2);
 }
 
@@ -760,9 +760,19 @@
   font-size: var(--text-base);
   color: var(--text-primary);
   background: var(--glass-fill);
-  width: 80px;
+  width: 140px;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.settings-row__action--toggle {
+  min-width: 56px;
+}
+
+.settings-row__action--time {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
 }
 
 /* --- Responsive: Larger screens --- */
