@@ -79,7 +79,7 @@ const SettingsAdvancedView = (() => {
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
             <div class="settings-row__value">Saved devotions on this device: <strong>${savedCount}</strong></div>
-            <div class="text-xs text-muted">Sync file is stored in Google Drive App Data (hidden app folder, not visible in normal Drive file list).</div>
+            <div class="text-xs text-muted">Sync file is stored in a visible Google Drive folder named <strong>abidefaith-docs</strong>.</div>
             <input id="google-client-id" class="input" type="text" placeholder="Google OAuth Client ID" value="${escapeHtml(state.googleClientId || '')}" />
             <div class="text-xs text-muted">Default client ID is preconfigured for all users. Override only if you host your own OAuth app.</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -177,7 +177,7 @@ const SettingsAdvancedView = (() => {
       const statusEl = root.querySelector('#sync-status');
       try {
         const result = await Sync.pushSavedDevotions();
-        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions and journal entries to Drive App Data.`;
+        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions and journal entries to Google Drive folder "abidefaith-docs".`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Upload failed: ${err.message}`;
       }

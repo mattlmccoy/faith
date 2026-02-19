@@ -196,7 +196,7 @@ const SettingsView = (() => {
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
             <div class="settings-row__value">
-              Saved devotions are currently stored locally on this device in browser storage. Use Advanced to sync to Google Drive for cross-device access.
+              Saved devotions and journal entries are stored locally on this device in browser storage. Use Advanced to sync to your visible Google Drive folder <strong>abidefaith-docs</strong> for cross-device access.
             </div>
             <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
           </div>

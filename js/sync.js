@@ -1,10 +1,11 @@
 /* ============================================================
-   ABIDE - Google Drive Sync (Saved Devotions)
+   ABIDE - Google Drive Sync (Saved Devotions + Journal)
    ============================================================ */
 
 const Sync = (() => {
   const FILE_NAME = 'abide-saved-devotions.json';
-  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+  const FOLDER_NAME = 'abidefaith-docs';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const PROFILE_SCOPE = 'openid email profile';
   const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   let _accessToken = '';
@@ -80,11 +81,24 @@ const Sync = (() => {
       name: profile.name || '',
       picture: profile.picture || '',
     };
-    Store.update({
+    const patch = {
       googleProfile: normalized,
       googleConnectedAt: new Date().toISOString(),
-    });
+    };
+    const firstName = extractFirstName(normalized.name, normalized.email);
+    if (firstName) patch.userName = firstName;
+    Store.update(patch);
     return normalized;
+  }
+
+  function extractFirstName(fullName = '', email = '') {
+    const cleanName = String(fullName || '').trim();
+    if (cleanName) {
+      const first = cleanName.split(/\s+/)[0] || '';
+      return first.trim();
+    }
+    const local = String(email || '').split('@')[0] || '';
+    return local.trim();
   }
 
   async function connectGoogle() {
@@ -92,19 +106,58 @@ const Sync = (() => {
     return fetchGoogleProfile();
   }
 
-  async function findFileId() {
-    const q = encodeURIComponent(`name='${FILE_NAME}' and 'appDataFolder' in parents and trashed=false`);
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=appDataFolder&fields=files(id,name,modifiedTime)&pageSize=1`;
+  function escapeQueryValue(value = '') {
+    return String(value).replace(/'/g, "\\'");
+  }
+
+  async function findFolderId() {
+    const q = encodeURIComponent(
+      `name='${escapeQueryValue(FOLDER_NAME)}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1`;
     const res = await driveFetch(url);
     const data = await res.json();
     return data?.files?.[0]?.id || '';
   }
 
-  async function createFile(jsonBody) {
+  async function createFolder() {
+    const metadata = {
+      name: FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+    };
+    const res = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(metadata),
+    });
+    const data = await res.json();
+    return data?.id || '';
+  }
+
+  async function findOrCreateFolderId() {
+    let folderId = (Store.get('googleDriveFolderId') || '').trim();
+    if (!folderId) folderId = await findFolderId();
+    if (!folderId) folderId = await createFolder();
+    if (folderId) Store.update({ googleDriveFolderId: folderId });
+    return folderId;
+  }
+
+  async function findFileId(folderId) {
+    if (!folderId) return '';
+    const q = encodeURIComponent(
+      `name='${escapeQueryValue(FILE_NAME)}' and '${escapeQueryValue(folderId)}' in parents and trashed=false`
+    );
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1`;
+    const res = await driveFetch(url);
+    const data = await res.json();
+    return data?.files?.[0]?.id || '';
+  }
+
+  async function createFile(jsonBody, folderId) {
     const boundary = 'abide_boundary_' + Date.now();
     const metadata = {
       name: FILE_NAME,
-      parents: ['appDataFolder'],
+      parents: [folderId],
       mimeType: 'application/json',
     };
     const body = [
@@ -141,14 +194,17 @@ const Sync = (() => {
 
   async function pushSavedDevotions() {
     const snapshot = Store.exportSavedDevotionsSnapshot();
+    const folderId = await findOrCreateFolderId();
+    if (!folderId) throw new Error('Could not create/find Google Drive folder');
     let fileId = (Store.get('googleDriveFileId') || '').trim();
-    if (!fileId) fileId = await findFileId();
+    if (!fileId) fileId = await findFileId(folderId);
     if (fileId) {
       await updateFile(fileId, snapshot);
     } else {
-      fileId = await createFile(snapshot);
+      fileId = await createFile(snapshot, folderId);
     }
     Store.update({
+      googleDriveFolderId: folderId,
       googleDriveFileId: fileId,
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -156,8 +212,10 @@ const Sync = (() => {
   }
 
   async function pullSavedDevotions() {
+    const folderId = await findOrCreateFolderId();
+    if (!folderId) return { fileId: '', count: 0, imported: false };
     let fileId = (Store.get('googleDriveFileId') || '').trim();
-    if (!fileId) fileId = await findFileId();
+    if (!fileId) fileId = await findFileId(folderId);
     if (!fileId) return { fileId: '', count: 0, imported: false };
 
     const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
@@ -165,6 +223,7 @@ const Sync = (() => {
     const data = await res.json();
     const result = Store.importSavedDevotionsSnapshot(data || {});
     Store.update({
+      googleDriveFolderId: folderId,
       googleDriveFileId: fileId,
       lastDriveSyncAt: new Date().toISOString(),
     });

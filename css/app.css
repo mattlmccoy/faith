@@ -62,6 +62,7 @@
   --safe-right:  env(safe-area-inset-right, 0px);
   --safe-top-ui: 0px;
   --safe-bottom-ui: 0px;
+  --app-height: 100svh;
 
   /* --- Typography --- */
   --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -575,7 +576,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 #app {
   display: flex;
   flex-direction: column;
-  height: 100svh;
+  height: var(--app-height, 100svh);
   max-width: var(--content-max-width);
   margin: 0 auto;
   position: relative;
@@ -583,7 +584,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   z-index: 1; /* sits above ambient blob layer */
 }
 @supports (height: 100dvh) {
-  #app { height: 100dvh; }
+  #app { height: min(var(--app-height, 100dvh), 100dvh); }
 }
 
 /* iOS Standalone status bar spacer */
@@ -595,6 +596,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 [data-standalone="true"] {
   --safe-top-ui: var(--safe-top);
+  --safe-bottom-ui: var(--safe-bottom);
+}
+[data-ios="true"] {
   --safe-bottom-ui: var(--safe-bottom);
 }
 [data-standalone="true"] .status-bar-spacer {
@@ -667,7 +671,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   scroll-padding-bottom: var(--space-4);
 }
 
-[data-standalone="true"] .view-container {
+[data-standalone="true"] .view-container,
+[data-ios="true"] .view-container {
   padding-bottom: var(--tab-total-height);
 }
 
@@ -720,6 +725,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transform: translateX(-50%);
   bottom: 0;
   width: min(100%, var(--content-max-width));
+}
+
+[data-ios="true"] .tab-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: min(100%, var(--content-max-width));
+}
+
+[data-ios="true"] .app-legal {
+  margin-bottom: var(--tab-total-height);
 }
 
 .tab-item {

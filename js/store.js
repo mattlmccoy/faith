@@ -62,6 +62,7 @@ const Store = (() => {
     lastAIPlanMeta: null,
     lastAIPhraseMeta: null,
     googleClientId: DEFAULT_GOOGLE_CLIENT_ID,
+    googleDriveFolderId: '',
     googleDriveFileId: '',
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }

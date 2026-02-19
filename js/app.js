@@ -34,6 +34,35 @@
     }
   }
 
+  function initIOS() {
+    const ua = window.navigator.userAgent || '';
+    const platform = window.navigator.platform || '';
+    const touchPoints = window.navigator.maxTouchPoints || 0;
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && touchPoints > 1);
+    if (isIOS) {
+      document.documentElement.dataset.ios = 'true';
+    }
+  }
+
+  function initViewportHeightFix() {
+    if (document.documentElement.dataset.ios !== 'true') return;
+    const setHeight = () => {
+      const vv = window.visualViewport;
+      const height = vv?.height || window.innerHeight || 0;
+      if (height > 0) {
+        document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+      }
+    };
+
+    setHeight();
+    window.addEventListener('resize', setHeight, { passive: true });
+    window.addEventListener('orientationchange', setHeight, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', setHeight, { passive: true });
+      window.visualViewport.addEventListener('scroll', setHeight, { passive: true });
+    }
+  }
+
   // --- Register service worker ---
   function registerSW() {
     if ('serviceWorker' in navigator) {
@@ -124,7 +153,9 @@
 
   // --- Boot ---
   async function boot() {
+    initIOS();
     initStandalone();
+    initViewportHeightFix();
     initPalette();
     initTheme();
     registerSW();
