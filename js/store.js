@@ -367,6 +367,7 @@ const Store = (() => {
       exportedAt: new Date().toISOString(),
       savedDevotions: list,
       savedDevotionLibrary: lib,
+      journalEntries: _state.journalEntries || {},
     };
   }
 
@@ -379,6 +380,25 @@ const Store = (() => {
     const mergedIds = new Set([...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []), ...list]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
+    const incomingJournal = snapshot.journalEntries && typeof snapshot.journalEntries === 'object'
+      ? snapshot.journalEntries
+      : {};
+    const currentJournal = _state.journalEntries && typeof _state.journalEntries === 'object'
+      ? _state.journalEntries
+      : {};
+    Object.entries(incomingJournal).forEach(([dateKey, entry]) => {
+      const existing = currentJournal[dateKey];
+      const inSavedAt = String(entry?.savedAt || '');
+      const exSavedAt = String(existing?.savedAt || '');
+      if (!existing || inSavedAt > exSavedAt) {
+        currentJournal[dateKey] = {
+          prompt: String(entry?.prompt || ''),
+          text: String(entry?.text || ''),
+          savedAt: inSavedAt || new Date().toISOString(),
+        };
+      }
+    });
+    _state.journalEntries = currentJournal;
     _state.lastDriveSyncAt = new Date().toISOString();
     save();
     return { count: _state.savedDevotions.length };

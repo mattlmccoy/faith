@@ -672,18 +672,19 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 .app-legal {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--tab-total-height) + 4px);
-  z-index: 6;
+  position: relative;
+  z-index: 2;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 8px;
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+  border-top: 1px solid var(--divider);
+  background: var(--glass-fill);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .app-legal a {

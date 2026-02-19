@@ -79,12 +79,13 @@ const SettingsAdvancedView = (() => {
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
             <div class="settings-row__value">Saved devotions on this device: <strong>${savedCount}</strong></div>
+            <div class="text-xs text-muted">Sync file is stored in Google Drive App Data (hidden app folder, not visible in normal Drive file list).</div>
             <input id="google-client-id" class="input" type="text" placeholder="Google OAuth Client ID" value="${escapeHtml(state.googleClientId || '')}" />
             <div class="text-xs text-muted">Default client ID is preconfigured for all users. Override only if you host your own OAuth app.</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-secondary btn-sm" id="connect-google-btn">Sign In Google</button>
-              <button class="btn btn-secondary btn-sm" id="push-sync-btn">Upload Saved Devotions</button>
-              <button class="btn btn-secondary btn-sm" id="pull-sync-btn">Download Saved Devotions</button>
+              <button class="btn btn-secondary btn-sm" id="push-sync-btn">Upload Devotions + Journal</button>
+              <button class="btn btn-secondary btn-sm" id="pull-sync-btn">Download Devotions + Journal</button>
             </div>
             <div id="sync-status" class="text-xs text-muted">
               Last sync: ${state.lastDriveSyncAt ? escapeHtml(new Date(state.lastDriveSyncAt).toLocaleString()) : 'Never'}
@@ -176,7 +177,7 @@ const SettingsAdvancedView = (() => {
       const statusEl = root.querySelector('#sync-status');
       try {
         const result = await Sync.pushSavedDevotions();
-        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions to Drive.`;
+        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions and journal entries to Drive App Data.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Upload failed: ${err.message}`;
       }
@@ -190,7 +191,7 @@ const SettingsAdvancedView = (() => {
           if (statusEl) statusEl.textContent = 'No existing Drive file found yet.';
           return;
         }
-        if (statusEl) statusEl.textContent = `Downloaded and merged ${result.count} saved devotions.`;
+        if (statusEl) statusEl.textContent = `Downloaded and merged ${result.count} saved devotions and journal entries.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Download failed: ${err.message}`;
       }
