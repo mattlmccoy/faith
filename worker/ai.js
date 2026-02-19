@@ -14,6 +14,9 @@ const DEFAULT_MIN_EVENING_WORDS = 130;
 const DEFAULT_MIN_MORNING_PARAGRAPHS = 3;
 const DEFAULT_MIN_EVENING_PARAGRAPHS = 2;
 const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
+const MODEL_LIST_CACHE_MS = 15 * 60 * 1000;
+let _modelListCache = null;
+let _modelListCachedAt = 0;
 
 function wordCount(text = '') {
   return String(text)
@@ -76,12 +79,8 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
-  const modelCandidates = [
-    env.GEMINI_MODEL,
-    DEFAULT_GEMINI_MODEL,
-    'gemini-1.5-flash-latest',
-    'gemini-2.0-flash',
-  ].filter(Boolean);
+  const discoveredModels = await listGeminiGenerateModels(env);
+  const modelCandidates = buildModelCandidates(env, discoveredModels);
 
   let lastError = null;
 
@@ -141,6 +140,68 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
   }
 
   throw lastError || new Error('Gemini request failed for all candidate models');
+}
+
+async function listGeminiGenerateModels(env) {
+  const now = Date.now();
+  if (_modelListCache && (now - _modelListCachedAt) < MODEL_LIST_CACHE_MS) {
+    return _modelListCache;
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+  const res = await fetch(endpoint);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gemini models.list error ${res.status}: ${body.slice(0, 260)}`);
+  }
+
+  const data = await res.json();
+  const models = (data.models || [])
+    .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+    .map(m => (m.name || '').replace(/^models\//, ''))
+    .filter(Boolean);
+
+  if (!models.length) {
+    throw new Error('Gemini models.list returned no generateContent-capable models');
+  }
+
+  _modelListCache = models;
+  _modelListCachedAt = now;
+  return models;
+}
+
+function buildModelCandidates(env, discoveredModels = []) {
+  const preferred = [
+    env.GEMINI_MODEL,
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    DEFAULT_GEMINI_MODEL,
+  ].filter(Boolean).map(m => String(m).replace(/^models\//, ''));
+
+  const seen = new Set();
+  const out = [];
+
+  function pushIfAvailable(model) {
+    if (!model || seen.has(model)) return;
+    if (discoveredModels.includes(model)) {
+      seen.add(model);
+      out.push(model);
+    }
+  }
+
+  preferred.forEach(pushIfAvailable);
+
+  // Then fill with other available flash models
+  discoveredModels
+    .filter(m => m.includes('flash'))
+    .forEach(pushIfAvailable);
+
+  // Finally allow any remaining compatible model
+  discoveredModels.forEach(pushIfAvailable);
+  return out;
 }
 
 function parseJsonBlock(raw) {
