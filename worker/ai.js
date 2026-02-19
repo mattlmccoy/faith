@@ -74,7 +74,7 @@ function validatePlanLength(planData, cfg) {
   return issues;
 }
 
-async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 8192 }) {
+async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 6144, jsonMode = false }) {
   if (!env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
@@ -100,6 +100,7 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
       generationConfig: {
         temperature,
         maxOutputTokens,
+        ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
       },
     };
 
@@ -173,8 +174,8 @@ async function listGeminiGenerateModels(env) {
 function buildModelCandidates(env, discoveredModels = []) {
   const preferred = [
     env.GEMINI_MODEL,
-    'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
@@ -232,10 +233,23 @@ function parseJsonBlock(raw) {
   try {
     return JSON.parse(raw);
   } catch {
-    const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
+    const cleaned = String(raw)
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim();
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
     if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
-    return JSON.parse(raw.slice(start, end + 1));
+    const candidate = cleaned.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      const repaired = candidate
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/\u201C|\u201D/g, '"')
+        .replace(/\u2018|\u2019/g, "'");
+      return JSON.parse(repaired);
+    }
   }
 }
 
@@ -334,13 +348,14 @@ Ensure valid JSON only.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}
     let lastErr = null;
     let modelRetryNote = retryReason;
 
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const raw = await runGemini(env, {
           systemPrompt,
           userPrompt: buildUserPrompt(modelRetryNote),
           temperature: 0.65,
-          maxOutputTokens: 8192,
+          maxOutputTokens: 6144,
+          jsonMode: true,
         });
 
         const planData = parseJsonBlock(raw);
@@ -443,6 +458,7 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
       userPrompt,
       temperature: 0.2,
       maxOutputTokens: 1400,
+      jsonMode: true,
     });
 
     const data = parseJsonBlock(raw);

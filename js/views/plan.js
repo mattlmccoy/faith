@@ -217,31 +217,23 @@ const PlanView = (() => {
     `;
 
     try {
-      let aiPlan = null;
-      let lastLengthIssue = '';
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        aiPlan = await API.buildAIPlan(topic, trustedPastors, {
-          minMorningWords: MIN_MORNING_WORDS,
-          minEveningWords: MIN_EVENING_WORDS,
-          minMorningParagraphs: MIN_MORNING_PARAS,
-          minEveningParagraphs: MIN_EVENING_PARAS,
-          attempt,
-          retryReason: lastLengthIssue,
-        });
-        if (!aiPlan?.days?.length) continue;
-
-        const lengthIssues = validatePlanLength(aiPlan);
-        if (!lengthIssues.length) break;
-        lastLengthIssue = lengthIssues.slice(0, 2).join('; ');
-        aiPlan = null;
-      }
+      const aiPlan = await API.buildAIPlan(topic, trustedPastors, {
+        minMorningWords: MIN_MORNING_WORDS,
+        minEveningWords: MIN_EVENING_WORDS,
+        minMorningParagraphs: MIN_MORNING_PARAS,
+        minEveningParagraphs: MIN_EVENING_PARAS,
+      });
 
       if (aiPlan && aiPlan.days && aiPlan.days.length > 0) {
+        const lengthIssues = validatePlanLength(aiPlan);
+        if (lengthIssues.length) {
+          throw new Error(`Plan too short: ${lengthIssues.slice(0, 2).join('; ')}`);
+        }
         const plan = convertAIPlanToAppFormat(topic, aiPlan, trustedPastors);
         Store.savePlan(plan);
         showSuccess(results, topic, true);
       } else {
-        throw new Error('AI returned short content repeatedly');
+        throw new Error('AI returned empty plan');
       }
 
     } catch (err) {
