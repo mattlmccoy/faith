@@ -4,6 +4,7 @@
 
 const Store = (() => {
   const KEY = 'abide_state';
+  const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   const USAGE_METRICS = [
     'bibleQueries',
     'esvQueries',
@@ -60,7 +61,7 @@ const Store = (() => {
     },
     lastAIPlanMeta: null,
     lastAIPhraseMeta: null,
-    googleClientId: '',
+    googleClientId: DEFAULT_GOOGLE_CLIENT_ID,
     googleDriveFileId: '',
     lastDriveSyncAt: null,
   };
@@ -80,6 +81,9 @@ const Store = (() => {
       }
       _state.usageStats = normalizeUsageStats(_state.usageStats);
       _state.usageLimits = normalizeUsageLimits(_state.usageLimits);
+      if (!_state.googleClientId || !_state.googleClientId.trim()) {
+        _state.googleClientId = DEFAULT_GOOGLE_CLIENT_ID;
+      }
     } catch (e) {
       _state = { ...defaults };
     }

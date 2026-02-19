@@ -80,6 +80,7 @@ const SettingsAdvancedView = (() => {
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
             <div class="settings-row__value">Saved devotions on this device: <strong>${savedCount}</strong></div>
             <input id="google-client-id" class="input" type="text" placeholder="Google OAuth Client ID" value="${escapeHtml(state.googleClientId || '')}" />
+            <div class="text-xs text-muted">Default client ID is preconfigured for all users. Override only if you host your own OAuth app.</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-secondary btn-sm" id="connect-google-btn">Sign In Google</button>
               <button class="btn btn-secondary btn-sm" id="push-sync-btn">Upload Saved Devotions</button>

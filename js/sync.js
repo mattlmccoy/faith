@@ -5,6 +5,7 @@
 const Sync = (() => {
   const FILE_NAME = 'abide-saved-devotions.json';
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+  const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   let _accessToken = '';
   let _tokenClient = null;
 
@@ -13,7 +14,7 @@ const Sync = (() => {
   }
 
   function getClientId() {
-    return (Store.get('googleClientId') || '').trim();
+    return (Store.get('googleClientId') || DEFAULT_GOOGLE_CLIENT_ID || '').trim();
   }
 
   function ensureClientConfig() {
