@@ -61,8 +61,7 @@
   --safe-left:   env(safe-area-inset-left, 0px);
   --safe-right:  env(safe-area-inset-right, 0px);
   --safe-top-ui: 0px;
-  --safe-bottom-ui: 0px;
-  --app-height: 100svh;
+  --safe-bottom-ui: env(safe-area-inset-bottom, 0px);
 
   /* --- Typography --- */
   --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -495,6 +494,7 @@
 
 html {
   height: 100%;
+  min-height: 100%;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -506,6 +506,7 @@ html {
 
 body {
   height: 100%;
+  min-height: 100%;
   font-family: var(--font-sans);
   font-size: var(--text-base);
   font-weight: var(--weight-regular);
@@ -576,7 +577,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 #app {
   display: flex;
   flex-direction: column;
-  height: var(--app-height, 100svh);
+  height: 100%;
+  min-height: 100svh;
   max-width: var(--content-max-width);
   margin: 0 auto;
   position: relative;
@@ -584,7 +586,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   z-index: 1; /* sits above ambient blob layer */
 }
 @supports (height: 100dvh) {
-  #app { height: min(var(--app-height, 100dvh), 100dvh); }
+  #app { min-height: 100dvh; }
 }
 
 /* iOS Standalone status bar spacer */
@@ -596,10 +598,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 [data-standalone="true"] {
   --safe-top-ui: var(--safe-top);
-  --safe-bottom-ui: var(--safe-bottom);
-}
-[data-ios="true"] {
-  --safe-bottom-ui: var(--safe-bottom);
 }
 [data-standalone="true"] .status-bar-spacer {
   display: block;
@@ -669,10 +667,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overscroll-behavior-y: contain;
   position: relative;
   scroll-padding-bottom: var(--space-4);
-}
-
-[data-standalone="true"] .view-container,
-[data-ios="true"] .view-container {
   padding-bottom: var(--tab-total-height);
 }
 
@@ -702,40 +696,24 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    ============================================================ */
 .tab-bar {
   flex-shrink: 0;
-  /* Total height: visual bar + safe-area below home indicator */
   height: var(--tab-total-height);
-  /* Pad the bottom so the home indicator area is just background */
-  padding-bottom: var(--safe-bottom-ui);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--glass-fill);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--glass-border);
-  /* Anchor items to TOP of bar — they fill the 56px visual zone,
-     not the full height which includes safe-area */
   display: flex;
-  align-items: flex-start;
-  position: relative;
+  align-items: center;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: min(100%, var(--content-max-width));
   z-index: 10;
   transition: background var(--transition-theme), border-color var(--transition-theme);
 }
 
-[data-standalone="true"] .tab-bar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 0;
-  width: min(100%, var(--content-max-width));
-}
-
-[data-ios="true"] .tab-bar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 0;
-  width: min(100%, var(--content-max-width));
-}
-
-[data-ios="true"] .app-legal {
+.app-legal {
   margin-bottom: var(--tab-total-height);
 }
 
@@ -772,6 +750,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: var(--weight-medium);
   letter-spacing: 0.02em;
   line-height: 1;
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --safe-top-ui: var(--safe-top);
+    --safe-bottom-ui: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Active indicator: top bar */
