@@ -1,20 +1,19 @@
 /**
- * ABIDE Worker - AI handlers using Cloudflare AI (free)
- * Model: @cf/meta/llama-3.1-8b-instruct
+ * ABIDE Worker - AI handlers using Gemini API.
  *
- * No API key needed — uses env.AI binding (Cloudflare Workers AI, free tier).
- * Configured in wrangler.toml:
- *   [ai]
- *   binding = "AI"
+ * Required secret:
+ *   GEMINI_API_KEY
+ * Optional:
+ *   GEMINI_MODEL (default: gemini-1.5-flash)
  */
 
 const PLAN_CACHE_TTL = 24 * 60 * 60; // 24 hours (seconds, for KV)
 const PHRASE_CACHE_TTL = 60 * 60;    // 1 hour
-const MIN_MORNING_WORDS = 170;
-const MIN_EVENING_WORDS = 130;
-
-// Fast, free, structured-output-capable model on Cloudflare
-const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const DEFAULT_MIN_MORNING_WORDS = 170;
+const DEFAULT_MIN_EVENING_WORDS = 130;
+const DEFAULT_MIN_MORNING_PARAGRAPHS = 3;
+const DEFAULT_MIN_EVENING_PARAGRAPHS = 2;
+const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
 
 function wordCount(text = '') {
   return String(text)
@@ -22,6 +21,12 @@ function wordCount(text = '') {
     .split(/\s+/)
     .filter(Boolean)
     .length;
+}
+
+function normalizePositiveInt(value, fallback, min = 1, max = 4000) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 function devotionalText(session = {}) {
@@ -43,7 +48,7 @@ function devotionalParagraphs(session = {}) {
   return txt.split(/\n{2,}/).map(p => p.trim()).filter(Boolean).length;
 }
 
-function validatePlanLength(planData) {
+function validatePlanLength(planData, cfg) {
   const issues = [];
 
   planData.days.forEach((day, i) => {
@@ -55,15 +60,80 @@ function validatePlanLength(planData) {
     const eveningParas = devotionalParagraphs(day.evening);
     const dayNum = i + 1;
 
-    if (morningWords < MIN_MORNING_WORDS || morningParas < 3) {
+    if (morningWords < cfg.minMorningWords || morningParas < cfg.minMorningParagraphs) {
       issues.push(`Day ${dayNum} morning too short (${morningWords} words, ${morningParas} paragraphs)`);
     }
-    if (eveningWords < MIN_EVENING_WORDS || eveningParas < 2) {
+    if (eveningWords < cfg.minEveningWords || eveningParas < cfg.minEveningParagraphs) {
       issues.push(`Day ${dayNum} evening too short (${eveningWords} words, ${eveningParas} paragraphs)`);
     }
   });
 
   return issues;
+}
+
+async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 8192 }) {
+  if (!env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const model = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+
+  const payload = {
+    systemInstruction: {
+      parts: [{ text: systemPrompt }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: userPrompt }],
+      },
+    ],
+    generationConfig: {
+      temperature,
+      maxOutputTokens,
+    },
+  };
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const blocked = data?.promptFeedback?.blockReason;
+  if (blocked) {
+    throw new Error(`Gemini blocked prompt: ${blocked}`);
+  }
+
+  const text = (data?.candidates || [])
+    .flatMap(c => c?.content?.parts || [])
+    .map(p => p?.text || '')
+    .join('\n')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned empty response');
+  }
+
+  return text;
+}
+
+function parseJsonBlock(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
+    return JSON.parse(raw.slice(start, end + 1));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -72,18 +142,32 @@ function validatePlanLength(planData) {
 // ---------------------------------------------------------------------------
 export async function handleAIPlan(request, url, env, origin, json) {
   if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
-  if (!env.AI) return json({ error: 'AI binding not configured' }, 503, origin);
 
   let topic = 'Grace';
   let pastors = [];
+  let retryReason = '';
+  const cfg = {
+    minMorningWords: DEFAULT_MIN_MORNING_WORDS,
+    minEveningWords: DEFAULT_MIN_EVENING_WORDS,
+    minMorningParagraphs: DEFAULT_MIN_MORNING_PARAGRAPHS,
+    minEveningParagraphs: DEFAULT_MIN_EVENING_PARAGRAPHS,
+  };
+
   try {
     const b = await request.json();
     topic = b.topic || 'Grace';
     pastors = Array.isArray(b.pastors) ? b.pastors.filter(Boolean) : [];
+    retryReason = String(b.retryReason || '').trim();
+
+    cfg.minMorningWords = normalizePositiveInt(b.minMorningWords, DEFAULT_MIN_MORNING_WORDS, 80, 1200);
+    cfg.minEveningWords = normalizePositiveInt(b.minEveningWords, DEFAULT_MIN_EVENING_WORDS, 60, 900);
+    cfg.minMorningParagraphs = normalizePositiveInt(b.minMorningParagraphs, DEFAULT_MIN_MORNING_PARAGRAPHS, 2, 8);
+    cfg.minEveningParagraphs = normalizePositiveInt(b.minEveningParagraphs, DEFAULT_MIN_EVENING_PARAGRAPHS, 2, 7);
   } catch {}
 
   const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
-  const cacheKey = `plan:cf:v2:${topic.toLowerCase().trim()}:${pastorKey}`;
+  const lengthKey = `${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}`;
+  const cacheKey = `plan:gemini:v1:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -91,8 +175,8 @@ export async function handleAIPlan(request, url, env, origin, json) {
 
   const systemPrompt = `You are a thoughtful non-denominational Protestant pastor writing personal daily Bible devotions.
 You draw inspiration from trusted Protestant pastors provided by the user.
-You write in a warm, direct, gospel-centered style. Scripture references use the World English Bible (WEB).
-CRITICAL REQUIREMENT: Every single morning AND evening block MUST have a non-empty scripture_ref field with a real Bible reference (e.g. "Romans 8:28", "Psalm 23:1"). A day with no scripture_ref is invalid and will be rejected. Use a different passage for each day.
+You write in a warm, direct, gospel-centered style.
+CRITICAL REQUIREMENT: Every single morning AND evening block MUST have a non-empty scripture_ref field with a real Bible reference (e.g. "Romans 8:28", "Psalm 23:1").
 You MUST respond with valid JSON only — no markdown, no code blocks, no extra text before or after the JSON.`;
 
   const pastorLine = pastors.length
@@ -136,46 +220,32 @@ Return ONLY this exact JSON structure (no markdown fences, no explanation, just 
   ]
 }
 
-Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day. Ensure valid JSON.
+Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day.
 Devotional body content must be substantial. Scripture references do NOT count toward body length.
 For each day:
-- Morning body: at least 3 paragraphs and at least ${MIN_MORNING_WORDS} words of devotional explanation/application.
-- Evening body: at least 2 paragraphs and at least ${MIN_EVENING_WORDS} words of devotional reflection.
-Do not pad with repeated filler sentences.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}`;
+- Morning body: at least ${cfg.minMorningParagraphs} paragraphs and at least ${cfg.minMorningWords} words.
+- Evening body: at least ${cfg.minEveningParagraphs} paragraphs and at least ${cfg.minEveningWords} words.
+Ensure valid JSON only.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}`;
 
   try {
-    let retryNote = '';
     let lastErr = null;
+    let modelRetryNote = retryReason;
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const response = await env.AI.run(MODEL, {
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: buildUserPrompt(retryNote) },
-          ],
-          max_tokens: 7000,
+        const raw = await runGemini(env, {
+          systemPrompt,
+          userPrompt: buildUserPrompt(modelRetryNote),
           temperature: 0.65,
+          maxOutputTokens: 8192,
         });
 
-        const raw = (response.response || '').trim();
-
-        // Extract JSON — Llama sometimes wraps with commentary or markdown
-        let planData;
-        try {
-          planData = JSON.parse(raw);
-        } catch {
-          const start = raw.indexOf('{');
-          const end = raw.lastIndexOf('}');
-          if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
-          planData = JSON.parse(raw.slice(start, end + 1));
-        }
+        const planData = parseJsonBlock(raw);
 
         if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
           throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);
         }
 
-        // Fallback scripture refs if model omits them
         const FALLBACK_REFS = [
           'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
           'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
@@ -203,7 +273,7 @@ Do not pad with repeated filler sentences.${retryNote ? `\n\nRETRY REQUIREMENT: 
           throw new Error(`Plan missing too many scripture refs (${missingCount})`);
         }
 
-        const lengthIssues = validatePlanLength(planData);
+        const lengthIssues = validatePlanLength(planData, cfg);
         if (lengthIssues.length) {
           throw new Error(`Plan too short: ${lengthIssues.slice(0, 4).join('; ')}`);
         }
@@ -217,13 +287,13 @@ Do not pad with repeated filler sentences.${retryNote ? `\n\nRETRY REQUIREMENT: 
         return json(result, 200, origin);
       } catch (attemptErr) {
         lastErr = attemptErr;
-        retryNote = attemptErr.message;
+        modelRetryNote = attemptErr.message;
       }
     }
 
     throw lastErr || new Error('Unknown AI generation failure');
   } catch (err) {
-    console.error('CF AI plan error:', err.message);
+    console.error('Gemini plan error:', err.message);
     return json({ error: `AI plan failed: ${err.message}` }, 502, origin);
   }
 }
@@ -234,18 +304,18 @@ Do not pad with repeated filler sentences.${retryNote ? `\n\nRETRY REQUIREMENT: 
 // ---------------------------------------------------------------------------
 export async function handleAIPhrase(request, url, env, origin, json) {
   if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
-  if (!env.AI) return json({ verses: [], fallback: true }, 200, origin);
 
   let phrase = '';
   try { const b = await request.json(); phrase = b.phrase || ''; } catch {}
   if (!phrase.trim()) return json({ verses: [], fallback: true }, 200, origin);
 
-  const cacheKey = `phrase:cf:${phrase.toLowerCase().trim()}`;
+  const cacheKey = `phrase:gemini:v1:${phrase.toLowerCase().trim()}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
   }
 
+  const systemPrompt = 'You are a Bible scholar. Respond with valid JSON only.';
   const userPrompt = `A person searching their Bible app typed: "${phrase}"
 
 List the 6 most relevant Bible verses for this search. Consider emotional context, theological meaning, and practical application.
@@ -265,27 +335,14 @@ Respond ONLY with this JSON (no markdown, no extra text, just raw JSON):
 Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Rank by relevance.`;
 
   try {
-    const response = await env.AI.run(MODEL, {
-      messages: [
-        { role: 'system', content: 'You are a Bible scholar. Respond only with valid JSON, no markdown.' },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 800,
-      temperature: 0.3,
+    const raw = await runGemini(env, {
+      systemPrompt,
+      userPrompt,
+      temperature: 0.2,
+      maxOutputTokens: 1400,
     });
 
-    const raw = (response.response || '').trim();
-
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      const start = raw.indexOf('{');
-      const end = raw.lastIndexOf('}');
-      if (start === -1 || end === -1) throw new Error('No JSON in response');
-      data = JSON.parse(raw.slice(start, end + 1));
-    }
-
+    const data = parseJsonBlock(raw);
     if (!data.verses?.length) throw new Error('Empty verses array');
 
     const result = { verses: data.verses, fallback: false };
@@ -296,7 +353,7 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
 
     return json(result, 200, origin);
   } catch (err) {
-    console.error('CF AI phrase error:', err.message);
+    console.error('Gemini phrase error:', err.message);
     return json({ verses: [], fallback: true }, 200, origin);
   }
 }

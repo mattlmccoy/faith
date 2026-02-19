@@ -2,10 +2,6 @@ name = "abide-worker"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
-# Cloudflare AI — free inference, no API key needed
-[ai]
-binding = "AI"
-
 # KV Namespace - create with: wrangler kv:namespace create ABIDE_KV
 [[kv_namespaces]]
 binding = "ABIDE_KV"
@@ -22,9 +18,12 @@ crons = ["*/30 * * * *"]
 #   wrangler secret put ESV_API_TOKEN
 #   → paste: 92b3774f0e4f96c24bc8398b6b5c1fd93bd0f57d
 #
-# Required for AI plan builder + phrase search:
-#   wrangler secret put OPENAI_API_KEY
-#   → paste your OpenAI key (get one at platform.openai.com)
+# Required for AI plan builder + phrase search (Gemini):
+#   wrangler secret put GEMINI_API_KEY
+#   → paste your Gemini API key
+# Optional:
+#   wrangler secret put GEMINI_MODEL
+#   → e.g. gemini-1.5-flash
 #
 # Required for devotional web search:
 #   wrangler secret put SERPER_API_KEY

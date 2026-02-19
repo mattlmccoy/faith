@@ -5,7 +5,8 @@
  * Secrets (set with: wrangler secret put SECRET_NAME):
  *   ESV_API_TOKEN     - api.esv.org token
  *   SERPER_API_KEY    - Serper.dev search API key
- *   OPENAI_API_KEY    - OpenAI API key for AI plan + phrase search
+ *   GEMINI_API_KEY    - Gemini API key for AI plan + phrase search
+ *   GEMINI_MODEL      - Optional Gemini model name
  *   VAPID_PUBLIC_KEY  - VAPID public key for push
  *   VAPID_PRIVATE_KEY - VAPID private key for push
  *   VAPID_SUBJECT     - mailto:your@email.com

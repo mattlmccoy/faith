@@ -88,6 +88,14 @@ Secrets are stored encrypted in Cloudflare — never in your code or repo.
 wrangler secret put SERPER_API_KEY
 # Paste your key when prompted
 
+# Gemini API key (for /ai/plan and /ai/phrase)
+wrangler secret put GEMINI_API_KEY
+# Paste your Gemini key when prompted
+
+# Optional: choose Gemini model (defaults to gemini-1.5-flash)
+wrangler secret put GEMINI_MODEL
+# Example value: gemini-1.5-flash
+
 # VAPID public key (from step 5)
 wrangler secret put VAPID_PUBLIC_KEY
 
