@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script>
+    (function () {
+      var path = window.location.pathname || '/';
+      var last = path.split('/').pop() || '';
+      var looksLikeFile = last.indexOf('.') !== -1;
+      if (!path.endsWith('/') && !looksLikeFile) {
+        window.location.replace(path + '/' + window.location.search + window.location.hash);
+      }
+    })();
+  </script>
 
   <!-- PWA / iOS meta -->
   <meta name="apple-mobile-web-app-capable" content="yes">
