@@ -142,6 +142,13 @@ const Sync = (() => {
     return folderId;
   }
 
+  async function findExistingFolderId() {
+    let folderId = (Store.get('googleDriveFolderId') || '').trim();
+    if (!folderId) folderId = await findFolderId();
+    if (folderId) Store.update({ googleDriveFolderId: folderId });
+    return folderId;
+  }
+
   async function findFileId(folderId) {
     if (!folderId) return '';
     const q = encodeURIComponent(
@@ -212,7 +219,7 @@ const Sync = (() => {
   }
 
   async function pullSavedDevotions() {
-    const folderId = await findOrCreateFolderId();
+    const folderId = await findExistingFolderId();
     if (!folderId) return { fileId: '', count: 0, imported: false };
     let fileId = (Store.get('googleDriveFileId') || '').trim();
     if (!fileId) fileId = await findFileId(folderId);
@@ -227,7 +234,14 @@ const Sync = (() => {
       googleDriveFileId: fileId,
       lastDriveSyncAt: new Date().toISOString(),
     });
-    return { fileId, count: result.count || 0, imported: true };
+    return {
+      fileId,
+      count: result.count || 0,
+      importedIds: result.importedIds || 0,
+      importedLibrary: result.importedLibrary || 0,
+      importedJournal: result.importedJournal || 0,
+      imported: true,
+    };
   }
 
   function clearSession() {

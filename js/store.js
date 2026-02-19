@@ -306,19 +306,7 @@ const Store = (() => {
       const day = getDevotionData(dateKey) || {};
       const sessionData = day?.[session] || null;
       if (sessionData) {
-        _state.savedDevotionLibrary[id] = {
-          id,
-          dateKey,
-          session,
-          savedAt: new Date().toISOString(),
-          theme: day.theme || '',
-          title: sessionData.title || '',
-          openingVerse: sessionData.opening_verse || null,
-          body: Array.isArray(sessionData.body) ? sessionData.body : [],
-          reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
-          prayer: sessionData.prayer || '',
-          inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
-        };
+        _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData);
       }
     }
     save();
@@ -335,9 +323,45 @@ const Store = (() => {
       .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
   }
 
+  function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '') {
+    return {
+      id,
+      dateKey,
+      session,
+      savedAt: existingSavedAt || new Date().toISOString(),
+      theme: day.theme || '',
+      title: sessionData.title || '',
+      openingVerse: sessionData.opening_verse || null,
+      body: Array.isArray(sessionData.body) ? sessionData.body : [],
+      reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
+      prayer: sessionData.prayer || '',
+      inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
+      devotionData: JSON.parse(JSON.stringify({
+        theme: day.theme || '',
+        sources: Array.isArray(day.sources) ? day.sources : [],
+        faith_stretch: day.faith_stretch || null,
+        morning: day.morning || null,
+        evening: day.evening || null,
+      })),
+    };
+  }
+
   function exportSavedDevotionsSnapshot() {
     const list = Array.isArray(_state.savedDevotions) ? _state.savedDevotions : [];
     const lib = { ...(_state.savedDevotionLibrary || {}) };
+
+    Object.keys(lib).forEach((id) => {
+      const entry = lib[id] || {};
+      if (entry.devotionData && entry.body?.length) return;
+      const parts = String(id).split('-');
+      const session = parts.pop();
+      const dateKey = parts.join('-');
+      if (!dateKey || !session) return;
+      const day = getDevotionData(dateKey) || {};
+      const sessionData = day?.[session];
+      if (!sessionData) return;
+      lib[id] = buildSavedEntry(id, dateKey, session, day, sessionData, entry.savedAt || '');
+    });
 
     list.forEach((id) => {
       if (lib[id]) return;
@@ -348,25 +372,15 @@ const Store = (() => {
       const day = getDevotionData(dateKey) || {};
       const sessionData = day?.[session];
       if (!sessionData) return;
-      lib[id] = {
-        id,
-        dateKey,
-        session,
-        savedAt: new Date().toISOString(),
-        theme: day.theme || '',
-        title: sessionData.title || '',
-        openingVerse: sessionData.opening_verse || null,
-        body: Array.isArray(sessionData.body) ? sessionData.body : [],
-        reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
-        prayer: sessionData.prayer || '',
-        inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
-      };
+      lib[id] = buildSavedEntry(id, dateKey, session, day, sessionData, lib[id]?.savedAt || '');
     });
 
+    const uniqueIds = Array.from(new Set([...list, ...Object.keys(lib)]));
+
     return {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
-      savedDevotions: list,
+      savedDevotions: uniqueIds,
       savedDevotionLibrary: lib,
       journalEntries: _state.journalEntries || {},
     };
@@ -378,7 +392,11 @@ const Store = (() => {
       ? snapshot.savedDevotionLibrary
       : {};
 
-    const mergedIds = new Set([...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []), ...list]);
+    const mergedIds = new Set([
+      ...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []),
+      ...list,
+      ...Object.keys(lib),
+    ]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
     const incomingJournal = snapshot.journalEntries && typeof snapshot.journalEntries === 'object'
@@ -402,7 +420,12 @@ const Store = (() => {
     _state.journalEntries = currentJournal;
     _state.lastDriveSyncAt = new Date().toISOString();
     save();
-    return { count: _state.savedDevotions.length };
+    return {
+      count: _state.savedDevotions.length,
+      importedIds: list.length,
+      importedLibrary: Object.keys(lib).length,
+      importedJournal: Object.keys(incomingJournal).length,
+    };
   }
 
   // --- Pastors ---

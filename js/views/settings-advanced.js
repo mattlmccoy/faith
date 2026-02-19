@@ -191,7 +191,7 @@ const SettingsAdvancedView = (() => {
           if (statusEl) statusEl.textContent = 'No existing Drive file found yet.';
           return;
         }
-        if (statusEl) statusEl.textContent = `Downloaded and merged ${result.count} saved devotions and journal entries.`;
+        if (statusEl) statusEl.textContent = `Downloaded ${result.importedLibrary || 0} saved devotional records and ${result.importedJournal || 0} journal entries. Library total: ${result.count}.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Download failed: ${err.message}`;
       }
