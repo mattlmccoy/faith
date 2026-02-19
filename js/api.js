@@ -185,7 +185,10 @@ const API = (() => {
       body: JSON.stringify({ topic, pastors, ...options }),
     });
     Store.trackUsage('aiPlanRequests', 1);
-    if (!res.ok) throw new Error(`AI plan error: ${res.status}`);
+    if (!res.ok) {
+      const detail = await readErrorMessage(res, 'AI plan error');
+      throw new Error(detail);
+    }
     return res.json();
   }
 
@@ -269,3 +272,16 @@ const Cache = (() => {
 
 window.API = API;
 window.Cache = Cache;
+  async function readErrorMessage(res, fallback = 'Request failed') {
+    try {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        return data?.error || `${fallback}: ${res.status}`;
+      }
+      const text = await res.text();
+      return text?.trim() || `${fallback}: ${res.status}`;
+    } catch {
+      return `${fallback}: ${res.status}`;
+    }
+  }

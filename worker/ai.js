@@ -76,53 +76,71 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
-  const model = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+  const modelCandidates = [
+    env.GEMINI_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    'gemini-1.5-flash-latest',
+    'gemini-2.0-flash',
+  ].filter(Boolean);
 
-  const payload = {
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: userPrompt }],
+  let lastError = null;
+
+  for (const model of modelCandidates) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+
+    const payload = {
+      systemInstruction: {
+        parts: [{ text: systemPrompt }],
       },
-    ],
-    generationConfig: {
-      temperature,
-      maxOutputTokens,
-    },
-  };
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }],
+        },
+      ],
+      generationConfig: {
+        temperature,
+        maxOutputTokens,
+      },
+    };
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${body.slice(0, 300)}`);
+    if (!res.ok) {
+      const body = await res.text();
+      const message = `Gemini(${model}) error ${res.status}: ${body.slice(0, 300)}`;
+      lastError = new Error(message);
+
+      // Try next model for model-related failures
+      if (res.status === 404 || res.status === 400) continue;
+      throw lastError;
+    }
+
+    const data = await res.json();
+    const blocked = data?.promptFeedback?.blockReason;
+    if (blocked) {
+      throw new Error(`Gemini blocked prompt: ${blocked}`);
+    }
+
+    const text = (data?.candidates || [])
+      .flatMap(c => c?.content?.parts || [])
+      .map(p => p?.text || '')
+      .join('\n')
+      .trim();
+
+    if (!text) {
+      lastError = new Error(`Gemini(${model}) returned empty response`);
+      continue;
+    }
+
+    return text;
   }
 
-  const data = await res.json();
-  const blocked = data?.promptFeedback?.blockReason;
-  if (blocked) {
-    throw new Error(`Gemini blocked prompt: ${blocked}`);
-  }
-
-  const text = (data?.candidates || [])
-    .flatMap(c => c?.content?.parts || [])
-    .map(p => p?.text || '')
-    .join('\n')
-    .trim();
-
-  if (!text) {
-    throw new Error('Gemini returned empty response');
-  }
-
-  return text;
+  throw lastError || new Error('Gemini request failed for all candidate models');
 }
 
 function parseJsonBlock(raw) {
