@@ -5,6 +5,7 @@
 const Sync = (() => {
   const FILE_NAME = 'abide-saved-devotions.json';
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+  const PROFILE_SCOPE = 'openid email profile';
   const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   let _accessToken = '';
   let _tokenClient = null;
@@ -31,7 +32,7 @@ const Sync = (() => {
     if (!_tokenClient) {
       _tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
-        scope: DRIVE_SCOPE,
+        scope: `${DRIVE_SCOPE} ${PROFILE_SCOPE}`,
         callback: () => {},
       });
     }
@@ -61,6 +62,34 @@ const Sync = (() => {
       throw new Error(`Drive API ${res.status}: ${body.slice(0, 180)}`);
     }
     return res;
+  }
+
+  async function fetchGoogleProfile() {
+    const token = await requestToken(true);
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Google profile fetch failed: ${res.status} ${body.slice(0, 120)}`);
+    }
+    const profile = await res.json();
+    const normalized = {
+      sub: profile.sub || '',
+      email: profile.email || '',
+      name: profile.name || '',
+      picture: profile.picture || '',
+    };
+    Store.update({
+      googleProfile: normalized,
+      googleConnectedAt: new Date().toISOString(),
+    });
+    return normalized;
+  }
+
+  async function connectGoogle() {
+    await requestToken(true);
+    return fetchGoogleProfile();
   }
 
   async function findFileId() {
@@ -144,10 +173,16 @@ const Sync = (() => {
 
   function clearSession() {
     _accessToken = '';
+    Store.update({
+      googleProfile: null,
+      googleConnectedAt: null,
+    });
   }
 
   return {
     requestToken,
+    fetchGoogleProfile,
+    connectGoogle,
     pushSavedDevotions,
     pullSavedDevotions,
     clearSession,

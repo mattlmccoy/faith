@@ -64,6 +64,8 @@ const Store = (() => {
     googleClientId: DEFAULT_GOOGLE_CLIENT_ID,
     googleDriveFileId: '',
     lastDriveSyncAt: null,
+    googleProfile: null,      // { sub, email, name, picture }
+    googleConnectedAt: null,
   };
 
   let _state = null;

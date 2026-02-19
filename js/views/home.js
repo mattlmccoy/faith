@@ -83,7 +83,9 @@ const HomeView = (() => {
   }
 
   function renderNoPlan(div, selectedDate) {
+    const googleCard = renderGooglePanel();
     div.innerHTML = `
+      ${googleCard}
       <div class="empty-state">
         <div class="empty-state__icon">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -108,8 +110,10 @@ const HomeView = (() => {
     const dayIndex = Math.max(0, dayKeys.indexOf(selectedDate));
     const hasPrev = dayIndex > 0;
     const hasNext = dayIndex < dayKeys.length - 1;
+    const googleCard = renderGooglePanel();
 
     div.innerHTML = `
+      ${googleCard}
       <!-- Greeting -->
       <div class="home-greeting card-enter">
         <div class="home-greeting__time">${DateUtils.format(selectedDate)}</div>
@@ -312,6 +316,54 @@ const HomeView = (() => {
     `;
   }
 
+  function renderGooglePanel() {
+    const profile = Store.get('googleProfile');
+    if (profile?.email || profile?.name) {
+      const avatar = profile.picture
+        ? `<img src="${profile.picture}" alt="Google avatar" class="google-avatar" />`
+        : `<div class="google-avatar google-avatar--fallback">${(profile.name || profile.email || 'U').slice(0,1).toUpperCase()}</div>`;
+      return `
+        <div class="google-panel card-enter">
+          <div class="google-panel__left">
+            ${avatar}
+            <div class="google-panel__meta">
+              <div class="google-panel__title">Google connected</div>
+              <div class="google-panel__email">${profile.name || profile.email || ''}</div>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Sync</button>
+        </div>
+      `;
+    }
+    return `
+      <div class="google-panel card-enter">
+        <div class="google-panel__meta">
+          <div class="google-panel__title">Sign in with Google</div>
+          <div class="google-panel__email">Sync saved devotions across devices.</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="HomeView.connectGoogle()">Connect</button>
+      </div>
+    `;
+  }
+
+  async function connectGoogle() {
+    try {
+      await Sync.connectGoogle();
+      render(document.getElementById('view-container'));
+    } catch (err) {
+      alert(`Google sign-in failed: ${err.message}`);
+    }
+  }
+
+  async function syncSavedNow() {
+    try {
+      await Sync.pushSavedDevotions();
+      alert('Saved devotions synced to Google Drive.');
+    } catch (err) {
+      alert(`Sync failed: ${err.message}`);
+    }
+  }
+
   function toggleComplete() {
     const selectedDate = Store.getSelectedDevotionDate();
     const session = currentSession;
@@ -371,7 +423,7 @@ const HomeView = (() => {
     }
   }
 
-  return { render, toggleComplete, toggleSave, shiftDay };
+  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow };
 })();
 
 // Global collapsible toggle helper

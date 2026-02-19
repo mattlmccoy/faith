@@ -165,8 +165,8 @@ const SettingsAdvancedView = (() => {
     root.querySelector('#connect-google-btn')?.addEventListener('click', async () => {
       const statusEl = root.querySelector('#sync-status');
       try {
-        await Sync.requestToken(true);
-        if (statusEl) statusEl.textContent = 'Google sign-in succeeded.';
+        const profile = await Sync.connectGoogle();
+        if (statusEl) statusEl.textContent = `Google connected: ${profile.name || profile.email || 'Account linked'}.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Google sign-in failed: ${err.message}`;
       }
