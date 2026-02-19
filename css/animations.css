@@ -1,0 +1,270 @@
+/* ============================================================
+   ABIDE - Animations & Transitions
+   ============================================================ */
+
+/* --- View Transition System --- */
+.view-enter {
+  animation: viewSlideIn 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.view-enter-back {
+  animation: viewSlideInBack 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.view-exit {
+  animation: viewSlideOut 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@keyframes viewSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes viewSlideInBack {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes viewSlideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+/* --- Tab Switch Animation --- */
+.tab-switch-enter {
+  animation: tabFadeIn 200ms ease forwards;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Card Entrance --- */
+.card-enter {
+  animation: cardRise 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.card-enter:nth-child(2) { animation-delay: 60ms; }
+.card-enter:nth-child(3) { animation-delay: 120ms; }
+.card-enter:nth-child(4) { animation-delay: 180ms; }
+
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* --- Fade In / Out --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* --- Fade Up --- */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Scale In (for modals, sheets) --- */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* --- Spinner --- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Heartbeat (for streak badge) --- */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.heartbeat {
+  animation: heartbeat 2.5s ease-in-out infinite;
+}
+
+/* --- Shimmer Loading Skeleton --- */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-sunken) 25%,
+    var(--color-border) 50%,
+    var(--color-surface-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.skeleton-text {
+  height: 1em;
+  border-radius: var(--radius-full);
+  margin-bottom: 0.5em;
+}
+
+.skeleton-block {
+  border-radius: var(--radius-xl);
+}
+
+/* --- Tab Item Tap Feedback --- */
+.tab-item {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-item:active .tab-icon {
+  transform: scale(0.88);
+}
+
+/* --- Button press effect --- */
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+/* --- Collapsible animation --- */
+.collapsible__content {
+  overflow: hidden;
+}
+
+.collapsible__content.animating {
+  display: block;
+  animation: collapseOpen 200ms ease forwards;
+}
+
+.collapsible.closing .collapsible__content {
+  display: block;
+  animation: collapseClose 180ms ease forwards;
+}
+
+@keyframes collapseOpen {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 600px; }
+}
+
+@keyframes collapseClose {
+  from { opacity: 1; max-height: 600px; }
+  to { opacity: 0; max-height: 0; }
+}
+
+/* --- Notification Permission Slide Up --- */
+.notification-sheet {
+  animation: slideUp 350ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Prayer session step transition --- */
+.prayer-step-enter {
+  animation: stepFade 300ms ease forwards;
+}
+
+@keyframes stepFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Timer pulse when near zero --- */
+.timer-warning {
+  animation: timerPulse 0.5s ease-in-out infinite;
+  color: var(--color-error) !important;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* --- Source card selection --- */
+.source-card {
+  transition: all var(--transition-base);
+}
+
+.source-card.selected {
+  animation: selectPop 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes selectPop {
+  from { transform: scale(0.98); }
+  to { transform: scale(1); }
+}
+
+/* --- Theme transition (smooth light/dark switch) --- */
+html {
+  transition: background-color 400ms ease, color 400ms ease;
+}
+
+/* Disable animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

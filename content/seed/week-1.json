@@ -1,0 +1,385 @@
+{
+  "week": "2026-02-16",
+  "theme": "Grace",
+  "sources": [],
+  "days": {
+    "2026-02-16": {
+      "theme": "New Every Morning",
+      "morning": {
+        "title": "Waking to Mercy",
+        "opening_verse": {
+          "reference": "Lamentations 3:22-23",
+          "text": "The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning; great is your faithfulness.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "There is something profound about the morning. Before the weight of the day settles on your shoulders, before the inbox demands and the calendar tyrannizes — there is this: new mercy. Not recycled grace from yesterday, but fresh covenant love, pressed into your hands before you've done a single thing to deserve it." },
+          { "type": "scripture_block", "reference": "Romans 8:1", "text": "There is therefore now no condemnation for those who are in Christ Jesus." },
+          { "type": "paragraph", "content": "Tim Keller once described grace as 'accepting a love you can't afford.' This morning, that love has already been extended to you. The question isn't whether you've earned it — you haven't, and neither has anyone else. The question is whether you'll receive it. Open your hands. Start there." }
+        ],
+        "reflection_prompts": [
+          "What does it feel like to start the day knowing you are already loved — not because of what you'll accomplish today?",
+          "Where did yesterday leave residue of guilt or shame? Bring that specifically to God right now.",
+          "What is one way you could extend today the same grace you've just received?"
+        ],
+        "prayer": "Lord, before I reach for my phone or plan my day, I reach for you. Thank you that your mercies are already new — I didn't have to earn them overnight. Help me carry this grace into every interaction today. Amen.",
+        "midday_prompt": "Pause for 60 seconds. Ask: 'Where has God's grace shown up in my morning that I almost missed?'"
+      },
+      "evening": {
+        "title": "Ending in Rest",
+        "opening_verse": {
+          "reference": "Psalm 4:8",
+          "text": "I will both lay me down in peace, and sleep; for you, the Lord alone, make me live in safety.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The day is done. Whatever it held — the victories you expected, the failures you didn't — you are still held. This is the posture of evening prayer: not a review of your performance, but a returning. The prodigal comes home not because he's cleaned up, but because he remembers the Father's house." }
+        ],
+        "reflection_prompts": [
+          "Name one moment from today where you sensed God's presence, even faintly.",
+          "Is there anything from today you need to release before you sleep? Name it and give it to God.",
+          "Who showed you kindness today? Take 30 seconds to thank God for them by name."
+        ],
+        "prayer": "Father, I return to you at the close of this day. I lay down the weight of what I did and didn't do. You are faithful even when I am not. Guard my mind through the night. Amen.",
+        "lectio_divina": {
+          "passage": "Psalm 23",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read Psalm 23 slowly, aloud if possible. Read it twice. Let the words land without analyzing them." },
+            { "name": "Meditatio (Meditate)", "instruction": "Which word or phrase stopped you? Sit with it for two minutes. Repeat it quietly. Don't explain it — just receive it." },
+            { "name": "Oratio (Pray)", "instruction": "Let that word become your prayer. Talk to God about what it stirred in you. What is he saying to you through this text tonight?" },
+            { "name": "Contemplatio (Rest)", "instruction": "Simply rest in God's presence for two to three minutes. No agenda, no more words. Just be with him." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "The Gratitude Inventory",
+        "description": "Before bed tonight, write down 10 specific things you're grateful for from today. Not generic things (health, family) — specific moments. The mundane details are where God hides.",
+        "journal_prompt": "Write about a time when God showed up in a way you almost dismissed as coincidence. Looking back, what do you believe now about that moment?"
+      }
+    },
+    "2026-02-17": {
+      "theme": "The Wilderness of Grace",
+      "morning": {
+        "title": "Why God Allows the Hard Road",
+        "opening_verse": {
+          "reference": "Deuteronomy 8:2-3",
+          "text": "You shall remember all the way which the Lord your God has led you these forty years in the wilderness, that he might humble you, to test you, to know what was in your heart, whether you would keep his commandments, or not. He humbled you, and allowed you to be hungry, and fed you with manna.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The wilderness was not a mistake. God didn't lose his GPS coordinates and accidentally leave his people wandering. He led them there. John Mark Comer writes that the places of greatest spiritual formation are rarely the comfortable ones — they're the narrow roads, the dry seasons, the waiting rooms we didn't ask to be in." },
+          { "type": "scripture_block", "reference": "Matthew 4:1", "text": "Then Jesus was led up by the Spirit into the wilderness to be tempted by the devil." },
+          { "type": "paragraph", "content": "Even Jesus went through the wilderness — and he was led there by the Spirit. Whatever wilderness you're in right now, you are not alone in it, and it is not punishment. It may be the very place where God is stripping away what you don't need so you can find what you've been looking for." }
+        ],
+        "reflection_prompts": [
+          "What 'wilderness' are you currently in — a season of waiting, uncertainty, or lack?",
+          "What might God be forming in you through this season that couldn't happen any other way?",
+          "Where have you been tempted to take a shortcut out of your wilderness rather than trusting God through it?"
+        ],
+        "prayer": "Lord, I confess I often prefer comfort to formation. But you led even your Son through the wilderness. Help me trust that you are present in mine, and that what feels like abandonment might be apprenticeship. Amen.",
+        "midday_prompt": "Take 2 minutes away from your screen. Ask: 'What is the thing I've been avoiding feeling? Can I bring it to God right now?'"
+      },
+      "evening": {
+        "title": "Manna for Today",
+        "opening_verse": {
+          "reference": "Exodus 16:4",
+          "text": "The Lord said to Moses, 'Behold, I will rain bread from the sky for you, and the people shall go out and gather a day's portion every day, that I may test them, whether they will walk in my law, or not.'",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "Manna didn't keep. You couldn't stockpile it for later, hoard it against a rainy day. It was daily provision — enough for today. That was the point. God was teaching his people to need him every morning, not just in times of crisis. Dependence is the curriculum of the wilderness." }
+        ],
+        "reflection_prompts": [
+          "What did you receive today that you didn't earn or plan — provision that just showed up?",
+          "Where are you trying to 'stockpile' security rather than trusting God day by day?",
+          "What would it look like to go to bed tonight without being anxious about tomorrow?"
+        ],
+        "prayer": "Father, you gave manna in the wilderness. You provide what I need when I need it — not always when I want it, or how. Help me trust your provision for tomorrow without needing to control it tonight. Amen.",
+        "lectio_divina": {
+          "passage": "Psalm 46",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read Psalm 46 slowly. Notice the contrast between chaos and stillness." },
+            { "name": "Meditatio (Meditate)", "instruction": "'Be still and know that I am God.' Sit with just that phrase for two minutes." },
+            { "name": "Oratio (Pray)", "instruction": "What chaos in your life needs to hear this verse? Pray it over that situation specifically." },
+            { "name": "Contemplatio (Rest)", "instruction": "Be still. No words. Just be known by God." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "24-Hour Fast from Complaint",
+        "description": "For the next 24 hours, practice zero verbal complaint. Every time you feel the urge — about traffic, a person, your circumstances — pause, and name one thing you're grateful for instead.",
+        "journal_prompt": "Write about one area of your life where you have been complaining rather than praying. What would it look like to surrender that to God and trust him with it?"
+      }
+    },
+    "2026-02-18": {
+      "theme": "Abiding in the Vine",
+      "morning": {
+        "title": "The Branch That Bears Fruit",
+        "opening_verse": {
+          "reference": "John 15:4-5",
+          "text": "Remain in me, and I in you. As the branch can't bear fruit by itself, unless it remains in the vine, so neither can you, unless you remain in me. I am the vine. You are the branches. He who remains in me, and I in him, bears much fruit, for apart from me you can do nothing.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The branch doesn't try to produce fruit. It doesn't strain, hustle, or optimize. It simply stays connected to the vine. The fruit is a natural consequence of an organic relationship — not the product of effort but of union. Jesus uses this image not as a command to work harder but as an invitation to stay." },
+          { "type": "scripture_block", "reference": "Colossians 3:3", "text": "For you died, and your life is hidden with Christ in God." },
+          { "type": "paragraph", "content": "John Mark Comer has written that the most countercultural thing a Christian can do in our age is slow down enough to remain. To abide. The branch doesn't check notifications. It just stays." }
+        ],
+        "reflection_prompts": [
+          "What does 'abiding' in Christ actually look like in the texture of your ordinary day?",
+          "Where do you try to produce spiritual 'fruit' through effort and willpower rather than through connection?",
+          "What one practice could help you stay more consistently connected to God throughout today?"
+        ],
+        "prayer": "Jesus, I don't want to be a branch that strains. I want to be one that simply stays. Teach me what it means to abide in you — not as a religious discipline but as a living relationship. Amen.",
+        "midday_prompt": "Set a 12pm reminder: pause for 3 breaths and say, 'I am in Christ. Christ is in me.' Then continue with your day."
+      },
+      "evening": {
+        "title": "Pruned for More",
+        "opening_verse": {
+          "reference": "John 15:2",
+          "text": "Every branch in me that doesn't bear fruit, he takes away. Every branch that bears fruit, he prunes, that it may bear more fruit.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "Pruning is not punishment — it's the gardener's way of saying 'more.' When God removes something from your life — a relationship, a comfort, an ambition — it doesn't necessarily mean you failed. It may mean you're being prepared for more than what you're currently producing." }
+        ],
+        "reflection_prompts": [
+          "What has God removed from your life in the past year that felt like loss but may have been pruning?",
+          "Is there anything you're clinging to that might need to be released so you can grow more fully?",
+          "How would it change your perspective to see current difficulties as pruning rather than punishment?"
+        ],
+        "prayer": "Lord, I trust your hands as the gardener. Prune what needs to go — even when it hurts. I want to bear fruit that lasts. Amen.",
+        "lectio_divina": {
+          "passage": "John 15:1-11",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read John 15:1-11 slowly. This is Jesus speaking on the night before his death." },
+            { "name": "Meditatio (Meditate)", "instruction": "What single word or image from this passage is God drawing your attention to?" },
+            { "name": "Oratio (Pray)", "instruction": "Respond to God from what you received. Be honest. Be personal." },
+            { "name": "Contemplatio (Rest)", "instruction": "Rest in the love of the Father. You are a branch. You are held." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "The Unplugged Morning",
+        "description": "Tomorrow morning, don't touch your phone for the first 30 minutes after you wake up. Instead: read scripture, pray, sit quietly. Start with God before you start with the world.",
+        "journal_prompt": "Write about the last time you felt truly close to God. What was different about that season? What conditions made closeness possible?"
+      }
+    },
+    "2026-02-19": {
+      "theme": "Forgiving Because We've Been Forgiven",
+      "morning": {
+        "title": "The Math of Forgiveness",
+        "opening_verse": {
+          "reference": "Matthew 18:21-22",
+          "text": "Then Peter came and said to him, 'Lord, how often shall my brother sin against me, and I forgive him? Until seven times?' Jesus said to him, 'I don't tell you until seven times, but, until seventy times seven.'",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "Seventy times seven isn't a cap — it's a deconstruction of the whole accounting project. Jesus is not saying 'forgive 490 times and then you're done.' He's saying: stop keeping score. The math of forgiveness breaks down in the presence of grace." },
+          { "type": "scripture_block", "reference": "Ephesians 4:32", "text": "And be kind to one another, tenderhearted, forgiving each other, just as God also in Christ forgave you." },
+          { "type": "paragraph", "content": "The parable that follows Peter's question (Matthew 18:23-35) is sobering: a servant forgiven an unpayable debt who then throttles a fellow servant over a small loan. The point is not lost on us. We've been forgiven more than we can imagine — and then we go and struggle to forgive what, by comparison, is nothing." }
+        ],
+        "reflection_prompts": [
+          "Who in your life are you keeping a tab on — counting their offenses, waiting for accountability?",
+          "What would it mean to extend to them the same 'wiped clean' forgiveness you've received from God?",
+          "Is there someone you need to forgive today? What's stopping you?"
+        ],
+        "prayer": "Father, you forgave a debt I could never repay. Help me not to leave your throne and then demand payment from those who've hurt me. Give me a heart that freely gives what it has freely received. Amen.",
+        "midday_prompt": "Think of the person you're finding hardest to forgive right now. Pray for them by name — just 60 seconds."
+      },
+      "evening": {
+        "title": "The Running Father",
+        "opening_verse": {
+          "reference": "Luke 15:20",
+          "text": "He arose, and came to his father. But while he was still far off, his father saw him, and was moved with compassion, and ran, and fell on his neck, and kissed him.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "In the culture of the first century, a man of honor did not run. It was undignified. Yet the father in this story — who represents God — hikes up his robe and sprints toward his returning son while the boy is still far off. Before a word of apology. Before any proof of change. He ran." }
+        ],
+        "reflection_prompts": [
+          "Where in your life do you need to receive this running-father welcome? Where have you been treating God as a disappointed employer rather than a running father?",
+          "Where do you need to take on the posture of the running father toward someone in your life?",
+          "What would your relationship with God look like if you actually believed he runs toward you?"
+        ],
+        "prayer": "Father, let me know you as the one who ran. Help me return to you without shame — and receive the embrace you're already extending. And give me feet like yours when others need it. Amen.",
+        "lectio_divina": {
+          "passage": "Luke 15:11-32",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read the full parable of the prodigal son slowly. You may know it well — read it like you don't." },
+            { "name": "Meditatio (Meditate)", "instruction": "Which character do you most identify with right now — the younger son, the older, or the father? Why?" },
+            { "name": "Oratio (Pray)", "instruction": "Pray from that character's posture. If you're the younger son, return. If the older, ask for a softened heart." },
+            { "name": "Contemplatio (Rest)", "instruction": "Rest in the knowledge that the Father sees you while you are still far off — and he runs." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "Write a Letter of Forgiveness",
+        "description": "Write a letter to someone who has hurt you — a letter you don't have to send. Pour out honestly what they did, how it affected you, and then write the words: 'I choose to forgive you.' Put it away or burn it. The decision is real whether or not the letter is sent.",
+        "journal_prompt": "What is the difference between forgiveness and trust? Who in your life have you forgiven, but not re-extended trust to — and is that the right call?"
+      }
+    },
+    "2026-02-20": {
+      "theme": "Work as Worship",
+      "morning": {
+        "title": "Whatever You Do",
+        "opening_verse": {
+          "reference": "Colossians 3:23-24",
+          "text": "And whatever you do, work heartily, as for the Lord, and not for men; knowing that from the Lord you will receive the reward of the inheritance; for you serve the Lord Christ.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The sacred/secular divide is a fiction. God is not more present in a church service than in a spreadsheet, a classroom, a construction site, or a hospital room — if the person working there is doing it as an act of service to him. Jonathan Pokluda often says: the most spiritual thing you can do today might be to do your work excellently." },
+          { "type": "scripture_block", "reference": "Ecclesiastes 9:10", "text": "Whatever your hand finds to do, do it with all your might." },
+          { "type": "paragraph", "content": "This isn't about hustle culture or productivity. It's about consecration — the act of setting something apart for God. You can consecrate a Monday morning meeting the same way you consecrate a Sunday morning prayer. Both can be offerings." }
+        ],
+        "reflection_prompts": [
+          "How does it change your experience of work to see it as service to God rather than service to your boss or paycheck?",
+          "What would it look like to bring prayer, presence, and intention to your work today in a way that you haven't before?",
+          "Is there any part of your work that you've been doing half-heartedly? What would 'as for the Lord' look like there?"
+        ],
+        "prayer": "Lord, I consecrate my work to you today. Every meeting, every email, every task — done for you. Give me the focus and the character to work in a way that honors your name. Amen.",
+        "midday_prompt": "Before your next task or meeting, take 30 seconds to pray: 'Lord, I do this for you.' Then begin."
+      },
+      "evening": {
+        "title": "The Dignity of Rest",
+        "opening_verse": {
+          "reference": "Genesis 2:2",
+          "text": "On the seventh day God finished his work which he had done; and he rested on the seventh day from all his work which he had done.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "God rested. Not because he was tired, but because rest is a good thing — inherently valuable, not just instrumentally useful. We live in a culture that measures worth by output. The Sabbath whispers a different gospel: you are not what you produce. You are beloved." }
+        ],
+        "reflection_prompts": [
+          "Do you struggle to rest? Why do you think that is?",
+          "What is the difference between rest and laziness, in your understanding?",
+          "What would it look like to truly practice Sabbath — one day this week where you stop, rest, and delight?"
+        ],
+        "prayer": "God, you rested and called it good. Help me believe that I can stop — that the world won't fall apart, that my worth isn't tied to my output. Teach me the Sabbath. Amen.",
+        "lectio_divina": {
+          "passage": "Mark 6:30-32",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read Mark 6:30-32. Notice what Jesus says to his disciples after they've been working hard." },
+            { "name": "Meditatio (Meditate)", "instruction": "'Come away by yourselves to a desolate place and rest a while.' Sit with that invitation." },
+            { "name": "Oratio (Pray)", "instruction": "Is Jesus saying this to you tonight? What do you need to come away from? Pray honestly." },
+            { "name": "Contemplatio (Rest)", "instruction": "Accept the invitation. Rest in his presence. That's enough." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "Pray Over Your Work Before Beginning",
+        "description": "For the rest of this week: every morning before you begin work, spend 2 minutes praying over your day's tasks by name. Ask God to be present in each one, and to let your work bring glory to him.",
+        "journal_prompt": "What would it mean for your work to be an act of worship? What would have to change about how you approach it — your attitude, your integrity, your quality of attention?"
+      }
+    },
+    "2026-02-21": {
+      "theme": "The Gift of Community",
+      "morning": {
+        "title": "You Were Not Made to Do This Alone",
+        "opening_verse": {
+          "reference": "Hebrews 10:24-25",
+          "text": "Let us consider how to provoke one another to love and good works, not forsaking our own assembling together, as the custom of some is, but exhorting one another; and so much the more, as you see the Day approaching.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The writer of Hebrews assumes we'll need provoking. That word — 'provoke' — is the same one used for irritation. Good community irritates us toward growth. It doesn't just affirm us where we are; it invites us (sometimes uncomfortably) into who we could become." },
+          { "type": "scripture_block", "reference": "Proverbs 27:17", "text": "Iron sharpens iron; so a man sharpens his friend's countenance." },
+          { "type": "paragraph", "content": "The early church 'devoted themselves to the apostles' teaching, to fellowship, to the breaking of bread, and to prayer' (Acts 2:42). This wasn't optional enrichment — it was the oxygen they breathed. Who in your life is sharpening you? Are you letting them?" }
+        ],
+        "reflection_prompts": [
+          "Who in your life actually knows you — the real version, not the curated one?",
+          "Where have you been isolated or self-sufficient in your faith, when community was what was needed?",
+          "What would it look like to move toward deeper community this week — not just social contact, but real spiritual friendship?"
+        ],
+        "prayer": "Lord, you placed the lonely in families. Help me resist the temptation toward spiritual isolation. Give me the courage to be known — and to truly know others. Amen.",
+        "midday_prompt": "Send a text to one person in your life today that says: 'Thinking of you. Praying for you.' Then actually pray for them."
+      },
+      "evening": {
+        "title": "The Early Church Portrait",
+        "opening_verse": {
+          "reference": "Acts 2:44-47",
+          "text": "All who believed were together, and had all things in common. They sold their possessions and goods, and distributed them to all, according as anyone had need. Day by day, continuing steadfastly with one accord in the temple, and breaking bread at home, they took their food with gladness and singleness of heart, praising God.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "This is not a community organized around a worship service. It's a community organized around a life — eating, sharing, worshipping, giving, learning together. The church was most alive when it was most ordinary. When the sacred bled into the everyday." }
+        ],
+        "reflection_prompts": [
+          "How does your experience of Christian community compare to the Acts 2 portrait? What's missing?",
+          "What is one thing you could offer to your community — your time, your home, your resources?",
+          "Who have you been meaning to reach out to or reconnect with? What's one step you could take tomorrow?"
+        ],
+        "prayer": "Lord, let me be the kind of friend I wish I had. Give our community the gladness and singleness of heart that marked the early church. Amen.",
+        "lectio_divina": {
+          "passage": "John 17:20-23",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read Jesus' prayer for his followers in John 17:20-23. He's praying for you." },
+            { "name": "Meditatio (Meditate)", "instruction": "What does it mean that Jesus prayed that you would be 'one' — united with other believers and with God?" },
+            { "name": "Oratio (Pray)", "instruction": "Pray for unity in your church, your friendships, your family. Name people specifically." },
+            { "name": "Contemplatio (Rest)", "instruction": "Rest in the reality that Jesus intercedes for you even now. You are not forgotten or alone." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "The Reconnection",
+        "description": "This week, reach out to someone you've drifted from — a friend, a family member, someone you used to walk with. Don't wait for the perfect moment. Send the text. Make the call.",
+        "journal_prompt": "Who is the person in your life who has most shaped your faith? Have you ever told them? What would you want to say to them?"
+      }
+    },
+    "2026-02-22": {
+      "theme": "Sabbath",
+      "morning": {
+        "title": "The Gift No One Can Take",
+        "opening_verse": {
+          "reference": "Exodus 20:8-10",
+          "text": "Remember the Sabbath day, to keep it holy. You shall labor six days, and do all your work, but the seventh day is a Sabbath to the Lord your God.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "John Mark Comer writes that Sabbath is 'the practice of doing nothing.' Not productivity. Not self-improvement. Not even ministry. Nothing. You stop working. You rest. You delight. You worship. The world does not need your output for one day. And you need to be reminded of that." },
+          { "type": "scripture_block", "reference": "Isaiah 58:13-14", "text": "If you turn away your foot from the Sabbath, from doing your pleasure on my holy day; and call the Sabbath a delight, and the holy of the Lord honorable... then you shall delight yourself in the Lord." },
+          { "type": "paragraph", "content": "The Sabbath is not a rule to follow — it's a gift to receive. It is God saying: you are not a machine. You are my beloved. Stop. Rest in that." }
+        ],
+        "reflection_prompts": [
+          "What would a genuine Sabbath look like in your life? What would you stop, and what would you do instead?",
+          "What makes you afraid to truly rest — what will fall apart if you stop?",
+          "What is the difference between 'not working' and 'delighting'? What do you delight in?"
+        ],
+        "prayer": "Lord, I receive the Sabbath as a gift. Help me stop long enough to remember who I am — not what I produce, but your beloved. Amen.",
+        "midday_prompt": "Today: resist the urge to be productive for 15 minutes. Go outside. Look at something beautiful. Let that be your work."
+      },
+      "evening": {
+        "title": "Come Away and Rest",
+        "opening_verse": {
+          "reference": "Mark 6:31",
+          "text": "He said to them, 'Come away into a deserted place, and rest awhile.' For there were many coming and going, and they had no leisure even to eat.",
+          "translation": "WEB"
+        },
+        "body": [
+          { "type": "paragraph", "content": "The disciples had been busy doing ministry. Legitimate, important, kingdom work. And Jesus pulled them away anyway. The invitation to rest is not a reward for finishing your to-do list — because you will never finish your to-do list. The invitation comes in the middle of the crowd." }
+        ],
+        "reflection_prompts": [
+          "When did you last feel truly rested — not just caught up, but genuinely restored?",
+          "Is rest something you schedule, or something you feel you have to earn? Why?",
+          "What would you do tomorrow if you knew God's only instruction for the day was 'rest'?"
+        ],
+        "prayer": "Jesus, you invited your tired disciples to rest. I accept the invitation. I'm tired. Restore me tonight. Amen.",
+        "lectio_divina": {
+          "passage": "Psalm 62:1-2",
+          "steps": [
+            { "name": "Lectio (Read)", "instruction": "Read Psalm 62:1-2 slowly. 'My soul finds rest in God alone.'" },
+            { "name": "Meditatio (Meditate)", "instruction": "Where do you actually find rest? Is it in God, or in something else?" },
+            { "name": "Oratio (Pray)", "instruction": "Ask God to become your resting place — the one your soul returns to." },
+            { "name": "Contemplatio (Rest)", "instruction": "Close your eyes. Rest in him. Nothing to do. Nothing to prove." }
+          ]
+        }
+      },
+      "faith_stretch": {
+        "title": "True Sabbath",
+        "description": "Designate one full day this week as Sabbath. No work, no social media, no productivity apps. Fill it with rest, worship, food with people you love, and delight. See what God does in the space you create.",
+        "journal_prompt": "Reflect on your relationship with busyness. Is it an addiction? A badge of honor? A defense against something? What does God think about the pace of your life right now?"
+      }
+    }
+  }
+}

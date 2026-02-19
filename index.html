@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- PWA / iOS meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Abide">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#2D5016">
+  <meta name="description" content="Personal daily Bible devotions">
+
+  <link rel="manifest" href="/faith/manifest.json">
+  <link rel="apple-touch-icon" href="/faith/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/faith/icons/icon-192.png">
+
+  <title>Abide</title>
+
+  <!-- Google Fonts (fallback while self-hosted fonts aren't added yet) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/faith/css/app.css">
+  <link rel="stylesheet" href="/faith/css/components.css">
+  <link rel="stylesheet" href="/faith/css/views.css">
+  <link rel="stylesheet" href="/faith/css/animations.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Status bar spacer for iOS standalone mode -->
+    <div class="status-bar-spacer"></div>
+
+    <!-- App Header -->
+    <header id="app-header" class="app-header">
+      <div class="header-content">
+        <button id="header-back" class="header-back" aria-label="Back" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <h1 id="view-title" class="header-title">Abide</h1>
+        <div id="header-actions" class="header-actions"></div>
+      </div>
+    </header>
+
+    <!-- Main View Container -->
+    <main id="view-container" class="view-container" role="main">
+      <div class="loading-screen">
+        <div class="loading-cross">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="20" y="4" width="8" height="40" rx="4" fill="currentColor"/>
+            <rect x="4" y="16" width="40" height="8" rx="4" fill="currentColor"/>
+          </svg>
+        </div>
+        <p class="loading-text">Abide</p>
+      </div>
+    </main>
+
+    <!-- Bottom Tab Bar -->
+    <nav id="tab-bar" class="tab-bar" role="navigation" aria-label="Main navigation">
+      <a href="#/" class="tab-item" data-tab="home" aria-label="Today's devotion">
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <span class="tab-label">Today</span>
+      </a>
+      <a href="#/scripture" class="tab-item" data-tab="scripture" aria-label="Scripture search">
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span class="tab-label">Scripture</span>
+      </a>
+      <a href="#/prayer" class="tab-item" data-tab="prayer" aria-label="Prayer">
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+        </svg>
+        <span class="tab-label">Prayer</span>
+      </a>
+      <a href="#/journal" class="tab-item" data-tab="journal" aria-label="Journal">
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+        <span class="tab-label">Journal</span>
+      </a>
+      <a href="#/settings" class="tab-item" data-tab="settings" aria-label="More options">
+        <svg class="tab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span class="tab-label">More</span>
+      </a>
+    </nav>
+  </div>
+
+  <!-- JavaScript - order matters -->
+  <script src="/faith/js/date.js"></script>
+  <script src="/faith/js/store.js"></script>
+  <script src="/faith/js/api.js"></script>
+  <script src="/faith/js/router.js"></script>
+  <script src="/faith/js/notifications.js"></script>
+  <script src="/faith/js/views/home.js"></script>
+  <script src="/faith/js/views/devotion.js"></script>
+  <script src="/faith/js/views/scripture.js"></script>
+  <script src="/faith/js/views/prayer.js"></script>
+  <script src="/faith/js/views/journal.js"></script>
+  <script src="/faith/js/views/plan.js"></script>
+  <script src="/faith/js/views/settings.js"></script>
+  <script src="/faith/js/app.js"></script>
+</body>
+</html>

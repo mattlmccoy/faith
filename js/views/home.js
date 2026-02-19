@@ -1,0 +1,319 @@
+/* ============================================================
+   ABIDE - Home View (Today's Devotion)
+   ============================================================ */
+
+const HomeView = (() => {
+  let currentSession = DateUtils.session();
+
+  function render(container) {
+    Router.setTitle('Abide');
+    Router.clearHeaderActions();
+
+    currentSession = Store.get('_sessionOverride') || DateUtils.session();
+
+    const devotionData = Store.getTodayDevotionData();
+    const userName = Store.get('userName');
+    const today = DateUtils.today();
+
+    if (!devotionData && !Store.get('onboardingDone')) {
+      renderSetup(container, userName);
+      return;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'view-content tab-switch-enter';
+
+    if (devotionData) {
+      renderDevotion(div, devotionData, userName, today);
+    } else {
+      renderNoPlan(div);
+    }
+
+    container.innerHTML = '';
+    container.appendChild(div);
+
+    // Update streak
+    Store.updateStreak();
+  }
+
+  function renderSetup(container, userName) {
+    const div = document.createElement('div');
+    div.className = 'view-content tab-switch-enter';
+    div.innerHTML = `
+      <div class="setup-prompt">
+        <div class="setup-prompt__cross">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="27" y="5" width="10" height="54" rx="5" fill="currentColor"/>
+            <rect x="5" y="22" width="54" height="10" rx="5" fill="currentColor"/>
+          </svg>
+        </div>
+        <h1 class="setup-prompt__title">Welcome to Abide</h1>
+        <p class="setup-prompt__subtitle">A place to meet with God every morning and evening.</p>
+        ${!userName ? `
+        <div style="width:100%;max-width:300px;">
+          <input id="setup-name" class="input" type="text" placeholder="What's your name?" autocomplete="given-name" style="margin-bottom:12px;text-align:center;" />
+        </div>
+        ` : ''}
+        <button class="btn btn-primary" id="setup-start">
+          Build Your First Week
+        </button>
+        <p class="text-sm text-secondary" style="max-width:260px;line-height:1.6;">
+          Pick a theme for this week. We'll search for devotional content from trusted pastors and build your week automatically.
+        </p>
+      </div>
+    `;
+
+    container.innerHTML = '';
+    container.appendChild(div);
+
+    document.getElementById('setup-start')?.addEventListener('click', () => {
+      const nameInput = document.getElementById('setup-name');
+      if (nameInput && nameInput.value.trim()) {
+        Store.set('userName', nameInput.value.trim());
+      }
+      Store.set('onboardingDone', true);
+      Router.navigate('/settings?tab=plan');
+    });
+  }
+
+  function renderNoPlan(div) {
+    div.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <h2 class="empty-state__title">No devotion for today</h2>
+        <p class="empty-state__description">Build this week's plan to start your daily devotions.</p>
+        <button class="btn btn-primary" onclick="Router.navigate('/settings')">Build This Week's Plan</button>
+      </div>
+    `;
+  }
+
+  function renderDevotion(div, data, userName, today) {
+    const session = currentSession;
+    const sessionData = data[session];
+    if (!sessionData) { renderNoPlan(div); return; }
+
+    const isCompleted = Store.isCompleted(today, session);
+
+    div.innerHTML = `
+      <!-- Greeting -->
+      <div class="home-greeting card-enter">
+        <div class="home-greeting__time">${DateUtils.format(today)}</div>
+        <h2 class="home-greeting__name">${DateUtils.greeting(userName)}</h2>
+      </div>
+
+      <!-- Date + series -->
+      <div class="home-date-row card-enter" style="margin-top:6px;margin-bottom:20px;">
+        ${data.theme ? `<span class="home-series">${data.theme}</span>` : ''}
+        ${renderStreak()}
+      </div>
+
+      <!-- Session toggle -->
+      <div class="home-session-toggle card-enter">
+        <div class="session-toggle">
+          <button class="session-toggle__btn ${session === 'morning' ? 'session-toggle__btn--active' : ''}" data-session="morning">
+            ☀️ Morning
+          </button>
+          <button class="session-toggle__btn ${session === 'evening' ? 'session-toggle__btn--active' : ''}" data-session="evening">
+            🌙 Evening
+          </button>
+        </div>
+      </div>
+
+      <!-- Key Verse -->
+      <div class="home-verse card-enter">
+        ${renderVerseCard(sessionData.opening_verse, session)}
+      </div>
+
+      <!-- Devotion excerpt -->
+      <div class="home-devotion-excerpt card-enter">
+        ${renderExcerpt(sessionData)}
+      </div>
+
+      <!-- Reflection prompts -->
+      ${sessionData.reflection_prompts?.length ? `
+      <div class="home-prompts card-enter">
+        <div class="section-header">
+          <span class="section-title">Reflect</span>
+        </div>
+        ${sessionData.reflection_prompts.slice(0, 3).map((p, i) => `
+          <div class="prompt-card">
+            <div class="prompt-card__number">${i + 1}</div>
+            <div class="prompt-card__text">${p}</div>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      <!-- Midday prompt (morning only) -->
+      ${session === 'morning' && sessionData.midday_prompt ? `
+      <div class="home-midday card-enter">
+        <div class="midday-banner">
+          <div class="midday-banner__icon">⏰</div>
+          <div class="midday-banner__content">
+            <div class="midday-banner__title">Midday Check-in</div>
+            <div class="midday-banner__text">${sessionData.midday_prompt}</div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Prayer of the day -->
+      ${sessionData.prayer ? `
+      <div class="home-prayer card-enter">
+        <div class="collapsible" id="prayer-collapsible">
+          <button class="collapsible__trigger" onclick="toggleCollapsible('prayer-collapsible')">
+            <span class="collapsible__trigger-text">Prayer of the Day</span>
+            <svg class="collapsible__chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="collapsible__content">
+            <div class="prayer-card">
+              <div class="prayer-card__label">A Prayer</div>
+              <div class="prayer-card__text">${sessionData.prayer}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Lectio Divina (evening) -->
+      ${session === 'evening' && sessionData.lectio_divina ? `
+      <div class="card-enter">
+        <div class="collapsible" id="lectio-collapsible">
+          <button class="collapsible__trigger" onclick="toggleCollapsible('lectio-collapsible')">
+            <span class="collapsible__trigger-text">Lectio Divina — ${sessionData.lectio_divina.passage || ''}</span>
+            <svg class="collapsible__chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="collapsible__content">
+            ${sessionData.lectio_divina.steps.map(s => `
+              <div class="lectio-step">
+                <div class="lectio-step__name">${s.name}</div>
+                <div class="lectio-step__instruction">${s.instruction}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Faith Stretch -->
+      ${data.faith_stretch ? `
+      <div class="home-stretch card-enter">
+        <div class="section-header">
+          <span class="section-title">Faith Stretch</span>
+        </div>
+        <div class="stretch-card">
+          <div class="stretch-card__label">Today's Challenge</div>
+          <div class="stretch-card__title">${data.faith_stretch.title}</div>
+          <div class="stretch-card__description">${data.faith_stretch.description}</div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Actions -->
+      <div class="home-actions card-enter">
+        <button class="btn btn-secondary" style="flex:1;" onclick="Router.navigate('/devotion')">
+          Read Full Devotion
+        </button>
+        <button class="btn btn-secondary" style="flex:1;" onclick="Router.navigate('/prayer')">
+          Open Prayer
+        </button>
+      </div>
+
+      <!-- Complete button -->
+      <div class="home-complete-row card-enter">
+        <button class="complete-btn ${isCompleted ? 'completed' : ''}" id="complete-btn" onclick="HomeView.toggleComplete()">
+          ${isCompleted ? `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Completed
+          ` : `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+            Mark as Done
+          `}
+        </button>
+      </div>
+    `;
+
+    // Session toggle listeners
+    div.querySelectorAll('.session-toggle__btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const s = btn.dataset.session;
+        currentSession = s;
+        Store.set('_sessionOverride', s);
+        render(document.getElementById('view-container'));
+      });
+    });
+  }
+
+  function renderVerseCard(verse, session) {
+    if (!verse) return '';
+    return `
+      <div class="scripture-card scripture-card--${session}">
+        <div class="scripture-card__text">${verse.text || ''}</div>
+        <div class="scripture-card__reference">${verse.reference || ''}</div>
+        <div class="scripture-card__translation">${verse.translation || 'WEB'}</div>
+      </div>
+    `;
+  }
+
+  function renderExcerpt(sessionData) {
+    const firstPara = sessionData.body?.find(b => b.type === 'paragraph');
+    if (!firstPara && !sessionData.excerpt) return '';
+    const text = firstPara?.content || sessionData.excerpt || '';
+
+    return `
+      <div class="section-header">
+        <span class="section-title">${sessionData.title || 'Devotion'}</span>
+        <button class="section-action" onclick="Router.navigate('/devotion')">Read all →</button>
+      </div>
+      <p class="home-devotion-text">${text}</p>
+    `;
+  }
+
+  function renderStreak() {
+    const streak = Store.get('currentStreak');
+    if (!streak || streak < 2) return '';
+    return `
+      <div class="streak-badge heartbeat">
+        <span class="streak-badge__flame">🔥</span>
+        <span class="streak-badge__count">${streak}</span>
+        <span class="streak-badge__label">day streak</span>
+      </div>
+    `;
+  }
+
+  function toggleComplete() {
+    const today = DateUtils.today();
+    const session = currentSession;
+    const isNow = Store.isCompleted(today, session);
+    if (!isNow) {
+      Store.markCompleted(today, session);
+      const btn = document.getElementById('complete-btn');
+      if (btn) {
+        btn.classList.add('completed');
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Completed
+        `;
+      }
+    }
+  }
+
+  return { render, toggleComplete };
+})();
+
+// Global collapsible toggle helper
+function toggleCollapsible(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+}
+
+window.HomeView = HomeView;
