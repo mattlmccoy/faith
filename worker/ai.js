@@ -74,7 +74,7 @@ function validatePlanLength(planData, cfg) {
   return issues;
 }
 
-async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 6144, jsonMode = false }) {
+async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, maxOutputTokens = 8192, jsonMode = false }) {
   if (!env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
@@ -253,6 +253,26 @@ function parseJsonBlock(raw) {
   }
 }
 
+async function repairJsonWithGemini(env, malformedJson, schemaHint = '') {
+  const systemPrompt = 'You repair malformed JSON. Return valid JSON only. No markdown, no explanation.';
+  const userPrompt = `Fix this malformed JSON so it is valid and complete.
+${schemaHint ? `Schema hint: ${schemaHint}` : ''}
+
+Malformed JSON:
+${String(malformedJson).slice(0, 120000)}
+`;
+
+  const repaired = await runGemini(env, {
+    systemPrompt,
+    userPrompt,
+    temperature: 0.0,
+    maxOutputTokens: 8192,
+    jsonMode: true,
+  });
+
+  return parseJsonBlock(repaired);
+}
+
 // ---------------------------------------------------------------------------
 // POST /ai/plan  { topic: string, pastors?: string[] }
 // Returns a full 7-day devotional plan as JSON
@@ -354,11 +374,20 @@ Ensure valid JSON only.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}
           systemPrompt,
           userPrompt: buildUserPrompt(modelRetryNote),
           temperature: 0.65,
-          maxOutputTokens: 6144,
+          maxOutputTokens: 8192,
           jsonMode: true,
         });
 
-        const planData = parseJsonBlock(raw);
+        let planData;
+        try {
+          planData = parseJsonBlock(raw);
+        } catch (parseErr) {
+          planData = await repairJsonWithGemini(
+            env,
+            raw,
+            'Object with fields theme:string and days:array[7] containing morning/evening/scripture_ref/body/reflection_prompts/prayer'
+          );
+        }
 
         if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
           throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);

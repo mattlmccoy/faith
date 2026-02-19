@@ -7,7 +7,14 @@ const HomeView = (() => {
 
   function render(container) {
     Router.setTitle('Abide');
-    Router.clearHeaderActions();
+    Router.setHeaderActions(`
+      <button class="icon-btn" title="Build This Week" onclick="Router.navigate('/plan')" aria-label="Build This Week">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    `);
 
     currentSession = Store.get('_sessionOverride') || DateUtils.session();
 
@@ -85,7 +92,7 @@ const HomeView = (() => {
         </div>
         <h2 class="empty-state__title">No devotion for today</h2>
         <p class="empty-state__description">No devotion found for ${DateUtils.format(selectedDate)}. Build this week's plan to start your daily devotions.</p>
-        <button class="btn btn-primary" onclick="Router.navigate('/settings')">Build This Week's Plan</button>
+        <button class="btn btn-primary" onclick="Router.navigate('/plan')">Build This Week's Plan</button>
       </div>
     `;
   }
