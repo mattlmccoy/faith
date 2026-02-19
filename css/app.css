@@ -61,7 +61,7 @@
   --safe-left:   env(safe-area-inset-left, 0px);
   --safe-right:  env(safe-area-inset-right, 0px);
   --safe-top-ui: 0px;
-  --safe-bottom-ui: env(safe-area-inset-bottom, 0px);
+  --safe-bottom-ui: min(env(safe-area-inset-bottom, 0px), 34px);
 
   /* --- Typography --- */
   --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -697,7 +697,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .tab-bar {
   flex-shrink: 0;
   height: var(--tab-total-height);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--safe-bottom-ui);
   background: var(--glass-fill);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -711,10 +711,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   width: min(100%, var(--content-max-width));
   z-index: 10;
   transition: background var(--transition-theme), border-color var(--transition-theme);
-}
-
-.app-legal {
-  margin-bottom: var(--tab-total-height);
 }
 
 .tab-item {
@@ -755,7 +751,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 @media (display-mode: standalone) {
   :root {
     --safe-top-ui: var(--safe-top);
-    --safe-bottom-ui: env(safe-area-inset-bottom, 0px);
+    --safe-bottom-ui: min(env(safe-area-inset-bottom, 0px), 34px);
   }
 }
 
