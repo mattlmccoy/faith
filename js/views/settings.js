@@ -3,12 +3,26 @@
    ============================================================ */
 
 const SettingsView = (() => {
+
+  // Palette definitions for the picker UI
+  const PALETTES = [
+    { id: 'tuscan-sunset',   name: 'Tuscan',    dots: ['#E35336', '#FFD3AC', '#9988A1'] },
+    { id: 'desert-dusk',     name: 'Desert',    dots: ['#E68057', '#993A8B', '#BF7587'] },
+    { id: 'lavender-fields', name: 'Lavender',  dots: ['#CF6DFC', '#C1BFFF', '#BDB96A'] },
+    { id: 'cactus-flower',   name: 'Cactus',    dots: ['#92E4BA', '#E491A6', '#845763'] },
+    { id: 'mountain-mist',   name: 'Mountain',  dots: ['#6D8196', '#B0C4DE', '#01796F'] },
+    { id: 'graphite',        name: 'Graphite',  dots: ['#4A90D9', '#8C9BAB', '#C8D2DC'] },
+    { id: 'ocean-glass',     name: 'Ocean',     dots: ['#0EA5E9', '#22D3EE', '#64748B'] },
+    { id: 'mono',            name: 'Mono',      dots: ['#6B7280', '#9CA3AF', '#D1D5DB'] },
+  ];
+
   function render(container, params = '') {
     Router.setTitle('Settings');
     Router.clearHeaderActions();
 
     const state = Store.get();
     const tab = new URLSearchParams(params.replace('?', '')).get('tab');
+    const currentPalette = state.palette || 'tuscan-sunset';
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -41,12 +55,14 @@ const SettingsView = (() => {
       <div class="settings-section">
         <div class="settings-section-title">Appearance</div>
         <div class="settings-group">
+
+          <!-- Light/Dark mode -->
           <div class="settings-row">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             </div>
             <div class="settings-row__content">
-              <div class="settings-row__label">Theme</div>
+              <div class="settings-row__label">Mode</div>
             </div>
             <div class="settings-row__action">
               <select id="theme-select" class="input" style="width:auto;padding:6px 12px;">
@@ -56,6 +72,28 @@ const SettingsView = (() => {
               </select>
             </div>
           </div>
+
+          <!-- Color palette -->
+          <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+            <div style="display:flex;align-items:center;gap:var(--space-3);width:100%;margin-bottom:var(--space-3);">
+              <div class="settings-row__icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+              </div>
+              <div class="settings-row__label">Color Theme</div>
+            </div>
+            <div class="palette-grid" id="palette-grid">
+              ${PALETTES.map(p => `
+                <button class="palette-card ${currentPalette === p.id ? 'selected' : ''}" data-palette="${p.id}" type="button" aria-label="${p.name} theme">
+                  <div class="palette-dots">
+                    ${p.dots.map(c => `<span style="background:${c}"></span>`).join('')}
+                  </div>
+                  <span class="palette-name">${p.name}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Bible translation -->
           <div class="settings-row">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -75,10 +113,10 @@ const SettingsView = (() => {
               </select>
             </div>
           </div>
-          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--color-accent-warm);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
             <div style="display:flex;flex-direction:column;gap:4px;">
-              <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--color-text-primary);">⚠️ Copyrighted Translation</div>
-              <div style="font-size:var(--text-xs);line-height:1.6;color:var(--color-text-secondary);">
+              <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--text-primary);">⚠️ Copyrighted Translation</div>
+              <div style="font-size:var(--text-xs);line-height:1.6;color:var(--text-secondary);">
                 ESV is copyrighted. Passages are displayed for personal devotional use with full attribution.
                 ESV® Bible © Crossway. Requires Worker to be deployed.
               </div>
@@ -110,12 +148,14 @@ const SettingsView = (() => {
               </label>
             </div>
           </div>
-          <div class="settings-row">
+          <!-- Morning time — stacked so time input doesn't overflow on narrow screens -->
+          <div class="settings-row settings-row--stacked">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Morning Reminder</div>
+              <div class="settings-row__value">What time should we nudge you?</div>
             </div>
             <div class="settings-row__action">
               <input type="time" id="morning-time" class="settings-time-input"
@@ -123,12 +163,14 @@ const SettingsView = (() => {
               />
             </div>
           </div>
-          <div class="settings-row">
+          <!-- Evening time — stacked -->
+          <div class="settings-row settings-row--stacked">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Evening Reminder</div>
+              <div class="settings-row__value">End the day with reflection</div>
             </div>
             <div class="settings-row__action">
               <input type="time" id="evening-time" class="settings-time-input"
@@ -153,8 +195,8 @@ const SettingsView = (() => {
                 <div class="settings-row__value">Powers AI devotional search &amp; push notifications</div>
               </div>
             </div>
-            <div style="width:100%;padding:var(--space-2) var(--space-3);background:var(--color-surface-sunken);border-radius:var(--radius-sm);">
-              <p class="text-xs" style="color:var(--color-text-secondary);line-height:1.6;">
+            <div style="width:100%;padding:var(--space-2) var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);">
+              <p class="text-xs" style="color:var(--text-secondary);line-height:1.6;">
                 Default: <code style="font-size:0.7rem;word-break:break-all;">https://abide-worker.mattlmccoy.workers.dev</code>
               </p>
               <p class="text-xs text-muted" style="margin-top:4px;line-height:1.6;">
@@ -228,6 +270,17 @@ const SettingsView = (() => {
   }
 
   function setupSettingsListeners(root) {
+    // Palette picker — instant preview
+    root.querySelectorAll('.palette-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const palette = card.dataset.palette;
+        // Update selection UI
+        root.querySelectorAll('.palette-card').forEach(c => c.classList.toggle('selected', c.dataset.palette === palette));
+        // Live preview — apply immediately
+        document.documentElement.dataset.palette = palette;
+      });
+    });
+
     root.querySelector('#save-settings')?.addEventListener('click', () => {
       const name = root.querySelector('#settings-name')?.value?.trim() || '';
       const theme = root.querySelector('#theme-select')?.value || 'auto';
@@ -236,6 +289,7 @@ const SettingsView = (() => {
       const notifEnabled = root.querySelector('#notif-toggle')?.checked || false;
       const morningTime = root.querySelector('#morning-time')?.value || '06:30';
       const eveningTime = root.querySelector('#evening-time')?.value || '20:00';
+      const selectedPalette = document.documentElement.dataset.palette || 'tuscan-sunset';
 
       const [mh, mm] = morningTime.split(':').map(Number);
       const [eh, em] = eveningTime.split(':').map(Number);
@@ -250,23 +304,18 @@ const SettingsView = (() => {
         eveningHour: eh,
         eveningMinute: em,
         notificationsEnabled: notifEnabled,
+        palette: selectedPalette,
       });
 
       applyTheme(theme);
 
       // Handle notification toggle
-      // Note: We already saved notificationsEnabled to the store above.
-      // We only show a status message here — we do NOT override the saved preference
-      // based on whether the push subscription succeeds. This prevents the toggle
-      // from appearing to "reset" when the worker isn't reachable.
       if (notifEnabled) {
         Notifications.subscribeToPush().then(sub => {
           const msgEl = root.querySelector('#notif-status-msg');
           if (sub) {
             if (msgEl) msgEl.textContent = '✅ Reminders active!';
           } else {
-            // Subscription couldn't complete (worker not deployed, not installed, etc.)
-            // Show status info but KEEP the toggle on and preference saved.
             Notifications.getStatusMessage().then(msg => {
               if (msgEl) msgEl.textContent = msg || 'Enable when app is installed to Home Screen';
             });

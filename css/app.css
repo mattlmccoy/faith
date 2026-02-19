@@ -1,16 +1,11 @@
 /* ============================================================
    ABIDE - Design System
-   Core CSS: variables, reset, typography, layout
+   Arc-inspired soft glass modern design language.
+   Semantic tokens, 8 selectable palettes, glass surfaces,
+   ambient blobs, Inter + Playfair Display.
    ============================================================ */
 
-/* --- Fonts ---
-   Self-hosted WOFF2 files are used when available (see assets/fonts/).
-   Until then, Google Fonts is loaded in index.html as a fallback.
-   To add self-hosted fonts for full offline support:
-   1. Download Playfair Display and Inter from fonts.google.com
-   2. Place .woff2 files in assets/fonts/
-   3. Remove the Google Fonts link from index.html
-*/
+/* --- Fonts --- */
 @font-face {
   font-family: 'Playfair Display';
   src: url('/faith/assets/fonts/playfair-display.woff2') format('woff2');
@@ -18,7 +13,6 @@
   font-style: normal;
   font-display: swap;
 }
-
 @font-face {
   font-family: 'Playfair Display';
   src: url('/faith/assets/fonts/playfair-display-italic.woff2') format('woff2');
@@ -26,7 +20,6 @@
   font-style: italic;
   font-display: swap;
 }
-
 @font-face {
   font-family: 'Inter';
   src: url('/faith/assets/fonts/inter.woff2') format('woff2');
@@ -35,134 +28,421 @@
   font-display: swap;
 }
 
-/* --- CSS Custom Properties (Design Tokens) --- */
+/* ============================================================
+   BASE TOKENS (light mode defaults)
+   ============================================================ */
 :root {
-  /* Brand Colors — Tuscan Sunset
-     Terracotta #E35336 · Soft peach #FFD3AC · Dusty lavender #9988A1 · Deep tuscan #8A2B0E
-  */
-  --color-primary: #C44A32;       /* main terracotta (slightly deeper for legibility) */
-  --color-primary-light: #E35336; /* bright terracotta hover/active */
-  --color-primary-muted: #D9856E; /* muted clay */
-  --color-primary-faint: #FDF0EB; /* blush parchment */
+  /* --- Glass Material Recipe --- */
+  --glass-fill:        rgba(255, 255, 255, 0.60);
+  --glass-fill-strong: rgba(255, 255, 255, 0.80);
+  --glass-border:      rgba(255, 255, 255, 0.45);
+  --glass-shadow:      0 8px 32px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --glass-blur:        24px;
 
-  --color-accent: #9988A1;        /* dusty lavender */
-  --color-accent-light: #B5A8C0;  /* pale lavender */
-  --color-accent-warm: #EDE9F2;   /* lavender tint */
-  --color-accent-faint: #F7F5FA;  /* near-white lavender */
+  /* --- Text (never pure black) --- */
+  --text-primary:   rgba(0, 0, 0, 0.86);
+  --text-secondary: rgba(0, 0, 0, 0.58);
+  --text-tertiary:  rgba(0, 0, 0, 0.40);
+  --text-inverse:   rgba(255, 255, 255, 0.95);
 
-  /* Surfaces — soft peach parchment */
-  --color-surface: #FFF8F3;
-  --color-surface-raised: #FFFFFF;
-  --color-surface-sunken: #F5E8DF;
-  --color-border: #EDD9CC;
-  --color-border-strong: #D4B8A8;
+  /* --- UI Neutrals --- */
+  --divider: rgba(0, 0, 0, 0.08);
+  --icon:    rgba(0, 0, 0, 0.45);
 
-  /* Text */
-  --color-text-primary: #1A100C;
-  --color-text-secondary: #6B4438;
-  --color-text-muted: #A07868;
-  --color-text-inverse: #FFFFFF;
-
-  /* Semantic / State */
-  --color-morning: #E35336;       /* tuscan sunrise */
-  --color-evening: #9988A1;       /* dusty lavender dusk */
-  --color-success: #4A7A3A;
-  --color-error: #C0392B;
-
-  /* Typography */
-  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-
-  --text-xs: 0.6875rem;    /* 11px */
-  --text-sm: 0.8125rem;    /* 13px */
-  --text-base: 1rem;       /* 16px */
-  --text-md: 1.0625rem;    /* 17px */
-  --text-lg: 1.125rem;     /* 18px */
-  --text-xl: 1.25rem;      /* 20px */
-  --text-2xl: 1.5rem;      /* 24px */
-  --text-3xl: 1.875rem;    /* 30px */
-  --text-4xl: 2.25rem;     /* 36px */
-
-  --leading-tight: 1.2;
-  --leading-snug: 1.4;
-  --leading-normal: 1.6;
-  --leading-scripture: 1.85;
-
-  --weight-regular: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-
-  /* Spacing (4px base) */
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
-  --space-12: 3rem;     /* 48px */
-  --space-16: 4rem;     /* 64px */
-
-  /* Border Radius */
-  --radius-sm: 0.5rem;    /* 8px */
-  --radius-md: 1rem;      /* 16px */
-  --radius-lg: 1.25rem;   /* 20px */
-  --radius-xl: 1.5rem;    /* 24px */
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.05);
-
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 220ms ease;
-  --transition-slow: 350ms ease;
-
-  /* Layout */
+  /* --- Layout --- */
   --header-height: 56px;
   --tab-bar-height: 56px;
   --content-max-width: 680px;
 
-  /* iOS Safe Area */
-  --safe-top: env(safe-area-inset-top, 0px);
+  /* --- Safe Area (iOS) --- */
+  --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  /* --- Typography --- */
+  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --text-xs:   0.6875rem;  /* 11px */
+  --text-sm:   0.8125rem;  /* 13px */
+  --text-base: 1rem;       /* 16px */
+  --text-md:   1.0625rem;  /* 17px */
+  --text-lg:   1.125rem;   /* 18px */
+  --text-xl:   1.25rem;    /* 20px */
+  --text-2xl:  1.5rem;     /* 24px */
+  --text-3xl:  1.875rem;   /* 30px */
+  --text-4xl:  2.25rem;    /* 36px */
+
+  --leading-tight:     1.2;
+  --leading-snug:      1.4;
+  --leading-normal:    1.6;
+  --leading-scripture: 1.85;
+
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* --- Spacing (8pt grid) --- */
+  --space-1:  0.25rem;   /* 4px */
+  --space-2:  0.5rem;    /* 8px */
+  --space-3:  0.75rem;   /* 12px */
+  --space-4:  1rem;      /* 16px */
+  --space-5:  1.25rem;   /* 20px */
+  --space-6:  1.5rem;    /* 24px */
+  --space-8:  2rem;      /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+
+  /* --- Border Radius --- */
+  --radius-sm:   0.75rem;  /* 12px - controls */
+  --radius-md:   1rem;     /* 16px - inputs/chips */
+  --radius-lg:   1.25rem;  /* 20px - cards */
+  --radius-xl:   1.5rem;   /* 24px - modals/large panels */
+  --radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10), 0 4px 8px rgba(0, 0, 0, 0.05);
+
+  /* --- Transitions (smooth ease-out, "native" feel) --- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-slow: 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-theme: 380ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- Semantic Aliases (backwards compatibility) --- */
+  /* These map legacy --color-* names to the new token system
+     so all existing view/component code continues to work.    */
+  --color-primary:        var(--accent);
+  --color-primary-light:  var(--accent-light);
+  --color-primary-muted:  var(--accent-muted);
+  --color-primary-faint:  var(--accent-soft);
+  --color-accent:         var(--accent2);
+  --color-accent-light:   var(--accent2-light);
+  --color-accent-warm:    var(--accent2-soft);
+  --color-accent-faint:   var(--accent2-faint);
+  --color-surface:        var(--bg-base);
+  --color-surface-raised: var(--glass-fill);
+  --color-surface-sunken: var(--bg-sunken);
+  --color-border:         var(--divider-solid);
+  --color-border-strong:  var(--divider-strong);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-tertiary);
+  --color-text-inverse:   var(--text-inverse);
+  --color-morning:        var(--accent);
+  --color-evening:        var(--accent2);
+  --color-success:        #3A7D44;
+  --color-error:          #C0392B;
 }
 
-/* --- Dark Theme — Tuscan Night --- */
+/* ============================================================
+   PALETTE DEFINITIONS
+   Each palette sets: bg-base, bg-sunken, bg-gradient-1/2,
+   ambient-1/2/3, accent (+ light/muted/soft), accent2 (secondary),
+   divider-solid, divider-strong, focus-ring.
+   ============================================================ */
+
+/* --- 1. Tuscan Sunset (default) --- */
+:root,
+[data-palette="tuscan-sunset"] {
+  --bg-base:     #FFF8F3;
+  --bg-sunken:   #F5E8DF;
+  --bg-gradient-1: #FFF0E8;
+  --bg-gradient-2: #FFF8F3;
+
+  --ambient-1: #E35336;
+  --ambient-2: #9988A1;
+  --ambient-3: #FFD3AC;
+
+  --accent:       #C44A32;
+  --accent-light: #E35336;
+  --accent-muted: #D9856E;
+  --accent-soft:  rgba(196, 74, 50, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #9988A1;
+  --accent2-light: #B5A8C0;
+  --accent2-soft:  rgba(153, 136, 161, 0.12);
+  --accent2-faint: #F7F5FA;
+
+  --divider-solid:  #EDD9CC;
+  --divider-strong: #D4B8A8;
+  --focus-ring:     rgba(196, 74, 50, 0.30);
+}
+
+/* --- 2. Desert Dusk --- */
+[data-palette="desert-dusk"] {
+  --bg-base:     #FDF6F8;
+  --bg-sunken:   #F5E8EE;
+  --bg-gradient-1: #FDEEF4;
+  --bg-gradient-2: #FDF6F8;
+
+  --ambient-1: #E68057;
+  --ambient-2: #A2574F;
+  --ambient-3: #BF7587;
+
+  --accent:       #993A8B;
+  --accent-light: #B54FA8;
+  --accent-muted: #C078B4;
+  --accent-soft:  rgba(153, 58, 139, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #BF7587;
+  --accent2-light: #D499A8;
+  --accent2-soft:  rgba(191, 117, 135, 0.12);
+  --accent2-faint: #FDF3F5;
+
+  --divider-solid:  #EDCFD8;
+  --divider-strong: #D4B0BC;
+  --focus-ring:     rgba(153, 58, 139, 0.28);
+}
+
+/* --- 3. Lavender Fields --- */
+[data-palette="lavender-fields"] {
+  --bg-base:     #FDFCF0;
+  --bg-sunken:   #F5F3DC;
+  --bg-gradient-1: #FAF8E8;
+  --bg-gradient-2: #FDFCF0;
+
+  --ambient-1: #CF6DFC;
+  --ambient-2: #C1BFFF;
+  --ambient-3: #BDB96A;
+
+  --accent:       #A84ED4;
+  --accent-light: #CF6DFC;
+  --accent-muted: #C080E0;
+  --accent-soft:  rgba(168, 78, 212, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #C1BFFF;
+  --accent2-light: #D8D7FF;
+  --accent2-soft:  rgba(193, 191, 255, 0.18);
+  --accent2-faint: #F5F4FF;
+
+  --divider-solid:  #E0DEC0;
+  --divider-strong: #C8C6A0;
+  --focus-ring:     rgba(168, 78, 212, 0.28);
+}
+
+/* --- 4. Cactus Flower --- */
+[data-palette="cactus-flower"] {
+  --bg-base:     #F5FCF8;
+  --bg-sunken:   #E8F5EE;
+  --bg-gradient-1: #EEF9F3;
+  --bg-gradient-2: #F5FCF8;
+
+  --ambient-1: #E491A6;
+  --ambient-2: #92E4BA;
+  --ambient-3: #845763;
+
+  --accent:       #3DAB7A;
+  --accent-light: #52C990;
+  --accent-muted: #74D4A4;
+  --accent-soft:  rgba(61, 171, 122, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #E491A6;
+  --accent2-light: #EEB0C0;
+  --accent2-soft:  rgba(228, 145, 166, 0.12);
+  --accent2-faint: #FDF5F7;
+
+  --divider-solid:  #C8E8D8;
+  --divider-strong: #AACFBC;
+  --focus-ring:     rgba(61, 171, 122, 0.28);
+}
+
+/* --- 5. Mountain Mist --- */
+[data-palette="mountain-mist"] {
+  --bg-base:     #F5F7FA;
+  --bg-sunken:   #E8EDF3;
+  --bg-gradient-1: #EEF2F7;
+  --bg-gradient-2: #F5F7FA;
+
+  --ambient-1: #6D8196;
+  --ambient-2: #B0C4DE;
+  --ambient-3: #01796F;
+
+  --accent:       #01796F;
+  --accent-light: #029A8F;
+  --accent-muted: #44A89F;
+  --accent-soft:  rgba(1, 121, 111, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #6D8196;
+  --accent2-light: #8FA4B8;
+  --accent2-soft:  rgba(109, 129, 150, 0.12);
+  --accent2-faint: #F0F3F7;
+
+  --divider-solid:  #C8D4E0;
+  --divider-strong: #AAB8C8;
+  --focus-ring:     rgba(1, 121, 111, 0.28);
+}
+
+/* --- 6. Graphite (professional minimal) --- */
+[data-palette="graphite"] {
+  --bg-base:     #F8F7F6;
+  --bg-sunken:   #EEECEB;
+  --bg-gradient-1: #F3F2F1;
+  --bg-gradient-2: #F8F7F6;
+
+  --ambient-1: #9BAFC0;
+  --ambient-2: #C0BAB5;
+  --ambient-3: #7A98AC;
+
+  --accent:       #3A6EA8;
+  --accent-light: #4D84C4;
+  --accent-muted: #6D9FCC;
+  --accent-soft:  rgba(58, 110, 168, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #7A8FA0;
+  --accent2-light: #96ABBC;
+  --accent2-soft:  rgba(122, 143, 160, 0.12);
+  --accent2-faint: #F0F3F6;
+
+  --divider-solid:  #E0DCDA;
+  --divider-strong: #C8C4C2;
+  --focus-ring:     rgba(58, 110, 168, 0.28);
+}
+
+/* --- 7. Ocean Glass --- */
+[data-palette="ocean-glass"] {
+  --bg-base:     #F2F8FC;
+  --bg-sunken:   #E4F0F8;
+  --bg-gradient-1: #EBF4FA;
+  --bg-gradient-2: #F2F8FC;
+
+  --ambient-1: #0EA5E9;
+  --ambient-2: #38BDF8;
+  --ambient-3: #6366F1;
+
+  --accent:       #0284C7;
+  --accent-light: #0EA5E9;
+  --accent-muted: #38BDF8;
+  --accent-soft:  rgba(2, 132, 199, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #6366F1;
+  --accent2-light: #818CF8;
+  --accent2-soft:  rgba(99, 102, 241, 0.12);
+  --accent2-faint: #F0F0FF;
+
+  --divider-solid:  #C0DAF0;
+  --divider-strong: #A0C4E8;
+  --focus-ring:     rgba(2, 132, 199, 0.30);
+}
+
+/* --- 8. Mono Minimal --- */
+[data-palette="mono"] {
+  --bg-base:     #FAFAFA;
+  --bg-sunken:   #F0F0F0;
+  --bg-gradient-1: #F5F5F5;
+  --bg-gradient-2: #FAFAFA;
+
+  --ambient-1: transparent;
+  --ambient-2: transparent;
+  --ambient-3: transparent;
+
+  --accent:       #4B5563;
+  --accent-light: #6B7280;
+  --accent-muted: #9CA3AF;
+  --accent-soft:  rgba(75, 85, 99, 0.08);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #9CA3AF;
+  --accent2-light: #D1D5DB;
+  --accent2-soft:  rgba(156, 163, 175, 0.12);
+  --accent2-faint: #F9FAFB;
+
+  --divider-solid:  #E5E7EB;
+  --divider-strong: #D1D5DB;
+  --focus-ring:     rgba(75, 85, 99, 0.20);
+}
+
+/* ============================================================
+   DARK MODE OVERLAY
+   Applied on top of any palette when data-theme="dark"
+   ============================================================ */
 [data-theme="dark"] {
-  --color-primary: #C9705A;       /* muted terracotta glow */
-  --color-primary-light: #D98870;
-  --color-primary-muted: #7A4035;
-  --color-primary-faint: #1C0D09;
+  --glass-fill:        rgba(18, 18, 22, 0.65);
+  --glass-fill-strong: rgba(28, 28, 34, 0.85);
+  --glass-border:      rgba(255, 255, 255, 0.10);
+  --glass-shadow:      0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.30);
 
-  --color-accent: #8877A0;        /* deep dusty lavender */
-  --color-accent-light: #A090B8;
-  --color-accent-warm: #1E1828;
-  --color-accent-faint: #16121E;
+  --text-primary:   rgba(255, 255, 255, 0.90);
+  --text-secondary: rgba(255, 255, 255, 0.60);
+  --text-tertiary:  rgba(255, 255, 255, 0.38);
+  --text-inverse:   rgba(0, 0, 0, 0.86);
 
-  --color-surface: #120A07;       /* deep burnt umber night */
-  --color-surface-raised: #1E1210;
-  --color-surface-sunken: #0C0705;
-  --color-border: #2E1E18;
-  --color-border-strong: #4A2E25;
-
-  --color-text-primary: #F2EAE4;
-  --color-text-secondary: #C0907A;
-  --color-text-muted: #7A5548;
-  --color-text-inverse: #1E1210;
+  --divider: rgba(255, 255, 255, 0.08);
+  --icon:    rgba(255, 255, 255, 0.45);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.65);
 }
 
-/* --- Reset --- */
+/* Dark overrides per-palette */
+[data-theme="dark"][data-palette="tuscan-sunset"],
+[data-theme="dark"]:not([data-palette]) {
+  --bg-base:     #130A07;
+  --bg-sunken:   #0C0705;
+  --divider-solid:  rgba(237, 217, 204, 0.12);
+  --divider-strong: rgba(212, 184, 168, 0.20);
+  --accent-soft:  rgba(196, 74, 50, 0.15);
+}
+[data-theme="dark"][data-palette="desert-dusk"] {
+  --bg-base:   #120810;
+  --bg-sunken: #0A0608;
+  --divider-solid: rgba(237, 207, 216, 0.12);
+  --accent-soft:   rgba(153, 58, 139, 0.15);
+}
+[data-theme="dark"][data-palette="lavender-fields"] {
+  --bg-base:   #0E0C06;
+  --bg-sunken: #080600;
+  --divider-solid: rgba(224, 222, 192, 0.12);
+  --accent-soft:   rgba(168, 78, 212, 0.15);
+}
+[data-theme="dark"][data-palette="cactus-flower"] {
+  --bg-base:   #060E0A;
+  --bg-sunken: #040A06;
+  --divider-solid: rgba(200, 232, 216, 0.12);
+  --accent-soft:   rgba(61, 171, 122, 0.15);
+}
+[data-theme="dark"][data-palette="mountain-mist"] {
+  --bg-base:   #060A0E;
+  --bg-sunken: #04080C;
+  --divider-solid: rgba(200, 212, 224, 0.12);
+  --accent-soft:   rgba(1, 121, 111, 0.15);
+}
+[data-theme="dark"][data-palette="graphite"] {
+  --bg-base:   #0E0D0C;
+  --bg-sunken: #080706;
+  --divider-solid: rgba(224, 220, 218, 0.12);
+  --accent-soft:   rgba(58, 110, 168, 0.15);
+}
+[data-theme="dark"][data-palette="ocean-glass"] {
+  --bg-base:   #040E18;
+  --bg-sunken: #020A12;
+  --divider-solid: rgba(192, 218, 240, 0.12);
+  --accent-soft:   rgba(2, 132, 199, 0.15);
+}
+[data-theme="dark"][data-palette="mono"] {
+  --bg-base:   #111111;
+  --bg-sunken: #080808;
+  --divider-solid: rgba(229, 231, 235, 0.12);
+  --accent-soft:   rgba(75, 85, 99, 0.15);
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -174,6 +454,10 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Smooth theme + palette transitions */
+  transition:
+    background-color var(--transition-theme),
+    color var(--transition-theme);
 }
 
 body {
@@ -182,36 +466,69 @@ body {
   font-size: var(--text-base);
   font-weight: var(--weight-regular);
   line-height: var(--leading-normal);
-  color: var(--color-text-primary);
-  background-color: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* prevent body scroll; views scroll internally */
+  overflow: hidden;
+  /* Subtle base gradient for atmosphere */
+  background-image: linear-gradient(160deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
+  transition: background var(--transition-theme), color var(--transition-theme);
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+img, svg { display: block; max-width: 100%; }
+input, textarea, select { font-family: inherit; font-size: inherit; }
+
+/* ============================================================
+   AMBIENT BLOB LAYER
+   ============================================================ */
+.ambient-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  background: none;
+.ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.30;
+  transition:
+    background var(--transition-theme),
+    opacity var(--transition-theme);
 }
 
-img, svg {
-  display: block;
-  max-width: 100%;
+.ambient-blob--1 {
+  width: 65vw; height: 65vw;
+  max-width: 480px; max-height: 480px;
+  top: -15%; left: -10%;
+  background: var(--ambient-1);
 }
 
-input, textarea, select {
-  font-family: inherit;
-  font-size: inherit;
+.ambient-blob--2 {
+  width: 55vw; height: 55vw;
+  max-width: 420px; max-height: 420px;
+  top: 25%; right: -15%;
+  background: var(--ambient-2);
 }
 
-/* --- App Shell Layout --- */
+.ambient-blob--3 {
+  width: 50vw; height: 50vw;
+  max-width: 380px; max-height: 380px;
+  bottom: -8%; left: 15%;
+  background: var(--ambient-3);
+}
+
+[data-palette="mono"] .ambient-blob { opacity: 0; }
+[data-palette="graphite"] .ambient-blob { opacity: 0.12; }
+
+/* ============================================================
+   APP SHELL LAYOUT
+   ============================================================ */
 #app {
   display: flex;
   flex-direction: column;
@@ -220,23 +537,29 @@ input, textarea, select {
   margin: 0 auto;
   position: relative;
   overflow: hidden;
+  z-index: 1; /* sits above ambient blob layer */
 }
 
 /* iOS Standalone status bar spacer */
 .status-bar-spacer {
   height: var(--safe-top);
-  background: var(--color-surface-raised);
+  background: transparent;
   flex-shrink: 0;
 }
 
-/* --- App Header --- */
+/* ============================================================
+   APP HEADER
+   ============================================================ */
 .app-header {
   flex-shrink: 0;
   height: var(--header-height);
-  background: var(--color-surface-raised);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
   position: relative;
   z-index: 10;
+  transition: background var(--transition-theme), border-color var(--transition-theme);
 }
 
 .header-content {
@@ -254,21 +577,19 @@ input, textarea, select {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-full);
-  color: var(--color-primary);
-  transition: background var(--transition-fast);
+  color: var(--accent);
+  transition: background var(--transition-fast), color var(--transition-fast);
   flex-shrink: 0;
 }
 
-.header-back:hover {
-  background: var(--color-surface-sunken);
-}
+.header-back:hover { background: var(--accent-soft); }
 
 .header-title {
   flex: 1;
   font-family: var(--font-serif);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 
@@ -279,7 +600,9 @@ input, textarea, select {
   flex-shrink: 0;
 }
 
-/* --- View Container --- */
+/* ============================================================
+   VIEW CONTAINER
+   ============================================================ */
 .view-container {
   flex: 1;
   overflow-y: auto;
@@ -287,60 +610,58 @@ input, textarea, select {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   position: relative;
-}
-
-/* Scroll padding so content isn't hidden behind tab bar */
-.view-container {
   scroll-padding-bottom: var(--space-4);
 }
 
-/* --- Tab Bar --- */
+/* ============================================================
+   TAB BAR — fixed iOS PWA bottom positioning
+   ============================================================ */
 .tab-bar {
   flex-shrink: 0;
+  /* Total height: visual bar + safe-area below home indicator */
   height: calc(var(--tab-bar-height) + var(--safe-bottom));
+  /* Pad the bottom so the home indicator area is just background */
   padding-bottom: var(--safe-bottom);
-  background: var(--color-surface-raised);
-  border-top: 1px solid var(--color-border);
+  background: var(--glass-fill);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
+  /* Anchor items to TOP of bar — they fill the 56px visual zone,
+     not the full height which includes safe-area */
   display: flex;
-  align-items: flex-start; /* anchor items at top of bar, above safe-area padding */
+  align-items: flex-start;
   position: relative;
   z-index: 10;
+  transition: background var(--transition-theme), border-color var(--transition-theme);
 }
 
 .tab-item {
   flex: 1;
-  height: var(--tab-bar-height); /* exactly fills the visual bar, ignoring safe-area */
+  /* Exactly the visual 56px — ignores safe-area below */
+  height: var(--tab-bar-height);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
   padding: var(--space-1) var(--space-2);
-  color: var(--color-text-muted);
+  color: var(--icon);
   transition: color var(--transition-fast);
   position: relative;
   text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.tab-item.active {
-  color: var(--color-primary);
-}
+.tab-item.active { color: var(--accent); }
 
 .tab-icon {
-  width: 24px;
-  height: 24px;
+  width: 24px; height: 24px;
   flex-shrink: 0;
   transition: transform var(--transition-fast);
 }
 
-.tab-item.active .tab-icon {
-  /* Filled style for active */
-  stroke: var(--color-primary);
-}
-
-.tab-item:active .tab-icon {
-  transform: scale(0.9);
-}
+.tab-item.active .tab-icon { stroke: var(--accent); }
+.tab-item:active .tab-icon { transform: scale(0.88); }
 
 .tab-label {
   font-size: var(--text-xs);
@@ -349,7 +670,7 @@ input, textarea, select {
   line-height: 1;
 }
 
-/* Tab active indicator dot */
+/* Active indicator: top bar */
 .tab-item.active::before {
   content: '';
   position: absolute;
@@ -358,11 +679,14 @@ input, textarea, select {
   transform: translateX(-50%);
   width: 20px;
   height: 3px;
-  background: var(--color-primary);
+  background: var(--accent);
   border-radius: 0 0 var(--radius-full) var(--radius-full);
+  transition: background var(--transition-theme);
 }
 
-/* --- Loading Screen --- */
+/* ============================================================
+   LOADING SCREEN
+   ============================================================ */
 .loading-screen {
   display: flex;
   flex-direction: column;
@@ -370,26 +694,26 @@ input, textarea, select {
   justify-content: center;
   height: 100%;
   gap: var(--space-4);
-  color: var(--color-primary);
+  color: var(--accent);
 }
 
-.loading-cross {
-  animation: pulse 2s ease-in-out infinite;
-}
+.loading-cross { animation: pulse 2s ease-in-out infinite; }
 
 .loading-text {
   font-family: var(--font-serif);
   font-size: var(--text-2xl);
-  color: var(--color-primary);
+  color: var(--accent);
   letter-spacing: 0.05em;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.95); }
+  50%       { opacity: 0.6; transform: scale(0.95); }
 }
 
-/* --- Typography Utilities --- */
+/* ============================================================
+   TYPOGRAPHY UTILITIES
+   ============================================================ */
 .text-xs     { font-size: var(--text-xs); }
 .text-sm     { font-size: var(--text-sm); }
 .text-base   { font-size: var(--text-base); }
@@ -405,56 +729,57 @@ input, textarea, select {
 .font-semibold { font-weight: var(--weight-semibold); }
 .font-bold     { font-weight: var(--weight-bold); }
 
-.text-primary   { color: var(--color-text-primary); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-muted     { color: var(--color-text-muted); }
-.text-accent    { color: var(--color-accent); }
-.text-brand     { color: var(--color-primary); }
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-tertiary); }
+.text-accent    { color: var(--accent2); }
+.text-brand     { color: var(--accent); }
 
 .text-center { text-align: center; }
 .text-italic { font-style: italic; }
 .text-upper  { text-transform: uppercase; letter-spacing: 0.08em; }
 
-/* --- Layout Utilities --- */
-.flex        { display: flex; }
-.flex-col    { flex-direction: column; }
+/* ============================================================
+   LAYOUT UTILITIES
+   ============================================================ */
+.flex         { display: flex; }
+.flex-col     { flex-direction: column; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
-.gap-2       { gap: var(--space-2); }
-.gap-3       { gap: var(--space-3); }
-.gap-4       { gap: var(--space-4); }
+.gap-2 { gap: var(--space-2); }
+.gap-3 { gap: var(--space-3); }
+.gap-4 { gap: var(--space-4); }
 
 .hidden { display: none !important; }
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
 }
 
-/* --- Scrollable View Padding --- */
+/* ============================================================
+   SCROLLABLE VIEW PADDING
+   ============================================================ */
 .view-content {
   padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--safe-bottom));
   max-width: 100%;
 }
 
-/* Slightly more breathing room on wider screens */
 @media (min-width: 480px) {
   .view-content {
     padding: var(--space-5) var(--space-6) calc(var(--space-10) + var(--safe-bottom));
   }
 }
 
-/* --- Desktop layout adjustments --- */
+/* ============================================================
+   DESKTOP LAYOUT
+   ============================================================ */
 @media (min-width: 680px) {
   #app {
-    border-left: 1px solid var(--color-border);
-    border-right: 1px solid var(--color-border);
+    border-left: 1px solid var(--divider-solid);
+    border-right: 1px solid var(--divider-solid);
   }
-
   body {
-    background-color: var(--color-surface-sunken);
+    background: var(--bg-sunken);
+    background-image: linear-gradient(160deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
   }
 }

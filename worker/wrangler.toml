@@ -2,10 +2,14 @@ name = "abide-worker"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
+# Cloudflare AI — free inference, no API key needed
+[ai]
+binding = "AI"
+
 # KV Namespace - create with: wrangler kv:namespace create ABIDE_KV
 [[kv_namespaces]]
 binding = "ABIDE_KV"
-id = "YOUR_KV_NAMESPACE_ID_HERE"
+id = "5564c97493b34eaba4eb04d7edbe89b0"
 
 # Cron triggers: check for push notifications every 30 minutes
 [triggers]

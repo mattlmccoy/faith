@@ -1,243 +1,213 @@
 /**
- * ABIDE Worker - AI-powered handlers
+ * ABIDE Worker - AI handlers using Cloudflare AI (free)
+ * Model: @cf/meta/llama-3.1-8b-instruct
  *
- * /ai/plan  - Generate a full 7-day devotional plan for a given theme
- *             Uses Serper to find real content from approved ministries,
- *             then OpenAI to synthesize it into structured devotions.
- *
- * /ai/phrase - Find the best matching Bible verses for a phrase/keyword
- *              Returns ranked passage references with brief explanations.
- *
- * Secrets required:
- *   OPENAI_API_KEY  - OpenAI API key
- *   SERPER_API_KEY  - Serper.dev key (for plan builder web search)
+ * No API key needed — uses env.AI binding (Cloudflare Workers AI, free tier).
+ * Configured in wrangler.toml:
+ *   [ai]
+ *   binding = "AI"
  */
 
-const OPENAI_BASE = 'https://api.openai.com/v1';
+const PLAN_CACHE_TTL = 24 * 60 * 60; // 24 hours (seconds, for KV)
+const PHRASE_CACHE_TTL = 60 * 60;    // 1 hour
 
-const APPROVED_DOMAINS = [
-  'gospelinlife.com', 'timkeller.com', 'johnmarkcomer.com',
-  'practicingtheway.org', 'bridgechurch.com', 'louiegiglio.com',
-  'passionmovement.com', 'desiringgod.org', 'thegospelcoalition.org',
-  'ligonier.org', 'acts29.com',
-];
+// Fast, free, structured-output-capable model on Cloudflare
+const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 // ---------------------------------------------------------------------------
-// AI Plan Builder — POST /ai/plan  { topic: "Grace" }
+// POST /ai/plan  { topic: string }
+// Returns a full 7-day devotional plan as JSON
 // ---------------------------------------------------------------------------
-
 export async function handleAIPlan(request, url, env, origin, json) {
-  if (request.method !== 'POST') {
-    return json({ error: 'POST required' }, 405, origin);
-  }
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+  if (!env.AI) return json({ error: 'AI binding not configured' }, 503, origin);
 
-  if (!env.OPENAI_API_KEY) {
-    return json({ error: 'AI not configured (missing OPENAI_API_KEY)' }, 503, origin);
-  }
+  let topic = 'Grace';
+  let customPastor = '';
+  try { const b = await request.json(); topic = b.topic || 'Grace'; customPastor = b.customPastor || ''; } catch {}
 
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400, origin); }
-
-  const topic = (body.topic || '').trim();
-  if (!topic) return json({ error: 'Missing topic' }, 400, origin);
-
-  // Cache key
-  const cacheKey = `ai:plan:${topic.toLowerCase().replace(/\s+/g, '-')}`;
+  const cacheKey = `plan:cf:${topic.toLowerCase().trim()}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
-    if (cached) return json({ ...cached, cached: true }, 200, origin);
+    if (cached) return json(cached, 200, origin);
   }
 
-  // Step 1: Search Serper for real devotional content on this topic
-  let searchSnippets = '';
-  if (env.SERPER_API_KEY) {
-    try {
-      const siteFilters = APPROVED_DOMAINS.slice(0, 8).map(d => `site:${d}`).join(' OR ');
-      const query = `"${topic}" devotional OR sermon OR teaching (${siteFilters})`;
-      const serperRes = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: { 'X-API-KEY': env.SERPER_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: query, num: 8, gl: 'us' }),
-      });
-      if (serperRes.ok) {
-        const serperData = await serperRes.json();
-        const results = (serperData.organic || [])
-          .filter(r => APPROVED_DOMAINS.some(d => (r.link || '').includes(d)))
-          .slice(0, 5);
-        searchSnippets = results.map(r => `- ${r.title}: ${r.snippet}`).join('\n');
-      }
-    } catch (e) {
-      console.error('Serper search failed:', e);
-    }
-  }
+  const systemPrompt = `You are a thoughtful non-denominational Protestant pastor writing personal daily Bible devotions.
+You draw inspiration from pastors like Tim Keller, John Mark Comer, Jon Pokluda, Louie Giglio, John Piper, and Ben Stuart.
+You write in a warm, direct, gospel-centered style. Scripture references use the World English Bible (WEB).
+CRITICAL REQUIREMENT: Every single morning AND evening block MUST have a non-empty scripture_ref field with a real Bible reference (e.g. "Romans 8:28", "Psalm 23:1"). A day with no scripture_ref is invalid and will be rejected. Use a different passage for each day.
+You MUST respond with valid JSON only — no markdown, no code blocks, no extra text before or after the JSON.`;
 
-  // Step 2: Generate the plan with OpenAI
-  const systemPrompt = `You are a thoughtful Protestant devotional writer inspired by teachers like Tim Keller, John Mark Comer, Jonathan Pokluda, Louie Giglio, and John Piper. You write for a non-denominational, evangelical audience. Your writing is warm, honest, literary, and rooted in Scripture. You never moralize or use clichés. You always cite Scripture references (World English Bible preferred).`;
+  const customPastorLine = customPastor
+    ? `\nAlso draw from the theological style of ${customPastor}.`
+    : '';
 
-  const userPrompt = `Create a 7-day devotional plan on the theme: "${topic}".
+  const userPrompt = `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${customPastorLine}
 
-${searchSnippets ? `Here is real content from trusted ministries to draw inspiration from (do not copy directly, but let these inform the tone and ideas):\n${searchSnippets}\n` : ''}
-
-Return a JSON object with this exact structure:
+Return ONLY this exact JSON structure (no markdown fences, no explanation, just raw JSON):
 {
   "theme": "${topic}",
   "days": [
     {
       "dayIndex": 0,
-      "title": "Day subtitle (e.g. 'The Weight of Grace')",
+      "title": "Day title",
       "morning": {
-        "title": "Morning reading title",
-        "opening_verse": { "reference": "Book Ch:V", "text": "verse text", "translation": "WEB" },
-        "body": [
-          { "type": "paragraph", "content": "2-3 sentences of devotional reflection" },
-          { "type": "scripture_block", "reference": "Book Ch:V", "text": "supporting verse text" },
-          { "type": "paragraph", "content": "2-3 more sentences of reflection" }
-        ],
-        "reflection_prompts": ["question 1", "question 2", "question 3"],
-        "prayer": "2-3 sentence prayer",
-        "midday_prompt": "A single sentence check-in question for midday"
+        "scripture_ref": "Book Chapter:Verse",
+        "devotion": "2-3 paragraph devotional (150-200 words). Gospel-centered, personal, warm.",
+        "reflection_prompts": ["Question 1?", "Question 2?", "Question 3?"],
+        "prayer": "A 2-3 sentence personal prayer."
       },
       "evening": {
-        "title": "Evening reading title",
-        "opening_verse": { "reference": "Book Ch:V", "text": "verse text", "translation": "WEB" },
-        "body": [{ "type": "paragraph", "content": "2-3 sentences" }],
-        "reflection_prompts": ["question 1", "question 2"],
-        "prayer": "2-3 sentence prayer",
-        "lectio_divina": {
-          "passage": "Book Chapter",
-          "steps": [
-            { "name": "Lectio (Read)", "instruction": "..." },
-            { "name": "Meditatio (Meditate)", "instruction": "..." },
-            { "name": "Oratio (Pray)", "instruction": "..." },
-            { "name": "Contemplatio (Rest)", "instruction": "..." }
-          ]
-        }
+        "scripture_ref": "Book Chapter:Verse",
+        "devotion": "2-3 paragraph evening reflection (100-150 words). Quieter, reflective tone.",
+        "reflection_prompts": ["Question 1?", "Question 2?"],
+        "prayer": "A 1-2 sentence evening prayer."
       },
       "faith_stretch": {
-        "title": "Action title",
-        "description": "A practical challenge for the day",
-        "journal_prompt": "A journaling question"
+        "title": "Practical action title",
+        "description": "A concrete 1-2 sentence action to live out this theme today."
       }
     }
-    // ... 6 more days (dayIndex 1-6)
   ]
 }
 
-Make each day feel distinct. Progress through the theme: define it, explore scripture, confront the hard parts, find community, move to action, find rest, and land on living it. Use real Scripture references throughout. Be specific and pastoral, not generic.`;
+Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day. Ensure valid JSON.`;
 
   try {
-    const aiRes = await fetch(`${OPENAI_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 6000,
-        response_format: { type: 'json_object' },
-      }),
+    const response = await env.AI.run(MODEL, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 4000,
+      temperature: 0.7,
     });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error('OpenAI error:', errText);
-      return json({ error: `AI error: ${aiRes.status}` }, 502, origin);
+    const raw = (response.response || '').trim();
+
+    // Extract JSON — Llama sometimes wraps with commentary or markdown
+    let planData;
+    try {
+      planData = JSON.parse(raw);
+    } catch {
+      const start = raw.indexOf('{');
+      const end = raw.lastIndexOf('}');
+      if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
+      planData = JSON.parse(raw.slice(start, end + 1));
     }
 
-    const aiData = await aiRes.json();
-    const content = aiData.choices?.[0]?.message?.content;
-    if (!content) return json({ error: 'Empty AI response' }, 502, origin);
+    if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
+      throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);
+    }
 
-    const plan = JSON.parse(content);
+    // Fallback scripture refs if model omits them
+    const FALLBACK_REFS = [
+      'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
+      'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
+      'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
+    ];
 
-    // Cache for 24 hours
+    let missingCount = 0;
+    planData.days.forEach((day, i) => {
+      if (!day.morning) day.morning = {};
+      if (!day.evening) day.evening = {};
+      if (!day.morning.scripture_ref) {
+        day.morning.scripture_ref = FALLBACK_REFS[i % FALLBACK_REFS.length];
+        missingCount++;
+      }
+      if (!day.evening.scripture_ref) {
+        day.evening.scripture_ref = FALLBACK_REFS[(i + 4) % FALLBACK_REFS.length];
+        missingCount++;
+      }
+    });
+
+    // If more than half the days are missing scripture, regenerate
+    if (missingCount >= 7) {
+      throw new Error(`Plan missing too many scripture refs (${missingCount}), rejecting for retry`);
+    }
+
+    const result = { theme: planData.theme || topic, days: planData.days };
+
     if (env.ABIDE_KV) {
-      await env.ABIDE_KV.put(cacheKey, JSON.stringify(plan), { expirationTtl: 86400 });
+      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
     }
 
-    return json(plan, 200, origin);
-
+    return json(result, 200, origin);
   } catch (err) {
-    console.error('AI plan generation failed:', err);
-    return json({ error: err.message }, 500, origin);
+    console.error('CF AI plan error:', err.message);
+    return json({ error: `AI plan failed: ${err.message}` }, 502, origin);
   }
 }
 
 // ---------------------------------------------------------------------------
-// AI Phrase Search — POST /ai/phrase  { phrase: "feeling alone", translation: "web" }
+// POST /ai/phrase  { phrase: string }
+// Returns 6 best Bible verse refs + one-line explanations
 // ---------------------------------------------------------------------------
-
 export async function handleAIPhrase(request, url, env, origin, json) {
-  if (request.method !== 'POST') {
-    return json({ error: 'POST required' }, 405, origin);
-  }
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+  if (!env.AI) return json({ verses: [], fallback: true }, 200, origin);
 
-  if (!env.OPENAI_API_KEY) {
-    // Graceful fallback — return empty so the client uses its local keyword map
-    return json({ verses: [], fallback: true }, 200, origin);
-  }
+  let phrase = '';
+  try { const b = await request.json(); phrase = b.phrase || ''; } catch {}
+  if (!phrase.trim()) return json({ verses: [], fallback: true }, 200, origin);
 
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400, origin); }
-
-  const phrase = (body.phrase || '').trim();
-  if (!phrase) return json({ error: 'Missing phrase' }, 400, origin);
-
-  const cacheKey = `ai:phrase:${phrase.toLowerCase().replace(/\s+/g, '-').slice(0, 60)}`;
+  const cacheKey = `phrase:cf:${phrase.toLowerCase().trim()}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
-    if (cached) return json({ ...cached, cached: true }, 200, origin);
+    if (cached) return json(cached, 200, origin);
   }
 
-  const prompt = `A person searching for Bible guidance typed: "${phrase}"
+  const userPrompt = `A person searching their Bible app typed: "${phrase}"
 
-Return the 6 most relevant Bible passages that speak to this feeling, situation, or topic. For each one include:
-- The exact reference (book, chapter, verse)
-- A one-sentence explanation of why this passage applies
+List the 6 most relevant Bible verses for this search. Consider emotional context, theological meaning, and practical application.
 
-Return as JSON: { "verses": [ { "ref": "John 3:16", "why": "Because..." }, ... ] }
+Respond ONLY with this JSON (no markdown, no extra text, just raw JSON):
+{
+  "verses": [
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." },
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." },
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." },
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." },
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." },
+    { "ref": "Book Chapter:Verse", "why": "One sentence explaining relevance." }
+  ]
+}
 
-Use only real, accurate Bible references from the Protestant canon. Prefer the World English Bible (WEB) translation style. Order from most to least directly relevant.`;
+Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Rank by relevance.`;
 
   try {
-    const aiRes = await fetch(`${OPENAI_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 600,
-        response_format: { type: 'json_object' },
-      }),
+    const response = await env.AI.run(MODEL, {
+      messages: [
+        { role: 'system', content: 'You are a Bible scholar. Respond only with valid JSON, no markdown.' },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 800,
+      temperature: 0.3,
     });
 
-    if (!aiRes.ok) {
-      return json({ verses: [], fallback: true }, 200, origin);
+    const raw = (response.response || '').trim();
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      const start = raw.indexOf('{');
+      const end = raw.lastIndexOf('}');
+      if (start === -1 || end === -1) throw new Error('No JSON in response');
+      data = JSON.parse(raw.slice(start, end + 1));
     }
 
-    const aiData = await aiRes.json();
-    const content = aiData.choices?.[0]?.message?.content;
-    const result = content ? JSON.parse(content) : { verses: [] };
+    if (!data.verses?.length) throw new Error('Empty verses array');
 
-    // Cache for 1 hour
+    const result = { verses: data.verses, fallback: false };
+
     if (env.ABIDE_KV) {
-      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 3600 });
+      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PHRASE_CACHE_TTL });
     }
 
     return json(result, 200, origin);
-
   } catch (err) {
-    console.error('AI phrase search failed:', err);
+    console.error('CF AI phrase error:', err.message);
     return json({ verses: [], fallback: true }, 200, origin);
   }
 }

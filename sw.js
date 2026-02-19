@@ -3,7 +3,7 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v3';
+const SW_VERSION = 'abide-v4';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 

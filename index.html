@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-palette="tuscan-sunset">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Abide">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#2D5016">
+  <meta name="theme-color" content="#FFF8F3">
   <meta name="description" content="Personal daily Bible devotions">
 
   <link rel="manifest" href="/faith/manifest.json">
@@ -29,6 +29,13 @@
   <link rel="stylesheet" href="/faith/css/animations.css">
 </head>
 <body>
+  <!-- Ambient blob layer — always behind everything -->
+  <div class="ambient-layer" aria-hidden="true">
+    <div class="ambient-blob ambient-blob--1"></div>
+    <div class="ambient-blob ambient-blob--2"></div>
+    <div class="ambient-blob ambient-blob--3"></div>
+  </div>
+
   <div id="app">
     <!-- Status bar spacer for iOS standalone mode -->
     <div class="status-bar-spacer"></div>

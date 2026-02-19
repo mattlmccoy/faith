@@ -22,6 +22,7 @@ const Store = (() => {
     workerUrl: '',            // Set in settings after deploying worker
     onboardingDone: false,
     bibleTranslation: 'web',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby'
+    palette: 'tuscan-sunset', // Color palette / theme
   };
 
   let _state = null;

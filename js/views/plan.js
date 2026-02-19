@@ -47,9 +47,23 @@ const PlanView = (() => {
       </div>
       ` : ''}
 
-      <p class="text-secondary" style="margin-bottom:var(--space-5);line-height:1.6;">
-        Pick a theme or type anything — a word, a struggle, a question. AI will search trusted pastors and ministries and build a full 7-day devotional plan for you.
-      </p>
+      <!-- Pastor transparency -->
+      <div style="background:var(--glass-fill);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);">
+        <div style="font-size:var(--text-xs);font-weight:var(--weight-bold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-2);">Inspired by trusted teachers</div>
+        <div id="pastor-chips" style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3);">
+          <span class="pastor-chip">Tim Keller</span>
+          <span class="pastor-chip">John Mark Comer</span>
+          <span class="pastor-chip">Jon Pokluda</span>
+          <span class="pastor-chip">Louie Giglio</span>
+          <span class="pastor-chip">John Piper</span>
+          <span class="pastor-chip">Ben Stuart</span>
+          <button class="pastor-chip pastor-chip--add" id="add-pastor-btn" type="button">+ Add your own</button>
+        </div>
+        <div id="custom-pastor-wrap" style="display:none;">
+          <input id="custom-pastor" class="input" type="text" placeholder="e.g. C.S. Lewis, A.W. Tozer…" style="font-size:var(--text-sm);" />
+          <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px;line-height:1.5;">Their theological style will inform the AI devotions.</p>
+        </div>
+      </div>
 
       <!-- Topic suggestions -->
       <div class="section-header"><span class="section-title">Choose a Theme</span></div>
@@ -96,10 +110,10 @@ const PlanView = (() => {
   }
 
   function setupTopicPicker(root) {
-    root.querySelectorAll('.topic-chip').forEach(chip => {
+    root.querySelectorAll('.topic-chip[data-topic]').forEach(chip => {
       chip.addEventListener('click', () => {
         selectedTopic = chip.dataset.topic;
-        root.querySelectorAll('.topic-chip').forEach(c => c.classList.toggle('selected', c.dataset.topic === selectedTopic));
+        root.querySelectorAll('.topic-chip[data-topic]').forEach(c => c.classList.toggle('selected', c.dataset.topic === selectedTopic));
         const customInput = root.querySelector('#custom-topic');
         if (customInput) customInput.value = '';
       });
@@ -110,8 +124,19 @@ const PlanView = (() => {
       customInput.addEventListener('input', () => {
         if (customInput.value.trim()) {
           selectedTopic = customInput.value.trim();
-          root.querySelectorAll('.topic-chip').forEach(c => c.classList.remove('selected'));
+          root.querySelectorAll('.topic-chip[data-topic]').forEach(c => c.classList.remove('selected'));
         }
+      });
+    }
+
+    // "Add your own pastor" toggle
+    const addPastorBtn = root.querySelector('#add-pastor-btn');
+    const customPastorWrap = root.querySelector('#custom-pastor-wrap');
+    if (addPastorBtn && customPastorWrap) {
+      addPastorBtn.addEventListener('click', () => {
+        const isVisible = customPastorWrap.style.display !== 'none';
+        customPastorWrap.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) root.querySelector('#custom-pastor')?.focus();
       });
     }
   }
@@ -126,6 +151,9 @@ const PlanView = (() => {
     }
 
     selectedTopic = topic;
+
+    // Pick up custom pastor if provided
+    const customPastor = document.getElementById('custom-pastor')?.value?.trim() || '';
     const results = document.getElementById('plan-results');
     const buildBtn = document.getElementById('build-btn');
     if (!results) return;
@@ -148,7 +176,7 @@ const PlanView = (() => {
 
     try {
       // Try AI-generated plan first
-      const aiPlan = await API.buildAIPlan(topic);
+      const aiPlan = await API.buildAIPlan(topic, customPastor);
 
       if (aiPlan && aiPlan.days && aiPlan.days.length > 0) {
         // Convert AI plan format to the app's internal format
@@ -209,20 +237,36 @@ const PlanView = (() => {
       const aiDay = aiDays[i] || aiDays[i % aiDays.length];
       if (!aiDay) return;
 
+      // Build the opening_verse object from the AI's scripture_ref field
+      const morningRef = aiDay.morning?.scripture_ref || '';
+      const eveningRef = aiDay.evening?.scripture_ref || '';
+
       days[key] = {
         theme: aiDay.title || topic,
         morning: {
           title: aiDay.morning?.title || `Morning — Day ${i + 1}`,
-          opening_verse: aiDay.morning?.opening_verse || null,
-          body: aiDay.morning?.body || [],
+          opening_verse: morningRef
+            ? { reference: morningRef, text: aiDay.morning?.devotion || '', translation: 'WEB' }
+            : (aiDay.morning?.opening_verse || null),
+          body: aiDay.morning?.body
+            ? aiDay.morning.body
+            : (aiDay.morning?.devotion
+                ? [{ type: 'paragraph', content: aiDay.morning.devotion }]
+                : []),
           reflection_prompts: aiDay.morning?.reflection_prompts || [],
           prayer: aiDay.morning?.prayer || '',
           midday_prompt: aiDay.morning?.midday_prompt || '',
         },
         evening: {
           title: aiDay.evening?.title || `Evening — Day ${i + 1}`,
-          opening_verse: aiDay.evening?.opening_verse || null,
-          body: aiDay.evening?.body || [],
+          opening_verse: eveningRef
+            ? { reference: eveningRef, text: aiDay.evening?.devotion || '', translation: 'WEB' }
+            : (aiDay.evening?.opening_verse || null),
+          body: aiDay.evening?.body
+            ? aiDay.evening.body
+            : (aiDay.evening?.devotion
+                ? [{ type: 'paragraph', content: aiDay.evening.devotion }]
+                : []),
           reflection_prompts: aiDay.evening?.reflection_prompts || [],
           prayer: aiDay.evening?.prayer || '',
           lectio_divina: aiDay.evening?.lectio_divina || null,

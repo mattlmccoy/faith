@@ -592,25 +592,27 @@
 
 .topic-chip {
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-raised);
-  border: 1.5px solid var(--color-border);
+  background: var(--glass-fill);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid var(--glass-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
   text-align: center;
 }
 
 .topic-chip.selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-faint);
-  color: var(--color-primary);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .topic-chip:hover {
-  border-color: var(--color-primary-muted);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .plan-custom-input {
@@ -654,7 +656,7 @@
 .settings-section-title {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  color: var(--color-text-muted);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   padding: 0 var(--space-2);
@@ -662,9 +664,12 @@
 }
 
 .settings-group {
-  background: var(--color-surface-raised);
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
   /* Do NOT use overflow:hidden here — it clips native select pickers on iOS */
 }
 
@@ -672,7 +677,7 @@
   display: flex;
   align-items: center;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--divider);
   gap: var(--space-4);
   min-width: 0; /* prevent flex children from overflowing */
 }
@@ -691,7 +696,7 @@
 }
 
 .settings-row__icon {
-  color: var(--color-text-muted);
+  color: var(--icon);
   flex-shrink: 0;
 }
 
@@ -702,12 +707,12 @@
 
 .settings-row__label {
   font-size: var(--text-base);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .settings-row__value {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--text-tertiary);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -717,13 +722,29 @@
 .settings-row__action {
   flex-shrink: 0;
   max-width: 160px;  /* cap width so select can't overflow the row */
-  color: var(--color-text-muted);
+  color: var(--text-secondary);
 }
 
 /* Select elements inside settings rows */
 .settings-row__action .input {
   max-width: 100%;
   font-size: var(--text-sm);
+}
+
+/* Stacked rows — action wraps below label on narrow screens */
+.settings-row--stacked {
+  flex-wrap: wrap;
+}
+
+.settings-row--stacked .settings-row__content {
+  flex: 1 1 100%;
+}
+
+.settings-row--stacked .settings-row__action {
+  flex: 0 0 auto;
+  max-width: none;
+  margin-left: var(--space-8);
+  padding-top: var(--space-2);
 }
 
 .settings-time-picker {
@@ -734,12 +755,14 @@
 
 .settings-time-input {
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   font-size: var(--text-base);
-  color: var(--color-text-primary);
-  background: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--glass-fill);
   width: 80px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* --- Responsive: Larger screens --- */

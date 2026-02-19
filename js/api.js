@@ -172,11 +172,11 @@ const API = (() => {
 
   // --- AI Plan Builder (via Worker → OpenAI) ---
 
-  async function buildAIPlan(topic) {
+  async function buildAIPlan(topic, customPastor = '') {
     const res = await fetch(`${workerUrl()}/ai/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, customPastor }),
     });
     if (!res.ok) throw new Error(`AI plan error: ${res.status}`);
     return res.json();

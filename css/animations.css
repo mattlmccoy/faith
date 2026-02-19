@@ -4,15 +4,15 @@
 
 /* --- View Transition System --- */
 .view-enter {
-  animation: viewSlideIn 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: viewSlideIn 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .view-enter-back {
-  animation: viewSlideInBack 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: viewSlideInBack 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .view-exit {
-  animation: viewSlideOut 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: viewSlideOut 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -54,7 +54,7 @@
 
 /* --- Tab Switch Animation --- */
 .tab-switch-enter {
-  animation: tabFadeIn 200ms ease forwards;
+  animation: tabFadeIn 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes tabFadeIn {
@@ -64,7 +64,7 @@
 
 /* --- Card Entrance --- */
 .card-enter {
-  animation: cardRise 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: cardRise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .card-enter:nth-child(2) { animation-delay: 60ms; }
@@ -255,9 +255,18 @@
   to { transform: scale(1); }
 }
 
-/* --- Theme transition (smooth light/dark switch) --- */
+/* --- Theme / Palette transition (smooth palette + light/dark switch) --- */
 html {
-  transition: background-color 400ms ease, color 400ms ease;
+  transition:
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Ambient blobs transition handled inline via CSS vars — ensure root transitions them */
+:root {
+  transition:
+    --accent 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    --bg-base 380ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Disable animations for users who prefer reduced motion */

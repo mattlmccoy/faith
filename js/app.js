@@ -11,6 +11,19 @@
     SettingsView.applyTheme(theme);
   }
 
+  // --- Palette init (before render, prevent flash) ---
+  function initPalette() {
+    const palette = Store.get('palette') || 'tuscan-sunset';
+    document.documentElement.dataset.palette = palette;
+  }
+
+  // --- Standalone detection (iOS PWA home-screen mode) ---
+  function initStandalone() {
+    if (window.navigator.standalone === true) {
+      document.documentElement.dataset.standalone = 'true';
+    }
+  }
+
   // --- Register service worker ---
   function registerSW() {
     if ('serviceWorker' in navigator) {
@@ -97,6 +110,8 @@
 
   // --- Boot ---
   async function boot() {
+    initStandalone();
+    initPalette();
     initTheme();
     registerSW();
     registerRoutes();
