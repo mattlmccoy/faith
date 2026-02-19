@@ -32,6 +32,8 @@ const SettingsView = (() => {
     const trustedPastors = Store.getTrustedPastors();
     const usageStats = Store.getUsageStats();
     const usageLimits = Store.getUsageLimits();
+    const lastAIPlanMeta = state.lastAIPlanMeta || null;
+    const lastAIPhraseMeta = state.lastAIPhraseMeta || null;
     const appVersion = window.__ABIDE_VERSION__ || 'dev';
     const tab = new URLSearchParams(params.replace('?', '')).get('tab');
     const currentPalette = state.palette || 'tuscan-sunset';
@@ -266,6 +268,19 @@ const SettingsView = (() => {
             </div>
             <div class="text-xs text-muted" style="line-height:1.6;">
               Limits shown are app-level soft limits for visibility. Provider-side token/quota usage is not exposed by the shared worker endpoint yet.
+            </div>
+            <div style="width:100%;padding:var(--space-3);background:var(--bg-sunken);border-radius:var(--radius-sm);font-size:var(--text-sm);line-height:1.6;">
+              <div style="font-weight:600;margin-bottom:4px;">Latest AI Model Info</div>
+              <div>
+                Plan build:
+                <strong>${lastAIPlanMeta?.provider || 'n/a'}</strong>
+                ${Array.isArray(lastAIPlanMeta?.models) && lastAIPlanMeta.models.length ? `(${lastAIPlanMeta.models.join(', ')})` : ''}
+              </div>
+              <div>
+                Scripture phrase search:
+                <strong>${lastAIPhraseMeta?.provider || 'n/a'}</strong>
+                ${lastAIPhraseMeta?.model ? `(${lastAIPhraseMeta.model})` : ''}
+              </div>
             </div>
           </div>
           <div class="settings-row settings-row--stacked">

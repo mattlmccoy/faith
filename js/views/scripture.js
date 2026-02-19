@@ -286,6 +286,7 @@ const ScriptureView = (() => {
     let matchedRefs = [];
     let aiWhy = {};
     let usedAI = false;
+    let aiLabel = '';
 
     try {
       const aiResult = await API.searchPhrase(phrase);
@@ -293,6 +294,9 @@ const ScriptureView = (() => {
         matchedRefs = aiResult.verses.map(v => v.ref);
         aiResult.verses.forEach(v => { aiWhy[v.ref] = v.why; });
         usedAI = true;
+        const provider = aiResult.provider ? String(aiResult.provider) : '';
+        const model = aiResult.model ? String(aiResult.model) : '';
+        aiLabel = [provider, model].filter(Boolean).join(' · ');
       }
     } catch (e) {
       console.warn('AI phrase search unavailable, using local fallback');
@@ -324,7 +328,7 @@ const ScriptureView = (() => {
       <div style="margin-bottom:var(--space-4);">
         <div class="section-header">
           <span class="section-title">Verses about "${phrase}"</span>
-          ${usedAI ? '<span class="text-xs text-muted">✨ AI matched</span>' : ''}
+          ${usedAI ? `<span class="text-xs text-muted">✨ AI matched${aiLabel ? ` (${aiLabel})` : ''}</span>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);">
           ${matchedRefs.map(ref => `

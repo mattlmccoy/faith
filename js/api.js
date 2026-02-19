@@ -150,7 +150,7 @@ const API = (() => {
     return suggestions;
   }
 
-  // --- AI Phrase Search (via Worker → OpenAI) ---
+  // --- AI Phrase Search (via Worker) ---
 
   async function searchPhrase(phrase) {
     const cacheKey = `phrase:${phrase.toLowerCase().trim()}`;
@@ -166,6 +166,13 @@ const API = (() => {
       Store.trackUsage('aiPhraseQueries', 1);
       if (!res.ok) return { verses: [], fallback: true };
       const data = await res.json();
+      if (!data.fallback) {
+        Store.set('lastAIPhraseMeta', {
+          provider: data.provider || '',
+          model: data.model || '',
+          at: new Date().toISOString(),
+        });
+      }
       if (!data.fallback && data.verses?.length) {
         Cache.set(cacheKey, data, 60 * 60 * 1000); // 1 hour
       }
@@ -176,7 +183,7 @@ const API = (() => {
     }
   }
 
-  // --- AI Plan Builder (via Worker → OpenAI) ---
+  // --- AI Plan Builder (via Worker) ---
 
   async function buildAIPlan(topic, pastors = [], options = {}) {
     const res = await fetch(`${workerUrl()}/ai/plan`, {
@@ -189,7 +196,11 @@ const API = (() => {
       const detail = await readErrorMessage(res, 'AI plan error');
       throw new Error(detail);
     }
-    return res.json();
+    const data = await res.json();
+    if (data?.ai_meta) {
+      Store.set('lastAIPlanMeta', { ...data.ai_meta, at: new Date().toISOString() });
+    }
+    return data;
   }
 
   function translationLabel(id) {

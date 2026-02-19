@@ -57,6 +57,8 @@ const Store = (() => {
       aiPhraseQueries: 400,
       bibleQueries: 3000,
     },
+    lastAIPlanMeta: null,
+    lastAIPhraseMeta: null,
   };
 
   let _state = null;

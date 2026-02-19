@@ -234,7 +234,7 @@ const PlanView = (() => {
         }
         const plan = convertAIPlanToAppFormat(topic, aiPlan, trustedPastors);
         Store.savePlan(plan);
-        showSuccess(results, topic, true);
+        showSuccess(results, topic, true, formatPlanModelLabel(aiPlan?.ai_meta));
       } else {
         throw new Error('AI returned empty plan');
       }
@@ -310,6 +310,7 @@ const PlanView = (() => {
       const mWords = textWordCount(paragraphsFromSession(day.morning).join(' '));
       const eWords = textWordCount(paragraphsFromSession(day.evening).join(' '));
       const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      const modelLine = formatPlanModelLabel(aiPlan?.ai_meta);
 
       results.innerHTML = `
         <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);">
@@ -318,6 +319,7 @@ const PlanView = (() => {
           <p class="text-sm text-secondary" style="line-height:1.6;margin-bottom:var(--space-3);">
             Generated in ${elapsed}s. Morning ${mWords} words, Evening ${eWords} words.
           </p>
+          ${modelLine ? `<p class="text-xs text-muted" style="margin-bottom:var(--space-3);">${escapeHtml(modelLine)}</p>` : ''}
           <p class="text-xs text-muted">Now run "Build This Week's Plan" for a full 7-day save.</p>
         </div>
       `;
@@ -336,7 +338,15 @@ const PlanView = (() => {
     }
   }
 
-  function showSuccess(container, topic, isAI) {
+  function formatPlanModelLabel(meta = null) {
+    if (!meta?.provider) return '';
+    const provider = String(meta.provider).trim();
+    const models = Array.isArray(meta.models) ? meta.models.filter(Boolean) : [];
+    if (!models.length) return `Provider: ${provider}`;
+    return `Provider: ${provider} | Model${models.length > 1 ? 's' : ''}: ${models.join(', ')}`;
+  }
+
+  function showSuccess(container, topic, isAI, modelLine = '') {
     container.innerHTML = `
       <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);text-align:center;">
         <div style="font-size:2rem;margin-bottom:var(--space-2);">✅</div>
@@ -344,6 +354,7 @@ const PlanView = (() => {
         <p class="text-sm text-secondary" style="margin-bottom:var(--space-4);line-height:1.5;">
           7-day devotional plan on <strong>${topic}</strong>${isAI ? ', written by AI from trusted ministry sources' : ''}.
         </p>
+        ${modelLine ? `<p class="text-xs text-muted" style="margin-bottom:var(--space-3);">${escapeHtml(modelLine)}</p>` : ''}
         <button class="btn btn-primary" onclick="Router.navigate('/')">
           Start Today's Devotion →
         </button>
@@ -416,6 +427,7 @@ const PlanView = (() => {
       week: weekStart,
       theme: topic,
       aiGenerated: true,
+      aiMeta: aiPlan?.ai_meta || null,
       days,
       createdAt: new Date().toISOString(),
     };

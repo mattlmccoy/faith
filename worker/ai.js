@@ -137,7 +137,7 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
       continue;
     }
 
-    return text;
+    return { text, model, provider: 'gemini' };
   }
 
   throw lastError || new Error('Gemini request failed for all candidate models');
@@ -174,7 +174,7 @@ async function runCloudflareAI(env, { systemPrompt, userPrompt, temperature = 0.
         || ''
       ).trim();
       if (!text) throw new Error(`Cloudflare AI(${model}) returned empty text`);
-      return text;
+      return { text, model, provider: 'cloudflare-ai' };
     } catch (err) {
       lastErr = err;
     }
@@ -242,25 +242,6 @@ function buildModelCandidates(env, discoveredModels = []) {
 
   // Finally allow any remaining compatible model
   discoveredModels.forEach(pushIfAvailable);
-  return out;
-}
-
-async function mapWithConcurrency(items, limit, mapper) {
-  const out = new Array(items.length);
-  let cursor = 0;
-
-  async function workerLoop() {
-    while (true) {
-      const idx = cursor++;
-      if (idx >= items.length) break;
-      out[idx] = await mapper(items[idx], idx);
-    }
-  }
-
-  const workers = [];
-  const workerCount = Math.min(Math.max(1, limit), items.length || 1);
-  for (let i = 0; i < workerCount; i++) workers.push(workerLoop());
-  await Promise.all(workers);
   return out;
 }
 
@@ -392,7 +373,7 @@ ${String(malformedJson).slice(0, 120000)}
     jsonMode: true,
   });
 
-  return parseJsonBlock(repaired);
+  return parseJsonBlock(repaired.text);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +409,7 @@ export async function handleAIPlan(request, url, env, origin, json) {
 
   const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
   const lengthKey = `${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}-${daysCount}`;
-  const cacheKey = `plan:gemini:v3:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
+  const cacheKey = `plan:gemini:v4:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -542,28 +523,42 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
       'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
       'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
     ];
-    const indices = Array.from({ length: daysCount }, (_, i) => i);
-    const days = await mapWithConcurrency(indices, 2, async (dayIndex) => {
+    const days = [];
+    const modelUsage = [];
+
+    for (let dayIndex = 0; dayIndex < daysCount; dayIndex++) {
+      const dayCacheKey = `plan-day:gemini:v1:${topic.toLowerCase().trim()}:${pastorKey}:${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}:d${dayIndex + 1}`;
+      if (env.ABIDE_KV) {
+        const cachedDay = await env.ABIDE_KV.get(dayCacheKey, 'json');
+        if (cachedDay && typeof cachedDay === 'object') {
+          days.push(normalizeDay(cachedDay.day || cachedDay, dayIndex, FALLBACK_REFS));
+          if (cachedDay.meta?.model) modelUsage.push(cachedDay.meta.model);
+          continue;
+        }
+      }
+
       let dayData = null;
       let lastDayErr = null;
       let dayRetryReason = retryReason;
+      let dayModel = '';
 
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const raw = await runGemini(env, {
+          const gemini = await runGemini(env, {
             systemPrompt,
             userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
             temperature: 0.6,
             maxOutputTokens: 4096,
             jsonMode: true,
           });
+          dayModel = gemini.model || dayModel;
 
           try {
-            dayData = parseJsonBlock(raw);
+            dayData = parseJsonBlock(gemini.text);
           } catch {
             dayData = await repairJsonWithGemini(
               env,
-              raw,
+              gemini.text,
               'Object with dayIndex,title,inspired_by,morning,evening,faith_stretch'
             );
           }
@@ -573,15 +568,25 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
           if (dayLengthIssues.length) {
             throw new Error(dayLengthIssues.join('; '));
           }
-          return dayData;
+          days.push(dayData);
+          if (dayModel) modelUsage.push(dayModel);
+          if (env.ABIDE_KV) {
+            await env.ABIDE_KV.put(dayCacheKey, JSON.stringify({
+              day: dayData,
+              meta: { provider: 'gemini', model: dayModel, cachedAt: Date.now() },
+            }), { expirationTtl: PLAN_CACHE_TTL });
+          }
+          break;
         } catch (errDay) {
           lastDayErr = errDay;
           dayRetryReason = `Previous attempt failed with: ${errDay.message}`;
         }
       }
 
-      throw lastDayErr || new Error(`Day ${dayIndex + 1}: generation failed`);
-    });
+      if (!dayData) {
+        throw lastDayErr || new Error(`Day ${dayIndex + 1}: generation failed`);
+      }
+    }
 
     days.sort((a, b) => (a.dayIndex || 0) - (b.dayIndex || 0));
 
@@ -609,7 +614,17 @@ Do not include trailing commas. Escape quotes inside strings. Do not include mar
       }
     });
 
-    const result = { theme: topic, days: planData.days.slice(0, daysCount) };
+    const uniqueModels = [...new Set(modelUsage.filter(Boolean))];
+    const result = {
+      theme: topic,
+      days: planData.days.slice(0, daysCount),
+      ai_meta: {
+        provider: 'gemini',
+        models: uniqueModels,
+        chunked: true,
+        daysCount,
+      },
+    };
 
     if (env.ABIDE_KV) {
       await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
@@ -660,16 +675,16 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
 
   // Prefer Cloudflare AI for lightweight/low-cost phrase search.
   try {
-    const raw = await runCloudflareAI(env, {
+    const cf = await runCloudflareAI(env, {
       systemPrompt,
       userPrompt,
       temperature: 0.15,
       maxTokens: 900,
     });
-    const parsed = parseJsonBlock(raw);
+    const parsed = parseJsonBlock(cf.text);
     const verses = normalizeVerseList(parsed);
     if (!verses.length) throw new Error('Empty verses array from Cloudflare AI');
-    const result = { verses, fallback: false, provider: 'cloudflare-ai' };
+    const result = { verses, fallback: false, provider: cf.provider, model: cf.model };
 
     if (env.ABIDE_KV) {
       await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PHRASE_CACHE_TTL });
@@ -682,17 +697,17 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
 
   // Fallback to Gemini if Cloudflare AI is unavailable/unhealthy.
   try {
-    const raw = await runGemini(env, {
+    const gemini = await runGemini(env, {
       systemPrompt,
       userPrompt,
       temperature: 0.2,
       maxOutputTokens: 1400,
       jsonMode: true,
     });
-    const parsed = parseJsonBlock(raw);
+    const parsed = parseJsonBlock(gemini.text);
     const verses = normalizeVerseList(parsed);
     if (!verses.length) throw new Error('Empty verses array from Gemini');
-    const result = { verses, fallback: false, provider: 'gemini' };
+    const result = { verses, fallback: false, provider: gemini.provider, model: gemini.model };
 
     if (env.ABIDE_KV) {
       await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PHRASE_CACHE_TTL });
