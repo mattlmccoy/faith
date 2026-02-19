@@ -751,7 +751,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 @media (display-mode: standalone) {
   :root {
     --safe-top-ui: var(--safe-top);
-    --safe-bottom-ui: min(env(safe-area-inset-bottom, 0px), 34px);
+    --safe-bottom-ui: 0px;
+  }
+
+  .tab-bar {
+    height: var(--tab-bar-height);
+    padding-bottom: 0;
+    align-items: center;
+  }
+
+  .view-container {
+    padding-bottom: var(--tab-bar-height);
+  }
+
+  .app-legal {
+    margin-bottom: var(--tab-bar-height);
   }
 }
 
