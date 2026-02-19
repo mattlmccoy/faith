@@ -411,6 +411,18 @@ const Store = (() => {
     ]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
+    // Backfill library entries from current plan when older snapshots only contain IDs.
+    _state.savedDevotions.forEach((id) => {
+      if (_state.savedDevotionLibrary[id]) return;
+      const parts = String(id).split('-');
+      const session = parts.pop();
+      const dateKey = parts.join('-');
+      if (!dateKey || !session) return;
+      const day = getDevotionData(dateKey) || {};
+      const sessionData = day?.[session];
+      if (!sessionData) return;
+      _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData);
+    });
     const incomingJournal = snapshot.journalEntries && typeof snapshot.journalEntries === 'object'
       ? snapshot.journalEntries
       : {};

@@ -92,17 +92,16 @@ const JournalView = (() => {
       </div>
 
       <!-- Past entries -->
-      ${pastEntries.length > 0 ? `
       <div class="journal-past">
         <div class="section-header">
-          <span class="section-title">Past Entries</span>
+          <span class="section-title">Past Entries ${pastEntries.length ? `(${pastEntries.length})` : ''}</span>
           <div style="display:flex;gap:8px;align-items:center;">
             ${syncingHistory ? `<span class="text-xs text-secondary">Refreshing...</span>` : ''}
             ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.downloadHistory()">Download</button>` : ''}
             ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.uploadHistory()">Upload</button>` : ''}
           </div>
         </div>
-        ${pastEntries.map(e => {
+        ${pastEntries.length ? pastEntries.map(e => {
           const isOpen = openPastDate === e.date;
           return `
           <div class="journal-past-item">
@@ -114,9 +113,8 @@ const JournalView = (() => {
             </div>
           </div>
         `;
-        }).join('')}
+        }).join('') : `<div class="text-sm text-secondary">No past journal entries found yet. Use Download to pull your Drive history.</div>`}
       </div>
-      ` : ''}
     `;
 
     container.innerHTML = '';

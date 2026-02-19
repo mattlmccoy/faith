@@ -78,6 +78,8 @@ const DevotionView = (() => {
         <button class="btn btn-secondary btn-sm" ${hasNext ? '' : 'disabled'} onclick="DevotionView.shiftDay(1)">Next →</button>
       </div>
 
+      ${renderSavedLibrarySection()}
+
       <!-- Header -->
       <div class="devotion-header">
         <div class="devotion-meta">
@@ -198,8 +200,6 @@ const DevotionView = (() => {
           ${isSaved ? 'Saved ✓' : 'Save This Devotion'}
         </button>
       </div>
-
-      ${renderSavedLibrarySection()}
     `;
 
     // Session toggle
@@ -256,8 +256,9 @@ const DevotionView = (() => {
     if (!entry) return '';
     const devotionData = entry.devotionData || {};
     const sessionData = devotionData[entry.session] || {};
-    const body = Array.isArray(sessionData.body) ? sessionData.body : [];
     const prompts = Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : (entry.reflectionPrompts || []);
+    const fallbackBody = Array.isArray(entry.body) ? entry.body : [];
+    const body = Array.isArray(sessionData.body) && sessionData.body.length ? sessionData.body : fallbackBody;
     return `
       <div class="devotion-library-detail">
         ${sessionData.opening_verse?.text || entry.openingVerse?.text ? `
