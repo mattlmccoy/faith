@@ -6,15 +6,24 @@
 const API = (() => {
   // Direct Bible API (CORS-enabled, no key needed)
   const BIBLE_BASE = 'https://bible-api.com';
-  const BIBLE_TRANSLATION = 'web'; // World English Bible - public domain
 
-  // Worker URL - set by user in settings after deploying
+  // Default Worker URL — baked in after you deploy once.
+  // Users don't need to configure this. Override in Settings → Advanced only if self-hosting.
+  const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
+
+  function bibleTranslation() {
+    return Store.get('bibleTranslation') || 'web';
+  }
+
+  // Worker URL: use stored override if set, else fall back to default
   function workerUrl() {
-    return Store.get('workerUrl') || '';
+    return Store.get('workerUrl') || DEFAULT_WORKER_URL;
   }
 
   function hasWorker() {
-    return !!Store.get('workerUrl');
+    // Always true once the default URL is baked in; false only if explicitly cleared
+    const url = workerUrl();
+    return !!url && url !== '';
   }
 
   // --- Bible API ---
@@ -22,16 +31,18 @@ const API = (() => {
   async function getPassage(ref) {
     // Normalize reference for URL
     const encoded = encodeURIComponent(ref);
-    const url = `${BIBLE_BASE}/${encoded}?translation=${BIBLE_TRANSLATION}`;
+    const translation = bibleTranslation();
+    const url = `${BIBLE_BASE}/${encoded}?translation=${translation}`;
 
-    const cached = Cache.get(`bible:${ref}`);
+    const cacheKey = `bible:${ref}:${translation}`;
+    const cached = Cache.get(cacheKey);
     if (cached) return cached;
 
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Bible API error: ${res.status}`);
       const data = await res.json();
-      Cache.set(`bible:${ref}`, data, 7 * 24 * 60 * 60 * 1000); // 7 days
+      Cache.set(cacheKey, data, 7 * 24 * 60 * 60 * 1000); // 7 days
       return data;
     } catch (err) {
       console.error('getPassage error:', err);
@@ -189,7 +200,8 @@ const API = (() => {
     subscribePush,
     sendTestPush,
     hasWorker,
-    BIBLE_TRANSLATION: 'WEB',
+    workerUrl,
+    bibleTranslation,
   };
 })();
 

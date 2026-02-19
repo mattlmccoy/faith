@@ -56,6 +56,36 @@ const SettingsView = (() => {
               </select>
             </div>
           </div>
+          <div class="settings-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Bible Translation</div>
+              <div class="settings-row__value">Used for scripture search &amp; passages</div>
+            </div>
+            <div class="settings-row__action">
+              <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
+                <option value="web"   ${(state.bibleTranslation || 'web') === 'web'   ? 'selected' : ''}>WEB – World English Bible</option>
+                <option value="asv"   ${state.bibleTranslation === 'asv'   ? 'selected' : ''}>ASV – American Standard Version</option>
+                <option value="net"   ${state.bibleTranslation === 'net'   ? 'selected' : ''}>NET – New English Translation</option>
+                <option value="bbe"   ${state.bibleTranslation === 'bbe'   ? 'selected' : ''}>BBE – Bible in Basic English</option>
+                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>Darby Translation</option>
+                <option value="kjv"   ${state.bibleTranslation === 'kjv'   ? 'selected' : ''}>KJV – King James Version</option>
+                <option value="esv"   ${state.bibleTranslation === 'esv'   ? 'selected' : ''}>ESV – English Standard Version ⚠️</option>
+                <option value="niv"   ${state.bibleTranslation === 'niv'   ? 'selected' : ''}>NIV – New International Version ⚠️</option>
+              </select>
+            </div>
+          </div>
+          <div id="translation-notice" style="display:${['esv','niv'].includes(state.bibleTranslation) ? 'flex' : 'none'};background:var(--color-accent-warm);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="font-size:var(--text-sm);font-weight:var(--weight-semibold);color:var(--color-text-primary);">⚠️ Copyrighted Translation</div>
+              <div style="font-size:var(--text-xs);line-height:1.6;color:var(--color-text-secondary);">
+                ESV and NIV are copyrighted. Passages are displayed for personal devotional use with full attribution.
+                ESV® Bible © Crossway. NIV® © Biblica, Inc.
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -68,8 +98,12 @@ const SettingsView = (() => {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <div class="settings-row__content">
-              <div class="settings-row__label">Enable Reminders</div>
-              <div class="settings-row__value">Requires app installed on home screen (iOS 16.4+)</div>
+              <div class="settings-row__label">Morning &amp; Evening Reminders</div>
+              <div class="settings-row__value" id="notif-status-msg">
+                ${/iPhone|iPad|iPod/.test(navigator.userAgent) && !window.navigator.standalone
+                  ? '📲 Add to Home Screen first — open in Safari → Share → Add to Home Screen'
+                  : 'Sends reminders at your chosen times'}
+              </div>
             </div>
             <div class="settings-row__action">
               <label class="toggle__switch">
@@ -107,7 +141,7 @@ const SettingsView = (() => {
         </div>
       </div>
 
-      <!-- Worker URL -->
+      <!-- Worker / Advanced -->
       <div class="settings-section">
         <div class="settings-section-title">Advanced</div>
         <div class="settings-group">
@@ -117,21 +151,26 @@ const SettingsView = (() => {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </div>
               <div class="settings-row__content">
-                <div class="settings-row__label">Cloudflare Worker URL</div>
-                <div class="settings-row__value">Required for live search + notifications</div>
+                <div class="settings-row__label">Cloudflare Worker</div>
+                <div class="settings-row__value">Powers AI devotional search &amp; push notifications</div>
               </div>
+            </div>
+            <div style="width:100%;padding:var(--space-2) var(--space-3);background:var(--color-surface-sunken);border-radius:var(--radius-sm);">
+              <p class="text-xs" style="color:var(--color-text-secondary);line-height:1.6;">
+                Default: <code style="font-size:0.7rem;word-break:break-all;">https://abide-worker.mattlmccoy.workers.dev</code>
+              </p>
+              <p class="text-xs text-muted" style="margin-top:4px;line-height:1.6;">
+                The worker is shared — no setup needed. Override below only if self-hosting.
+              </p>
             </div>
             <input
               id="worker-url"
               class="input"
               type="url"
-              placeholder="https://abide-worker.username.workers.dev"
+              placeholder="Override URL (leave blank to use default)"
               value="${state.workerUrl || ''}"
-              style="margin-top:4px;"
+              style="margin-top:0;"
             />
-            <p class="text-xs text-muted" style="line-height:1.6;padding:0 4px;">
-              Deploy the worker from the <code style="background:var(--color-surface-sunken);padding:1px 4px;border-radius:4px;">worker/</code> folder, then paste the URL here. See <code>worker/README.md</code> for instructions.
-            </p>
           </div>
         </div>
       </div>
@@ -170,7 +209,7 @@ const SettingsView = (() => {
       <!-- App info -->
       <div style="text-align:center;padding:var(--space-6) 0 var(--space-4);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
-        <p class="text-xs text-muted" style="margin-top:4px;">Scripture: World English Bible (Public Domain)</p>
+        <p class="text-xs text-muted" style="margin-top:4px;">Scripture: Change translation in Appearance settings above</p>
       </div>
 
       <!-- Save button -->
@@ -194,6 +233,7 @@ const SettingsView = (() => {
     root.querySelector('#save-settings')?.addEventListener('click', () => {
       const name = root.querySelector('#settings-name')?.value?.trim() || '';
       const theme = root.querySelector('#theme-select')?.value || 'auto';
+      const bibleTranslation = root.querySelector('#translation-select')?.value || 'web';
       const workerUrl = root.querySelector('#worker-url')?.value?.trim() || '';
       const notifEnabled = root.querySelector('#notif-toggle')?.checked || false;
       const morningTime = root.querySelector('#morning-time')?.value || '06:30';
@@ -205,6 +245,7 @@ const SettingsView = (() => {
       Store.update({
         userName: name,
         theme,
+        bibleTranslation,
         workerUrl,
         morningHour: mh,
         morningMinute: mm,
@@ -217,11 +258,25 @@ const SettingsView = (() => {
 
       // Handle notification toggle
       if (notifEnabled) {
-        Notifications.requestPermission().then(granted => {
-          if (granted && API.hasWorker()) {
-            Notifications.subscribeToPush().catch(console.error);
+        Notifications.subscribeToPush().then(sub => {
+          const msgEl = root.querySelector('#notif-status-msg');
+          if (sub) {
+            if (msgEl) msgEl.textContent = '✅ Reminders active!';
+          } else {
+            // subscribeToPush returns null on failure — get status message
+            Notifications.getStatusMessage().then(msg => {
+              if (msgEl) msgEl.textContent = msg;
+            });
+            // Uncheck the toggle since subscription failed
+            const toggle = root.querySelector('#notif-toggle');
+            if (toggle) toggle.checked = false;
+            Store.set('notificationsEnabled', false);
           }
+        }).catch(err => {
+          console.error('Notification setup error:', err);
         });
+      } else {
+        Notifications.unsubscribe().catch(console.error);
       }
 
       const btn = root.querySelector('#save-settings');
@@ -235,6 +290,14 @@ const SettingsView = (() => {
     // Live theme preview
     root.querySelector('#theme-select')?.addEventListener('change', (e) => {
       applyTheme(e.target.value);
+    });
+
+    // Show copyright warning for ESV/NIV
+    root.querySelector('#translation-select')?.addEventListener('change', (e) => {
+      const notice = root.querySelector('#translation-notice');
+      if (notice) {
+        notice.style.display = ['esv', 'niv'].includes(e.target.value) ? 'flex' : 'none';
+      }
     });
   }
 

@@ -123,6 +123,7 @@ async function networkFirst(request, cacheName, maxAgeSeconds = 3600) {
 }
 
 // --- Push Notifications ---
+// iOS Note: 'actions' are NOT supported on iOS. Keep options minimal for compatibility.
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
@@ -134,17 +135,16 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'Abide';
+
+  // iOS-compatible options — no 'actions' field (unsupported on iOS)
   const options = {
     body: data.body || 'Time to spend a moment with God.',
     icon: '/faith/icons/icon-192.png',
     badge: '/faith/icons/icon-192.png',
     tag: data.tag || 'abide-reminder',
     renotify: true,
+    silent: false,
     data: { url: data.url || '/faith/' },
-    actions: [
-      { action: 'open', title: 'Open Abide' },
-      { action: 'dismiss', title: 'Dismiss' },
-    ],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

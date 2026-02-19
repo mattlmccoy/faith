@@ -37,34 +37,34 @@
 
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
-  /* Brand Colors */
-  --color-primary: #2D5016;
-  --color-primary-light: #4A7C2F;
-  --color-primary-muted: #8FAF6E;
-  --color-primary-faint: #EBF2E3;
+  /* Brand Colors — Desert Dawn palette */
+  --color-primary: #8B3A2A;       /* terracotta */
+  --color-primary-light: #B05040; /* lighter terracotta */
+  --color-primary-muted: #C4826E; /* muted terracotta */
+  --color-primary-faint: #F5EAE6; /* blush tint */
 
-  --color-accent: #C9872A;
-  --color-accent-light: #E8B85A;
-  --color-accent-warm: #F5E6C8;
-  --color-accent-faint: #FBF4E8;
+  --color-accent: #D4A853;        /* honey gold */
+  --color-accent-light: #E6C07A;  /* pale gold */
+  --color-accent-warm: #F6EDD5;   /* warm gold tint */
+  --color-accent-faint: #FBF6EC;  /* near-white warm */
 
-  /* Surfaces */
-  --color-surface: #FAFAF8;
+  /* Surfaces — warm sand */
+  --color-surface: #FAF6F0;
   --color-surface-raised: #FFFFFF;
-  --color-surface-sunken: #F0EDE6;
-  --color-border: #E5E0D5;
-  --color-border-strong: #CCC7BB;
+  --color-surface-sunken: #F0E9DF;
+  --color-border: #E4D9CC;
+  --color-border-strong: #C9B9A8;
 
   /* Text */
-  --color-text-primary: #1A1A17;
-  --color-text-secondary: #6B6558;
-  --color-text-muted: #9E9689;
+  --color-text-primary: #1E1612;
+  --color-text-secondary: #7A5C48;
+  --color-text-muted: #A8917E;
   --color-text-inverse: #FFFFFF;
 
   /* Semantic / State */
-  --color-morning: #E8934A;
-  --color-evening: #4A3B7C;
-  --color-success: #3A7D44;
+  --color-morning: #D4845A;       /* canyon morning */
+  --color-evening: #4A3560;       /* desert dusk purple */
+  --color-success: #4A7A3A;
   --color-error: #C0392B;
 
   /* Typography */
@@ -132,32 +132,32 @@
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* --- Dark Theme --- */
+/* --- Dark Theme — Desert Night --- */
 [data-theme="dark"] {
-  --color-primary: #8FAF6E;
-  --color-primary-light: #A8C98A;
-  --color-primary-muted: #6A8E52;
-  --color-primary-faint: #1A2410;
+  --color-primary: #D4845A;       /* warm canyon glow */
+  --color-primary-light: #E0A080;
+  --color-primary-muted: #8B5040;
+  --color-primary-faint: #1E1008;
 
-  --color-accent: #E8B85A;
-  --color-accent-light: #F0CA7A;
-  --color-accent-warm: #3A2E18;
-  --color-accent-faint: #2A2010;
+  --color-accent: #D4A853;
+  --color-accent-light: #E6C07A;
+  --color-accent-warm: #2A2010;
+  --color-accent-faint: #1E1808;
 
-  --color-surface: #0F1208;
-  --color-surface-raised: #1C2212;
-  --color-surface-sunken: #0A0D05;
-  --color-border: #2A3318;
-  --color-border-strong: #3A4525;
+  --color-surface: #110D09;
+  --color-surface-raised: #1E1610;
+  --color-surface-sunken: #0A0705;
+  --color-border: #2E2018;
+  --color-border-strong: #4A3028;
 
-  --color-text-primary: #F0EDE6;
-  --color-text-secondary: #B8B29A;
-  --color-text-muted: #7A7568;
-  --color-text-inverse: #1A1A17;
+  --color-text-primary: #F0EAE2;
+  --color-text-secondary: #C0A088;
+  --color-text-muted: #806050;
+  --color-text-inverse: #1E1612;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
 /* --- Reset --- */
@@ -300,8 +300,7 @@ input, textarea, select {
   background: var(--color-surface-raised);
   border-top: 1px solid var(--color-border);
   display: flex;
-  align-items: flex-start;
-  padding-top: var(--space-2);
+  align-items: center;
   position: relative;
   z-index: 10;
 }

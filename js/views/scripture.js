@@ -1,16 +1,75 @@
 /* ============================================================
    ABIDE - Scripture Search View
+   Supports: book/chapter/verse autocomplete + keyword phrase search
    ============================================================ */
 
 const ScriptureView = (() => {
   let searchTimeout = null;
   let currentRef = '';
+  let searchMode = 'reference'; // 'reference' | 'phrase'
 
   const QUICK_REFS = [
     'Psalm 23', 'John 3:16', 'Romans 8:28', 'Philippians 4:6-7',
     'Isaiah 40:31', 'Jeremiah 29:11', 'Proverbs 3:5-6', 'Matthew 11:28-30',
     'Hebrews 11:1', '1 Corinthians 13', 'Romans 12:1-2', 'Lamentations 3:22-23',
   ];
+
+  // Keyword → passage map for offline phrase search fallback
+  // Each entry: { ref, preview } — keywords are matched loosely
+  const KEYWORD_PASSAGES = [
+    { keywords: ['fear', 'afraid', 'anxiety', 'worried', 'worry'],
+      refs: ['Isaiah 41:10', 'Psalm 23:4', 'Joshua 1:9', 'Philippians 4:6-7', '2 Timothy 1:7'] },
+    { keywords: ['love', 'loved', 'loving'],
+      refs: ['John 3:16', '1 John 4:8', 'Romans 8:38-39', '1 Corinthians 13:4-7', 'John 15:13'] },
+    { keywords: ['hope', 'hopeless', 'despair'],
+      refs: ['Romans 15:13', 'Jeremiah 29:11', 'Lamentations 3:22-23', 'Isaiah 40:31', 'Psalm 42:11'] },
+    { keywords: ['strength', 'strong', 'weak', 'tired', 'weary', 'exhausted'],
+      refs: ['Isaiah 40:29-31', 'Philippians 4:13', '2 Corinthians 12:9', 'Psalm 46:1', 'Matthew 11:28-30'] },
+    { keywords: ['peace', 'calm', 'anxious', 'rest'],
+      refs: ['John 14:27', 'Philippians 4:6-7', 'Matthew 11:28-30', 'Psalm 46:10', 'Isaiah 26:3'] },
+    { keywords: ['forgiveness', 'forgive', 'guilt', 'shame', 'sin'],
+      refs: ['1 John 1:9', 'Psalm 103:12', 'Romans 8:1', 'Micah 7:19', 'Isaiah 43:25'] },
+    { keywords: ['faith', 'trust', 'doubt', 'believe'],
+      refs: ['Hebrews 11:1', 'Proverbs 3:5-6', 'Mark 9:24', 'Romans 10:17', 'James 1:6'] },
+    { keywords: ['prayer', 'pray', 'ask', 'seek'],
+      refs: ['Matthew 6:9-13', 'James 5:16', 'Philippians 4:6-7', 'Psalm 27:7-8', '1 Thessalonians 5:17'] },
+    { keywords: ['grace', 'mercy', 'compassion'],
+      refs: ['Ephesians 2:8-9', 'Titus 2:11', 'Lamentations 3:22-23', 'Hebrews 4:16', '2 Corinthians 12:9'] },
+    { keywords: ['purpose', 'calling', 'will', 'plan'],
+      refs: ['Jeremiah 29:11', 'Romans 8:28', 'Ephesians 2:10', 'Proverbs 16:9', 'Isaiah 46:10'] },
+    { keywords: ['joy', 'happiness', 'rejoice', 'delight'],
+      refs: ['Psalm 16:11', 'John 15:11', 'Nehemiah 8:10', 'Philippians 4:4', 'James 1:2-3'] },
+    { keywords: ['suffering', 'pain', 'trial', 'hardship', 'struggle'],
+      refs: ['Romans 8:18', 'James 1:2-4', '2 Corinthians 4:17', '1 Peter 4:12-13', 'Psalm 34:18'] },
+    { keywords: ['loneliness', 'lonely', 'alone', 'abandoned'],
+      refs: ['Psalm 34:18', 'Deuteronomy 31:8', 'Hebrews 13:5', 'Matthew 28:20', 'Isaiah 43:2'] },
+    { keywords: ['salvation', 'saved', 'eternal life', 'heaven'],
+      refs: ['Romans 10:9-10', 'John 3:16', 'Ephesians 2:8-9', 'Acts 4:12', 'John 14:6'] },
+    { keywords: ['wisdom', 'understanding', 'knowledge', 'discernment'],
+      refs: ['James 1:5', 'Proverbs 2:6', 'Proverbs 9:10', 'Colossians 2:3', 'Psalm 111:10'] },
+    { keywords: ['anger', 'rage', 'temper', 'frustrated'],
+      refs: ['James 1:19-20', 'Ephesians 4:26-27', 'Proverbs 15:1', 'Psalm 37:8', 'Colossians 3:8'] },
+    { keywords: ['money', 'wealth', 'greed', 'contentment', 'generous'],
+      refs: ['Matthew 6:24', '1 Timothy 6:6-8', 'Philippians 4:11-12', 'Proverbs 11:28', 'Luke 12:15'] },
+    { keywords: ['marriage', 'spouse', 'husband', 'wife', 'relationship'],
+      refs: ['Ephesians 5:25', '1 Corinthians 13:4-7', 'Proverbs 31:10', 'Genesis 2:24', 'Colossians 3:19'] },
+    { keywords: ['courage', 'brave', 'boldness'],
+      refs: ['Joshua 1:9', 'Psalm 27:1', 'Acts 4:29', '2 Timothy 1:7', 'Deuteronomy 31:6'] },
+    { keywords: ['identity', 'worth', 'value', 'self'],
+      refs: ['Psalm 139:14', 'Ephesians 1:4-5', 'Genesis 1:27', 'Romans 8:17', '1 Peter 2:9'] },
+  ];
+
+  // Copyright attribution strings for each translation
+  const TRANSLATION_ATTRIBUTION = {
+    esv: 'ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.',
+    niv: 'Holy Bible, New International Version®, NIV® © 1973, 1978, 1984, 2011 by Biblica, Inc.™ Used by permission. All rights reserved worldwide.',
+    kjv: 'King James Version (KJV). Public Domain.',
+    web: 'World English Bible (WEB). Public Domain.',
+    net: 'NET Bible® © 1996–2017 by Biblical Studies Press. Used by permission. All rights reserved.',
+    asv: 'American Standard Version (ASV, 1901). Public Domain.',
+    bbe: 'Bible in Basic English (BBE). Public Domain.',
+    darby: 'Darby Translation (1890). Public Domain.',
+  };
 
   function render(container) {
     Router.setTitle('Scripture');
@@ -22,6 +81,15 @@ const ScriptureView = (() => {
     div.innerHTML = `
       <!-- Search bar -->
       <div class="scripture-search-bar">
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button id="mode-ref" class="btn btn-sm ${searchMode === 'reference' ? 'btn-primary' : 'btn-secondary'}" style="flex:1;font-size:var(--text-sm);">
+            📖 Book / Chapter
+          </button>
+          <button id="mode-phrase" class="btn btn-sm ${searchMode === 'phrase' ? 'btn-primary' : 'btn-secondary'}" style="flex:1;font-size:var(--text-sm);">
+            🔍 Topic / Phrase
+          </button>
+        </div>
         <div class="search-input-wrap" style="position:relative;">
           <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -30,7 +98,7 @@ const ScriptureView = (() => {
             id="scripture-search"
             class="input"
             type="text"
-            placeholder="Search... John 3:16, Psalm 23, Romans 8"
+            placeholder="${searchMode === 'reference' ? 'John 3:16, Psalm 23, Romans 8…' : 'faith, fear not, peace, love…'}"
             autocomplete="off"
             autocorrect="off"
             spellcheck="false"
@@ -39,17 +107,25 @@ const ScriptureView = (() => {
         </div>
       </div>
 
-      <!-- Passage display -->
+      <!-- Passage / phrase results display -->
       <div id="passage-container"></div>
 
       <!-- Quick links -->
       <div class="scripture-quick-links" id="quick-links">
         <div class="section-header">
-          <span class="section-title">Favorites & Key Passages</span>
+          <span class="section-title">Key Passages</span>
         </div>
         <div class="quick-links-grid">
           ${QUICK_REFS.map(ref => `
             <button class="quick-link-btn" onclick="ScriptureView.loadPassage('${ref}')">${ref}</button>
+          `).join('')}
+        </div>
+        <div class="section-header" style="margin-top:var(--space-4);">
+          <span class="section-title">Topics</span>
+        </div>
+        <div class="quick-links-grid">
+          ${['Fear', 'Hope', 'Peace', 'Love', 'Strength', 'Forgiveness', 'Faith', 'Joy', 'Wisdom', 'Identity'].map(t => `
+            <button class="quick-link-btn" onclick="ScriptureView.searchPhrase('${t}')" style="background:var(--color-accent-warm);color:var(--color-text-secondary);">${t}</button>
           `).join('')}
         </div>
       </div>
@@ -58,12 +134,32 @@ const ScriptureView = (() => {
     container.innerHTML = '';
     container.appendChild(div);
 
+    setupModeToggle(div);
     setupSearch(div);
 
-    // If a ref was loaded before, restore it
     if (currentRef) {
       loadPassage(currentRef);
     }
+  }
+
+  function setupModeToggle(root) {
+    root.querySelector('#mode-ref')?.addEventListener('click', () => {
+      searchMode = 'reference';
+      root.querySelector('#mode-ref').className = 'btn btn-sm btn-primary';
+      root.querySelector('#mode-phrase').className = 'btn btn-sm btn-secondary';
+      const input = root.querySelector('#scripture-search');
+      if (input) { input.placeholder = 'John 3:16, Psalm 23, Romans 8…'; input.value = ''; input.focus(); }
+      hideDropdown(root.querySelector('#autocomplete-dropdown'));
+    });
+
+    root.querySelector('#mode-phrase')?.addEventListener('click', () => {
+      searchMode = 'phrase';
+      root.querySelector('#mode-phrase').className = 'btn btn-sm btn-primary';
+      root.querySelector('#mode-ref').className = 'btn btn-sm btn-secondary';
+      const input = root.querySelector('#scripture-search');
+      if (input) { input.placeholder = 'faith, fear not, peace, love…'; input.value = ''; input.focus(); }
+      hideDropdown(root.querySelector('#autocomplete-dropdown'));
+    });
   }
 
   function setupSearch(root) {
@@ -76,17 +172,30 @@ const ScriptureView = (() => {
       const q = input.value.trim();
       if (q.length < 2) { hideDropdown(dropdown); return; }
 
-      searchTimeout = setTimeout(() => {
-        const suggestions = API.getSuggestions(q);
-        renderDropdown(dropdown, suggestions, input);
-      }, 120);
+      if (searchMode === 'reference') {
+        searchTimeout = setTimeout(() => {
+          const suggestions = API.getSuggestions(q);
+          renderDropdown(dropdown, suggestions, input);
+        }, 120);
+      } else {
+        // Phrase mode: show matching topic suggestions
+        searchTimeout = setTimeout(() => {
+          const suggestions = getPhraseSuggestions(q);
+          renderPhraseSuggestions(dropdown, suggestions, input);
+        }, 150);
+      }
     });
 
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         hideDropdown(dropdown);
         const q = input.value.trim();
-        if (q) loadPassage(q);
+        if (!q) return;
+        if (searchMode === 'reference') {
+          loadPassage(q);
+        } else {
+          searchPhrase(q);
+        }
       }
       if (e.key === 'Escape') hideDropdown(dropdown);
     });
@@ -95,6 +204,8 @@ const ScriptureView = (() => {
       if (!root.contains(e.target)) hideDropdown(dropdown);
     }, { once: false });
   }
+
+  // --- Reference autocomplete ---
 
   function renderDropdown(dropdown, suggestions, input) {
     if (!suggestions.length) { hideDropdown(dropdown); return; }
@@ -116,6 +227,95 @@ const ScriptureView = (() => {
     });
   }
 
+  // --- Phrase / topic search ---
+
+  function getPhraseSuggestions(query) {
+    const q = query.toLowerCase();
+    const results = [];
+    for (const entry of KEYWORD_PASSAGES) {
+      if (entry.keywords.some(k => k.includes(q) || q.includes(k))) {
+        results.push(...entry.keywords.slice(0, 2));
+      }
+    }
+    // Also just pass the query itself
+    if (!results.includes(q)) results.unshift(query);
+    return [...new Set(results)].slice(0, 6).map(r => ({ label: r, phrase: r }));
+  }
+
+  function renderPhraseSuggestions(dropdown, suggestions, input) {
+    if (!suggestions.length) { hideDropdown(dropdown); return; }
+
+    dropdown.innerHTML = suggestions.map(s => `
+      <div class="autocomplete-item" data-phrase="${s.phrase}" style="display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--color-text-muted);font-size:var(--text-sm);">🔍</span>
+        ${highlightMatch(s.label, input.value)}
+      </div>
+    `).join('');
+
+    dropdown.style.display = 'block';
+
+    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('click', () => {
+        input.value = item.dataset.phrase;
+        hideDropdown(dropdown);
+        searchPhrase(item.dataset.phrase);
+      });
+    });
+  }
+
+  function searchPhrase(phrase) {
+    searchMode = 'phrase';
+    const input = document.getElementById('scripture-search');
+    if (input) input.value = phrase;
+
+    const container = document.getElementById('passage-container');
+    const quickLinks = document.getElementById('quick-links');
+    if (!container) return;
+
+    if (quickLinks) quickLinks.style.display = 'none';
+
+    // Find matching passages from keyword map
+    const q = phrase.toLowerCase();
+    let matchedRefs = [];
+
+    for (const entry of KEYWORD_PASSAGES) {
+      if (entry.keywords.some(k => q.includes(k) || k.includes(q))) {
+        matchedRefs.push(...entry.refs);
+      }
+    }
+
+    // Dedupe and limit
+    matchedRefs = [...new Set(matchedRefs)].slice(0, 8);
+
+    if (!matchedRefs.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__title">No matching passages</div>
+          <div class="empty-state__description">Try a word like "fear", "hope", "peace", or switch to Book/Chapter mode.</div>
+          <button class="btn btn-secondary btn-sm" onclick="ScriptureView.clearPassage()">Clear</button>
+        </div>
+      `;
+      return;
+    }
+
+    // Show list of matching passages to tap into
+    container.innerHTML = `
+      <div style="margin-bottom:var(--space-4);">
+        <div class="section-header">
+          <span class="section-title">Verses about "${phrase}"</span>
+        </div>
+        <div class="quick-links-grid" style="margin-top:var(--space-2);">
+          ${matchedRefs.map(ref => `
+            <button class="quick-link-btn" onclick="ScriptureView.loadPassage('${ref}')">${ref}</button>
+          `).join('')}
+        </div>
+        <div style="margin-top:var(--space-3);">
+          <button class="btn btn-ghost btn-sm" onclick="ScriptureView.clearPassage()">← Clear results</button>
+        </div>
+      </div>
+    `;
+  }
+
   function hideDropdown(dropdown) {
     if (dropdown) dropdown.style.display = 'none';
   }
@@ -128,13 +328,15 @@ const ScriptureView = (() => {
     return label.slice(0, idx) + `<strong>${label.slice(idx, idx + q.length)}</strong>` + label.slice(idx + q.length);
   }
 
+  // --- Passage loading ---
+
   async function loadPassage(ref) {
     currentRef = ref;
+    searchMode = 'reference';
     const container = document.getElementById('passage-container');
     const quickLinks = document.getElementById('quick-links');
     if (!container) return;
 
-    // Hide quick links, show loading
     if (quickLinks) quickLinks.style.display = 'none';
 
     container.innerHTML = `
@@ -151,7 +353,7 @@ const ScriptureView = (() => {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state__title">Couldn't load passage</div>
-          <div class="empty-state__description">Try a different reference, like "John 3" or "Psalm 23:1-6".</div>
+          <div class="empty-state__description">Try a different reference like "John 3" or "Psalm 23:1-6".</div>
           <button class="btn btn-secondary btn-sm" onclick="ScriptureView.clearPassage()">Clear</button>
         </div>
       `;
@@ -161,7 +363,10 @@ const ScriptureView = (() => {
   function renderPassage(container, data, ref) {
     const verses = data.verses || [];
     const reference = data.reference || ref;
-    const translation = data.translation_id?.toUpperCase() || API.BIBLE_TRANSLATION;
+    const translationId = (data.translation_id || API.bibleTranslation()).toLowerCase();
+    const translationLabel = translationId.toUpperCase();
+    const attribution = TRANSLATION_ATTRIBUTION[translationId] || '';
+    const isCopyrighted = ['esv', 'niv'].includes(translationId);
 
     // Parse chapter for prev/next nav
     const chMatch = reference.match(/(.+?)\s+(\d+)/);
@@ -174,7 +379,7 @@ const ScriptureView = (() => {
         <div class="passage-nav">
           <div>
             <div class="passage-nav__ref">${reference}</div>
-            <div class="passage-nav__translation">${translation} · World English Bible</div>
+            <div class="passage-nav__translation">${translationLabel}</div>
           </div>
           <div class="flex gap-2">
             ${chapter > 1 ? `
@@ -201,6 +406,14 @@ const ScriptureView = (() => {
           `).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
         </div>
 
+        <!-- Copyright attribution -->
+        ${attribution ? `
+        <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--color-surface-sunken);border-radius:var(--radius-sm);border-left:3px solid var(--color-border-strong);">
+          <p style="font-size:var(--text-xs);line-height:1.6;color:var(--color-text-muted);">${attribution}</p>
+          ${isCopyrighted ? `<p style="font-size:var(--text-xs);margin-top:4px;color:var(--color-text-muted);">For personal devotional use only. Not for reproduction or distribution.</p>` : ''}
+        </div>
+        ` : ''}
+
         <div style="margin-top:24px;">
           <button class="btn btn-ghost btn-sm" onclick="ScriptureView.clearPassage()">← Search again</button>
         </div>
@@ -218,7 +431,7 @@ const ScriptureView = (() => {
     if (input) { input.value = ''; input.focus(); }
   }
 
-  return { render, loadPassage, clearPassage };
+  return { render, loadPassage, clearPassage, searchPhrase };
 })();
 
 window.ScriptureView = ScriptureView;
