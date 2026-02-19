@@ -143,6 +143,46 @@ async function runGemini(env, { systemPrompt, userPrompt, temperature = 0.65, ma
   throw lastError || new Error('Gemini request failed for all candidate models');
 }
 
+async function runCloudflareAI(env, { systemPrompt, userPrompt, temperature = 0.2, maxTokens = 900 }) {
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    throw new Error('Cloudflare AI binding (env.AI) is not configured');
+  }
+
+  const candidates = [
+    '@cf/meta/llama-3.1-8b-instruct',
+    '@cf/meta/llama-3.1-8b-instruct-fast',
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  ];
+
+  let lastErr = null;
+  for (const model of candidates) {
+    try {
+      const result = await env.AI.run(model, {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      });
+
+      const text = String(
+        result?.response
+        || result?.text
+        || result?.result
+        || result?.output_text
+        || ''
+      ).trim();
+      if (!text) throw new Error(`Cloudflare AI(${model}) returned empty text`);
+      return text;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('Cloudflare AI failed for all candidate models');
+}
+
 async function listGeminiGenerateModels(env) {
   const now = Date.now();
   if (_modelListCache && (now - _modelListCachedAt) < MODEL_LIST_CACHE_MS) {
@@ -205,6 +245,25 @@ function buildModelCandidates(env, discoveredModels = []) {
   return out;
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  const out = new Array(items.length);
+  let cursor = 0;
+
+  async function workerLoop() {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) break;
+      out[idx] = await mapper(items[idx], idx);
+    }
+  }
+
+  const workers = [];
+  const workerCount = Math.min(Math.max(1, limit), items.length || 1);
+  for (let i = 0; i < workerCount; i++) workers.push(workerLoop());
+  await Promise.all(workers);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // GET /ai/models
 // Returns available Gemini models that support generateContent
@@ -229,28 +288,91 @@ export async function handleAIModels(request, url, env, origin, json) {
   }
 }
 
+function extractFirstJsonObject(input) {
+  const text = String(input || '');
+  let inString = false;
+  let escaped = false;
+  let depth = 0;
+  let start = -1;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+      continue;
+    }
+    if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+  return '';
+}
+
 function parseJsonBlock(raw) {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const cleaned = String(raw)
-      .replace(/```json/gi, '')
-      .replace(/```/g, '')
-      .trim();
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('No JSON block found in model response');
-    const candidate = cleaned.slice(start, end + 1);
+  const cleaned = String(raw)
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const candidates = [
+    cleaned,
+    extractFirstJsonObject(cleaned),
+  ].filter(Boolean);
+
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    candidates.push(cleaned.slice(start, end + 1));
+  }
+
+  let lastErr = null;
+  for (const candidate of candidates) {
     try {
       return JSON.parse(candidate);
-    } catch {
+    } catch (err) {
+      lastErr = err;
       const repaired = candidate
         .replace(/,\s*([}\]])/g, '$1')
         .replace(/\u201C|\u201D/g, '"')
-        .replace(/\u2018|\u2019/g, "'");
-      return JSON.parse(repaired);
+        .replace(/\u2018|\u2019/g, "'")
+        .replace(/\u0000/g, '');
+      try {
+        return JSON.parse(repaired);
+      } catch (err2) {
+        lastErr = err2;
+      }
     }
   }
+
+  throw new Error(`Unable to parse model JSON: ${lastErr?.message || 'unknown parse error'}`);
+}
+
+function normalizeVerseList(data) {
+  const verses = Array.isArray(data?.verses) ? data.verses : [];
+  return verses
+    .map(v => ({
+      ref: String(v?.ref || '').trim(),
+      why: String(v?.why || '').trim(),
+    }))
+    .filter(v => v.ref && v.why)
+    .slice(0, 6);
 }
 
 async function repairJsonWithGemini(env, malformedJson, schemaHint = '') {
@@ -283,6 +405,7 @@ export async function handleAIPlan(request, url, env, origin, json) {
   let topic = 'Grace';
   let pastors = [];
   let retryReason = '';
+  let daysCount = 7;
   const cfg = {
     minMorningWords: DEFAULT_MIN_MORNING_WORDS,
     minEveningWords: DEFAULT_MIN_EVENING_WORDS,
@@ -295,6 +418,7 @@ export async function handleAIPlan(request, url, env, origin, json) {
     topic = b.topic || 'Grace';
     pastors = Array.isArray(b.pastors) ? b.pastors.filter(Boolean) : [];
     retryReason = String(b.retryReason || '').trim();
+    daysCount = normalizePositiveInt(b.daysCount, 7, 1, 7);
 
     cfg.minMorningWords = normalizePositiveInt(b.minMorningWords, DEFAULT_MIN_MORNING_WORDS, 80, 1200);
     cfg.minEveningWords = normalizePositiveInt(b.minEveningWords, DEFAULT_MIN_EVENING_WORDS, 60, 900);
@@ -303,8 +427,8 @@ export async function handleAIPlan(request, url, env, origin, json) {
   } catch {}
 
   const pastorKey = pastors.map(p => p.toLowerCase().trim()).sort().join('|');
-  const lengthKey = `${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}`;
-  const cacheKey = `plan:gemini:v1:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
+  const lengthKey = `${cfg.minMorningWords}-${cfg.minEveningWords}-${cfg.minMorningParagraphs}-${cfg.minEveningParagraphs}-${daysCount}`;
+  const cacheKey = `plan:gemini:v3:${topic.toLowerCase().trim()}:${pastorKey}:${lengthKey}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -320,125 +444,178 @@ You MUST respond with valid JSON only — no markdown, no code blocks, no extra 
     ? `\nTrusted pastors to draw from: ${pastors.join(', ')}.`
     : '\nTrusted pastors to draw from: Tim Keller, John Mark Comer, Jon Pokluda, Louie Giglio, John Piper, Ben Stuart.';
 
-  const buildUserPrompt = (retryNote = '') => `Write a 7-day personal Bible devotional plan on the theme: "${topic}".${pastorLine}
+  const buildDayPrompt = (dayIndex, retryNote = '') => `Write day ${dayIndex + 1} of a ${daysCount}-day personal Bible devotional plan on the theme: "${topic}".${pastorLine}
 
 Return ONLY this exact JSON structure (no markdown fences, no explanation, just raw JSON):
 {
-  "theme": "${topic}",
-  "days": [
-    {
-      "dayIndex": 0,
-      "title": "Day title",
-      "inspired_by": ["Pastor Name 1", "Pastor Name 2"],
-      "morning": {
-        "scripture_ref": "Book Chapter:Verse",
-        "body": [
-          { "type": "paragraph", "content": "Paragraph 1..." },
-          { "type": "paragraph", "content": "Paragraph 2..." },
-          { "type": "paragraph", "content": "Paragraph 3..." }
-        ],
-        "reflection_prompts": ["Question 1?", "Question 2?", "Question 3?"],
-        "prayer": "A 2-3 sentence personal prayer."
-      },
-      "evening": {
-        "scripture_ref": "Book Chapter:Verse",
-        "body": [
-          { "type": "paragraph", "content": "Paragraph 1..." },
-          { "type": "paragraph", "content": "Paragraph 2..." }
-        ],
-        "reflection_prompts": ["Question 1?", "Question 2?"],
-        "prayer": "A 1-2 sentence evening prayer."
-      },
-      "faith_stretch": {
-        "title": "Practical action title",
-        "description": "A concrete 1-2 sentence action to live out this theme today."
-      }
-    }
-  ]
+  "dayIndex": ${dayIndex},
+  "title": "Day title",
+  "inspired_by": ["Pastor Name 1", "Pastor Name 2"],
+  "morning": {
+    "scripture_ref": "Book Chapter:Verse",
+    "body": [
+      { "type": "paragraph", "content": "Paragraph 1..." },
+      { "type": "paragraph", "content": "Paragraph 2..." },
+      { "type": "paragraph", "content": "Paragraph 3..." }
+    ],
+    "reflection_prompts": ["Question 1?", "Question 2?", "Question 3?"],
+    "prayer": "A 2-3 sentence personal prayer."
+  },
+  "evening": {
+    "scripture_ref": "Book Chapter:Verse",
+    "body": [
+      { "type": "paragraph", "content": "Paragraph 1..." },
+      { "type": "paragraph", "content": "Paragraph 2..." }
+    ],
+    "reflection_prompts": ["Question 1?", "Question 2?"],
+    "prayer": "A 1-2 sentence evening prayer."
+  },
+  "faith_stretch": {
+    "title": "Practical action title",
+    "description": "A concrete 1-2 sentence action to live out this theme today."
+  }
 }
 
-Write all 7 days (dayIndex 0 through 6). Use a different Bible passage for each day.
 Devotional body content must be substantial. Scripture references do NOT count toward body length.
-For each day:
-- Morning body: at least ${cfg.minMorningParagraphs} paragraphs and at least ${cfg.minMorningWords} words.
-- Evening body: at least ${cfg.minEveningParagraphs} paragraphs and at least ${cfg.minEveningWords} words.
-Ensure valid JSON only.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}`;
+Morning body: at least ${cfg.minMorningParagraphs} paragraphs and at least ${cfg.minMorningWords} words.
+Evening body: at least ${cfg.minEveningParagraphs} paragraphs and at least ${cfg.minEveningWords} words.
+Use a unique scripture reference for this day that differs from other days in the same week.
+Ensure valid JSON only.
+Do not include trailing commas. Escape quotes inside strings. Do not include markdown.${retryNote ? `\n\nRETRY REQUIREMENT: ${retryNote}` : ''}`;
 
-  try {
-    let lastErr = null;
-    let modelRetryNote = retryReason;
+  function normalizeSession(session, fallbackRef, fallbackParagraphs) {
+    const normalized = (session && typeof session === 'object') ? { ...session } : {};
+    normalized.scripture_ref = String(normalized.scripture_ref || '').trim() || fallbackRef;
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const raw = await runGemini(env, {
-          systemPrompt,
-          userPrompt: buildUserPrompt(modelRetryNote),
-          temperature: 0.65,
-          maxOutputTokens: 8192,
-          jsonMode: true,
-        });
-
-        let planData;
-        try {
-          planData = parseJsonBlock(raw);
-        } catch (parseErr) {
-          planData = await repairJsonWithGemini(
-            env,
-            raw,
-            'Object with fields theme:string and days:array[7] containing morning/evening/scripture_ref/body/reflection_prompts/prayer'
-          );
-        }
-
-        if (!planData.days || !Array.isArray(planData.days) || planData.days.length < 7) {
-          throw new Error(`Invalid plan: expected 7 days, got ${planData.days?.length ?? 0}`);
-        }
-
-        const FALLBACK_REFS = [
-          'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
-          'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
-          'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
-        ];
-
-        let missingCount = 0;
-        planData.days.forEach((day, i) => {
-          if (!day.morning) day.morning = {};
-          if (!day.evening) day.evening = {};
-          if (!Array.isArray(day.inspired_by) || !day.inspired_by.length) {
-            day.inspired_by = pastors.length ? pastors.slice(0, 3) : ['Tim Keller', 'John Mark Comer'];
-          }
-          if (!day.morning.scripture_ref) {
-            day.morning.scripture_ref = FALLBACK_REFS[i % FALLBACK_REFS.length];
-            missingCount++;
-          }
-          if (!day.evening.scripture_ref) {
-            day.evening.scripture_ref = FALLBACK_REFS[(i + 4) % FALLBACK_REFS.length];
-            missingCount++;
-          }
-        });
-
-        if (missingCount >= 7) {
-          throw new Error(`Plan missing too many scripture refs (${missingCount})`);
-        }
-
-        const lengthIssues = validatePlanLength(planData, cfg);
-        if (lengthIssues.length) {
-          throw new Error(`Plan too short: ${lengthIssues.slice(0, 4).join('; ')}`);
-        }
-
-        const result = { theme: planData.theme || topic, days: planData.days.slice(0, 7) };
-
-        if (env.ABIDE_KV) {
-          await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
-        }
-
-        return json(result, 200, origin);
-      } catch (attemptErr) {
-        lastErr = attemptErr;
-        modelRetryNote = attemptErr.message;
-      }
+    let body = [];
+    if (Array.isArray(normalized.body)) {
+      body = normalized.body
+        .filter(b => b && typeof b === 'object')
+        .map(b => ({
+          type: 'paragraph',
+          content: String(b.content || '').trim(),
+        }))
+        .filter(b => b.content);
+    } else if (typeof normalized.devotion === 'string') {
+      body = normalized.devotion
+        .split(/\n{2,}/)
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(content => ({ type: 'paragraph', content }));
     }
 
-    throw lastErr || new Error('Unknown AI generation failure');
+    while (body.length < fallbackParagraphs) {
+      body.push({ type: 'paragraph', content: 'Pause, pray, and reflect on this scripture in your present circumstances.' });
+    }
+    normalized.body = body;
+
+    if (!Array.isArray(normalized.reflection_prompts)) normalized.reflection_prompts = [];
+    normalized.reflection_prompts = normalized.reflection_prompts
+      .map(p => String(p || '').trim())
+      .filter(Boolean);
+    normalized.prayer = String(normalized.prayer || '').trim();
+    return normalized;
+  }
+
+  function normalizeDay(dayData, dayIndex, fallbackRefs) {
+    const fallbackMorningRef = fallbackRefs[dayIndex % fallbackRefs.length];
+    const fallbackEveningRef = fallbackRefs[(dayIndex + 4) % fallbackRefs.length];
+
+    const safe = (dayData && typeof dayData === 'object') ? { ...dayData } : {};
+    safe.dayIndex = dayIndex;
+    safe.title = String(safe.title || `Day ${dayIndex + 1}`).trim();
+    safe.inspired_by = Array.isArray(safe.inspired_by) && safe.inspired_by.length
+      ? safe.inspired_by.map(p => String(p || '').trim()).filter(Boolean).slice(0, 4)
+      : (pastors.length ? pastors.slice(0, 3) : ['Tim Keller', 'John Mark Comer']);
+    safe.morning = normalizeSession(safe.morning, fallbackMorningRef, cfg.minMorningParagraphs);
+    safe.evening = normalizeSession(safe.evening, fallbackEveningRef, cfg.minEveningParagraphs);
+
+    if (!safe.faith_stretch || typeof safe.faith_stretch !== 'object') safe.faith_stretch = {};
+    safe.faith_stretch.title = String(safe.faith_stretch.title || 'Faith Stretch').trim();
+    safe.faith_stretch.description = String(safe.faith_stretch.description || 'Take one concrete, faithful step in response to today\'s scripture.').trim();
+    return safe;
+  }
+
+  try {
+    const FALLBACK_REFS = [
+      'Romans 8:28', 'Psalm 23:1', 'John 3:16', 'Philippians 4:6-7',
+      'Isaiah 41:10', 'Jeremiah 29:11', 'Matthew 11:28', 'Psalm 46:1',
+      'Proverbs 3:5-6', 'Isaiah 40:31', '2 Corinthians 12:9', 'Hebrews 11:1',
+    ];
+    const indices = Array.from({ length: daysCount }, (_, i) => i);
+    const days = await mapWithConcurrency(indices, 2, async (dayIndex) => {
+      let dayData = null;
+      let lastDayErr = null;
+      let dayRetryReason = retryReason;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const raw = await runGemini(env, {
+            systemPrompt,
+            userPrompt: buildDayPrompt(dayIndex, dayRetryReason),
+            temperature: 0.6,
+            maxOutputTokens: 4096,
+            jsonMode: true,
+          });
+
+          try {
+            dayData = parseJsonBlock(raw);
+          } catch {
+            dayData = await repairJsonWithGemini(
+              env,
+              raw,
+              'Object with dayIndex,title,inspired_by,morning,evening,faith_stretch'
+            );
+          }
+
+          dayData = normalizeDay(dayData, dayIndex, FALLBACK_REFS);
+          const dayLengthIssues = validatePlanLength({ days: [dayData] }, cfg);
+          if (dayLengthIssues.length) {
+            throw new Error(dayLengthIssues.join('; '));
+          }
+          return dayData;
+        } catch (errDay) {
+          lastDayErr = errDay;
+          dayRetryReason = `Previous attempt failed with: ${errDay.message}`;
+        }
+      }
+
+      throw lastDayErr || new Error(`Day ${dayIndex + 1}: generation failed`);
+    });
+
+    days.sort((a, b) => (a.dayIndex || 0) - (b.dayIndex || 0));
+
+    const planData = { theme: topic, days };
+    const lengthIssues = validatePlanLength(planData, cfg);
+    if (lengthIssues.length) {
+      throw new Error(`Plan too short: ${lengthIssues.slice(0, 4).join('; ')}`);
+    }
+
+    // Ensure scripture refs are unique enough; if duplicates remain, patch them with fallback refs.
+    const seenMorning = new Set();
+    const seenEvening = new Set();
+    days.forEach((day, idx) => {
+      const m = (day.morning?.scripture_ref || '').toLowerCase();
+      const e = (day.evening?.scripture_ref || '').toLowerCase();
+      if (seenMorning.has(m)) {
+        day.morning.scripture_ref = FALLBACK_REFS[idx % FALLBACK_REFS.length];
+      } else {
+        seenMorning.add(m);
+      }
+      if (seenEvening.has(e)) {
+        day.evening.scripture_ref = FALLBACK_REFS[(idx + 4) % FALLBACK_REFS.length];
+      } else {
+        seenEvening.add(e);
+      }
+    });
+
+    const result = { theme: topic, days: planData.days.slice(0, daysCount) };
+
+    if (env.ABIDE_KV) {
+      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PLAN_CACHE_TTL });
+    }
+
+    return json(result, 200, origin);
   } catch (err) {
     console.error('Gemini plan error:', err.message);
     return json({ error: `AI plan failed: ${err.message}` }, 502, origin);
@@ -456,7 +633,7 @@ export async function handleAIPhrase(request, url, env, origin, json) {
   try { const b = await request.json(); phrase = b.phrase || ''; } catch {}
   if (!phrase.trim()) return json({ verses: [], fallback: true }, 200, origin);
 
-  const cacheKey = `phrase:gemini:v1:${phrase.toLowerCase().trim()}`;
+  const cacheKey = `phrase:cfai:v2:${phrase.toLowerCase().trim()}`;
   if (env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
@@ -481,6 +658,29 @@ Respond ONLY with this JSON (no markdown, no extra text, just raw JSON):
 
 Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Rank by relevance.`;
 
+  // Prefer Cloudflare AI for lightweight/low-cost phrase search.
+  try {
+    const raw = await runCloudflareAI(env, {
+      systemPrompt,
+      userPrompt,
+      temperature: 0.15,
+      maxTokens: 900,
+    });
+    const parsed = parseJsonBlock(raw);
+    const verses = normalizeVerseList(parsed);
+    if (!verses.length) throw new Error('Empty verses array from Cloudflare AI');
+    const result = { verses, fallback: false, provider: 'cloudflare-ai' };
+
+    if (env.ABIDE_KV) {
+      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PHRASE_CACHE_TTL });
+    }
+
+    return json(result, 200, origin);
+  } catch (cfErr) {
+    console.warn('Cloudflare AI phrase error, falling back to Gemini:', cfErr.message);
+  }
+
+  // Fallback to Gemini if Cloudflare AI is unavailable/unhealthy.
   try {
     const raw = await runGemini(env, {
       systemPrompt,
@@ -489,19 +689,17 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
       maxOutputTokens: 1400,
       jsonMode: true,
     });
-
-    const data = parseJsonBlock(raw);
-    if (!data.verses?.length) throw new Error('Empty verses array');
-
-    const result = { verses: data.verses, fallback: false };
+    const parsed = parseJsonBlock(raw);
+    const verses = normalizeVerseList(parsed);
+    if (!verses.length) throw new Error('Empty verses array from Gemini');
+    const result = { verses, fallback: false, provider: 'gemini' };
 
     if (env.ABIDE_KV) {
       await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: PHRASE_CACHE_TTL });
     }
-
     return json(result, 200, origin);
   } catch (err) {
-    console.error('Gemini phrase error:', err.message);
+    console.error('Phrase search failed on all providers:', err.message);
     return json({ verses: [], fallback: true }, 200, origin);
   }
 }

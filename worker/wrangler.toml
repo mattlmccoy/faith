@@ -2,6 +2,9 @@ name = "abide-worker"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
+[ai]
+binding = "AI"
+
 # KV Namespace - create with: wrangler kv:namespace create ABIDE_KV
 [[kv_namespaces]]
 binding = "ABIDE_KV"
@@ -18,12 +21,15 @@ crons = ["*/30 * * * *"]
 #   wrangler secret put ESV_API_TOKEN
 #   → paste: 92b3774f0e4f96c24bc8398b6b5c1fd93bd0f57d
 #
-# Required for AI plan builder + phrase search (Gemini):
+# Required for AI plan builder (Gemini):
 #   wrangler secret put GEMINI_API_KEY
 #   → paste your Gemini API key
 # Optional:
 #   wrangler secret put GEMINI_MODEL
 #   → e.g. gemini-1.5-flash
+#
+# Phrase search prefers Cloudflare AI via `env.AI` binding above
+# and falls back to Gemini if needed.
 #
 # Required for devotional web search:
 #   wrangler secret put SERPER_API_KEY
