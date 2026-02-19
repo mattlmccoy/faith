@@ -671,6 +671,26 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding-bottom: var(--tab-total-height);
 }
 
+.app-legal {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--tab-total-height) + 4px);
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.app-legal a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
 /* ============================================================
    TAB BAR — fixed iOS PWA bottom positioning
    ============================================================ */
