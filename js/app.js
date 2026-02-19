@@ -89,6 +89,11 @@
       DevotionView.render(container);
     });
 
+    Router.register('/saved', (container) => {
+      Router.setTitle('Saved Devotionals');
+      SavedView.render(container);
+    });
+
     Router.register('/scripture', (container) => {
       Router.setTitle('Scripture');
       ScriptureView.render(container);

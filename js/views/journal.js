@@ -6,6 +6,7 @@ const JournalView = (() => {
   let saveTimeout = null;
   let openPastDate = '';
   let syncingHistory = false;
+  let currentPrompt = '';
 
   function escapeHtml(text = '') {
     return String(text)
@@ -32,7 +33,7 @@ const JournalView = (() => {
     const googleConnected = !!Store.get('googleProfile');
 
     // Get prompt from today's devotion or use a fallback
-    const prompt = devotionData?.faith_stretch?.journal_prompt || getFallbackPrompt(today);
+    currentPrompt = existingEntry?.prompt || devotionData?.faith_stretch?.journal_prompt || getFallbackPrompt(today);
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -54,7 +55,7 @@ const JournalView = (() => {
         <span class="section-title">Today — ${DateUtils.format(today, 'short')}</span>
       </div>
       <div class="journal-entry-card">
-        <div class="journal-entry-card__prompt">${prompt}</div>
+        <div class="journal-entry-card__prompt">${currentPrompt}</div>
         <textarea
           id="journal-textarea"
           class="journal-entry-card__textarea"
@@ -126,7 +127,7 @@ const JournalView = (() => {
       textarea.addEventListener('input', () => {
         clearTimeout(saveTimeout);
         saveTimeout = setTimeout(() => {
-          autoSave(today, prompt, textarea.value);
+          autoSave(today, textarea.value);
         }, 1500);
       });
     }
@@ -134,8 +135,7 @@ const JournalView = (() => {
 
   function saveEntry() {
     const today = DateUtils.today();
-    const devotionData = Store.getTodayDevotionData();
-    const prompt = devotionData?.faith_stretch?.journal_prompt || getFallbackPrompt(today);
+    const prompt = currentPrompt || getFallbackPrompt(today);
     const textarea = document.getElementById('journal-textarea');
     const text = textarea?.value || '';
     Store.saveJournalEntry(today, prompt, text);
@@ -151,8 +151,8 @@ const JournalView = (() => {
     if (dateEl) dateEl.textContent = 'Saved just now';
   }
 
-  function autoSave(dateKey, prompt, text) {
-    Store.saveJournalEntry(dateKey, prompt, text);
+  function autoSave(dateKey, text) {
+    Store.saveJournalEntry(dateKey, currentPrompt || getFallbackPrompt(dateKey), text);
     const dateEl = document.querySelector('.journal-entry-card__date');
     if (dateEl) dateEl.textContent = 'Auto-saved';
   }
@@ -163,12 +163,13 @@ const JournalView = (() => {
       if (textarea.value && textarea.value.trim()) {
         textarea.value += '\n\n' + prompt + '\n';
       } else {
-        textarea.value = '';
+        textarea.value = `${prompt}\n\n`;
       }
       textarea.focus();
       // Update the displayed prompt
       const promptEl = document.querySelector('.journal-entry-card__prompt');
       if (promptEl) promptEl.textContent = prompt;
+      currentPrompt = prompt;
     }
   }
 

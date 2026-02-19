@@ -3,7 +3,7 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v13';
+const SW_VERSION = 'abide-v14';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
@@ -27,6 +27,7 @@ const STATIC_ASSETS = [
   p('js/app.js'),
   p('js/views/home.js'),
   p('js/views/devotion.js'),
+  p('js/views/saved.js'),
   p('js/views/scripture.js'),
   p('js/views/prayer.js'),
   p('js/views/journal.js'),
