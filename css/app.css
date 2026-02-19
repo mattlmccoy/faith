@@ -755,9 +755,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   }
 
   .tab-bar {
+    position: fixed;
+    bottom: 0;
     height: var(--tab-bar-height);
     padding-bottom: 0;
     align-items: center;
+    overflow: visible;
+  }
+
+  .tab-bar::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -48px;
+    height: 48px;
+    background: var(--glass-fill);
+    pointer-events: none;
   }
 
   .view-container {
