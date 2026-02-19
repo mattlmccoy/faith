@@ -2,8 +2,8 @@
   "name": "Abide - Daily Devotion",
   "short_name": "Abide",
   "description": "Personal daily Bible devotions — morning, evening, prayer, and scripture",
-  "start_url": "/abide/",
-  "scope": "/abide/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#2D5016",
@@ -12,19 +12,19 @@
   "categories": ["lifestyle", "education"],
   "icons": [
     {
-      "src": "/abide/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/abide/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/abide/icons/icon-maskable.png",
+      "src": "icons/icon-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -90,14 +90,14 @@ export async function handleScheduledPush(env) {
         title: 'Good morning ☀️',
         body: 'Your morning devotion is ready. Start the day with God.',
         tag: 'morning',
-        url: '/abide/',
+        url: '/faith/',
       }));
     } else if (isEvening) {
       sends.push(sendPush(env, data.subscription, {
         title: 'Evening reflection 🌙',
         body: 'Take a moment to close the day with God.',
         tag: 'evening',
-        url: '/abide/#/devotion',
+        url: '/faith/#/devotion',
       }));
     }
   }

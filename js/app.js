@@ -5,6 +5,14 @@
 (function () {
   'use strict';
 
+  function getBasePath() {
+    const path = window.location.pathname || '/';
+    if (path.endsWith('.html')) {
+      return path.slice(0, path.lastIndexOf('/') + 1);
+    }
+    return path.endsWith('/') ? path : `${path}/`;
+  }
+
   // --- Theme init (before render, to prevent flash) ---
   function initTheme() {
     const theme = Store.get('theme') || 'auto';
@@ -27,7 +35,8 @@
   // --- Register service worker ---
   function registerSW() {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/abide/sw.js', { scope: '/abide/' })
+      const basePath = getBasePath();
+      navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath })
         .then(reg => {
           console.log('[Abide] SW registered:', reg.scope);
         })
@@ -97,7 +106,7 @@
   async function autoLoadSeedIfNeeded() {
     if (!Store.getPlan()) {
       try {
-        const res = await fetch('/abide/content/seed/week-1.json');
+        const res = await fetch(`${getBasePath()}content/seed/week-1.json`);
         if (res.ok) {
           const data = await res.json();
           Store.savePlan(data);

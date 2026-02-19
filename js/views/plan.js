@@ -288,7 +288,7 @@ const PlanView = (() => {
   }
 
   function loadSeedPlan() {
-    fetch('/abide/content/seed/week-1.json')
+    fetch('content/seed/week-1.json')
       .then(r => r.json())
       .then(data => {
         Store.savePlan(data);

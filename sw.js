@@ -3,34 +3,36 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v5';
+const SW_VERSION = 'abide-v6';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
+const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
+const p = (path = '') => `${BASE_PATH}${path}`;
 
 const STATIC_ASSETS = [
-  '/abide/',
-  '/abide/index.html',
-  '/abide/offline.html',
-  '/abide/manifest.json',
-  '/abide/css/app.css',
-  '/abide/css/components.css',
-  '/abide/css/views.css',
-  '/abide/css/animations.css',
-  '/abide/js/date.js',
-  '/abide/js/store.js',
-  '/abide/js/api.js',
-  '/abide/js/router.js',
-  '/abide/js/notifications.js',
-  '/abide/js/app.js',
-  '/abide/js/views/home.js',
-  '/abide/js/views/devotion.js',
-  '/abide/js/views/scripture.js',
-  '/abide/js/views/prayer.js',
-  '/abide/js/views/journal.js',
-  '/abide/js/views/plan.js',
-  '/abide/js/views/settings.js',
-  '/abide/assets/fonts/playfair-display.woff2',
-  '/abide/assets/fonts/inter.woff2',
+  p(''),
+  p('index.html'),
+  p('offline.html'),
+  p('manifest.json'),
+  p('css/app.css'),
+  p('css/components.css'),
+  p('css/views.css'),
+  p('css/animations.css'),
+  p('js/date.js'),
+  p('js/store.js'),
+  p('js/api.js'),
+  p('js/router.js'),
+  p('js/notifications.js'),
+  p('js/app.js'),
+  p('js/views/home.js'),
+  p('js/views/devotion.js'),
+  p('js/views/scripture.js'),
+  p('js/views/prayer.js'),
+  p('js/views/journal.js'),
+  p('js/views/plan.js'),
+  p('js/views/settings.js'),
+  p('assets/fonts/playfair-display.woff2'),
+  p('assets/fonts/inter.woff2'),
 ];
 
 // --- Install: cache static assets ---
@@ -75,7 +77,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Content JSON files: network first, cache fallback
-  if (url.pathname.includes('/abide/content/')) {
+  if (url.pathname.includes(p('content/'))) {
     event.respondWith(networkFirst(request, CONTENT_CACHE, 60 * 60));
     return;
   }
@@ -99,7 +101,7 @@ async function cacheFirst(request, cacheName) {
     // Return offline page for navigation requests
     if (request.mode === 'navigate') {
       const cache = await caches.open(STATIC_CACHE);
-      return cache.match('/abide/offline.html') || new Response('Offline', { status: 503 });
+      return cache.match(p('offline.html')) || new Response('Offline', { status: 503 });
     }
     throw err;
   }
@@ -139,12 +141,12 @@ self.addEventListener('push', (event) => {
   // iOS-compatible options — no 'actions' field (unsupported on iOS)
   const options = {
     body: data.body || 'Time to spend a moment with God.',
-    icon: '/abide/icons/icon-192.png',
-    badge: '/abide/icons/icon-192.png',
+    icon: p('icons/icon-192.png'),
+    badge: p('icons/icon-192.png'),
     tag: data.tag || 'abide-reminder',
     renotify: true,
     silent: false,
-    data: { url: data.url || '/abide/' },
+    data: { url: data.url || p('') },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -155,10 +157,10 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
-  const url = event.notification.data?.url || '/abide/';
+  const url = event.notification.data?.url || p('');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      const existingClient = clientList.find(c => c.url.includes('/abide/'));
+      const existingClient = clientList.find(c => c.url.includes(BASE_PATH));
       if (existingClient) {
         return existingClient.focus();
       }
