@@ -225,7 +225,8 @@ const DevotionView = (() => {
         <span class="section-title">Saved Devotionals</span>
         <div style="display:flex;gap:8px;align-items:center;">
           ${syncingLibrary ? `<span class="text-xs text-secondary">Refreshing...</span>` : ''}
-          ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="DevotionView.syncLibrary()">Refresh from Drive</button>` : ''}
+          ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="DevotionView.downloadLibrary()">Download</button>` : ''}
+          ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="DevotionView.uploadLibrary()">Upload</button>` : ''}
         </div>
       </div>
       ${saved.length ? `
@@ -360,21 +361,41 @@ const DevotionView = (() => {
     render(document.getElementById('view-container'));
   }
 
-  async function syncLibrary() {
+  async function uploadLibrary() {
     if (syncingLibrary) return;
     syncingLibrary = true;
     render(document.getElementById('view-container'));
     try {
-      await Sync.pullSavedDevotions();
+      const result = await Sync.pushSavedDevotions();
+      alert(`Uploaded ${result.count || 0} saved devotionals and journal entries.`);
     } catch (err) {
-      alert(`Drive refresh failed: ${err.message}`);
+      alert(`Upload failed: ${err.message}`);
     } finally {
       syncingLibrary = false;
       render(document.getElementById('view-container'));
     }
   }
 
-  return { render, toggleSave, shiftDay, openSaved, syncLibrary };
+  async function downloadLibrary() {
+    if (syncingLibrary) return;
+    syncingLibrary = true;
+    render(document.getElementById('view-container'));
+    try {
+      const result = await Sync.pullSavedDevotions();
+      if (!result.imported) {
+        alert('No synced Drive file found yet.');
+        return;
+      }
+      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals and ${result.importedJournal || 0} journal entries.`);
+    } catch (err) {
+      alert(`Download failed: ${err.message}`);
+    } finally {
+      syncingLibrary = false;
+      render(document.getElementById('view-container'));
+    }
+  }
+
+  return { render, toggleSave, shiftDay, openSaved, uploadLibrary, downloadLibrary };
 })();
 
 window.DevotionView = DevotionView;

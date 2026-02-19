@@ -331,7 +331,10 @@ const HomeView = (() => {
               <div class="google-panel__email">${profile.name || profile.email || ''}</div>
             </div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Sync</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncDownloadNow()">Download</button>
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Upload</button>
+          </div>
         </div>
       `;
     }
@@ -357,10 +360,23 @@ const HomeView = (() => {
 
   async function syncSavedNow() {
     try {
-      await Sync.pushSavedDevotions();
-      alert('Saved devotions synced to Google Drive.');
+      const result = await Sync.pushSavedDevotions();
+      alert(`Uploaded ${result.count || 0} saved devotionals and journal entries to Google Drive.`);
     } catch (err) {
-      alert(`Sync failed: ${err.message}`);
+      alert(`Upload failed: ${err.message}`);
+    }
+  }
+
+  async function syncDownloadNow() {
+    try {
+      const result = await Sync.pullSavedDevotions();
+      if (!result.imported) {
+        alert('No synced Drive file found yet.');
+        return;
+      }
+      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals and ${result.importedJournal || 0} journal entries.`);
+    } catch (err) {
+      alert(`Download failed: ${err.message}`);
     }
   }
 
@@ -423,7 +439,7 @@ const HomeView = (() => {
     }
   }
 
-  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow };
+  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow };
 })();
 
 // Global collapsible toggle helper

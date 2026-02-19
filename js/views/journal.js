@@ -98,7 +98,8 @@ const JournalView = (() => {
           <span class="section-title">Past Entries</span>
           <div style="display:flex;gap:8px;align-items:center;">
             ${syncingHistory ? `<span class="text-xs text-secondary">Refreshing...</span>` : ''}
-            ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.syncHistory()">Refresh from Drive</button>` : ''}
+            ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.downloadHistory()">Download</button>` : ''}
+            ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.uploadHistory()">Upload</button>` : ''}
           </div>
         </div>
         ${pastEntries.map(e => {
@@ -226,21 +227,41 @@ const JournalView = (() => {
     render(document.getElementById('view-container'));
   }
 
-  async function syncHistory() {
+  async function uploadHistory() {
     if (syncingHistory) return;
     syncingHistory = true;
     render(document.getElementById('view-container'));
     try {
-      await Sync.pullSavedDevotions();
+      const result = await Sync.pushSavedDevotions();
+      alert(`Uploaded ${result.count || 0} saved devotionals and journal entries.`);
     } catch (err) {
-      alert(`Drive refresh failed: ${err.message}`);
+      alert(`Upload failed: ${err.message}`);
     } finally {
       syncingHistory = false;
       render(document.getElementById('view-container'));
     }
   }
 
-  return { render, saveEntry, usePrompt, togglePast, syncHistory };
+  async function downloadHistory() {
+    if (syncingHistory) return;
+    syncingHistory = true;
+    render(document.getElementById('view-container'));
+    try {
+      const result = await Sync.pullSavedDevotions();
+      if (!result.imported) {
+        alert('No synced Drive file found yet.');
+        return;
+      }
+      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals and ${result.importedJournal || 0} journal entries.`);
+    } catch (err) {
+      alert(`Download failed: ${err.message}`);
+    } finally {
+      syncingHistory = false;
+      render(document.getElementById('view-container'));
+    }
+  }
+
+  return { render, saveEntry, usePrompt, togglePast, uploadHistory, downloadHistory };
 })();
 
 window.JournalView = JournalView;
