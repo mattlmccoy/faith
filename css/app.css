@@ -55,10 +55,12 @@
   --content-max-width: 680px;
 
   /* --- Safe Area (iOS) --- */
-  --safe-top:    env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top:    min(env(safe-area-inset-top, 0px), 48px);
+  --safe-bottom: min(env(safe-area-inset-bottom, 0px), 34px);
   --safe-left:   env(safe-area-inset-left, 0px);
   --safe-right:  env(safe-area-inset-right, 0px);
+  --safe-top-ui: 0px;
+  --safe-bottom-ui: 0px;
 
   /* --- Typography --- */
   --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -370,72 +372,112 @@
    Applied on top of any palette when data-theme="dark"
    ============================================================ */
 [data-theme="dark"] {
-  --glass-fill:        rgba(18, 18, 22, 0.65);
-  --glass-fill-strong: rgba(28, 28, 34, 0.85);
-  --glass-border:      rgba(255, 255, 255, 0.10);
-  --glass-shadow:      0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.30);
+  --glass-fill:        rgba(16, 24, 30, 0.62);
+  --glass-fill-strong: rgba(16, 24, 30, 0.82);
+  --glass-border:      rgba(154, 212, 195, 0.18);
+  --glass-shadow:      0 12px 38px rgba(0, 0, 0, 0.52), 0 3px 10px rgba(0, 0, 0, 0.36);
 
-  --text-primary:   rgba(255, 255, 255, 0.90);
-  --text-secondary: rgba(255, 255, 255, 0.60);
-  --text-tertiary:  rgba(255, 255, 255, 0.38);
-  --text-inverse:   rgba(0, 0, 0, 0.86);
+  --text-primary:   #EAF3EF;
+  --text-secondary: rgba(234, 243, 239, 0.72);
+  --text-tertiary:  rgba(234, 243, 239, 0.48);
+  --text-inverse:   #0D1613;
 
-  --divider: rgba(255, 255, 255, 0.08);
-  --icon:    rgba(255, 255, 255, 0.45);
+  --divider: rgba(184, 226, 213, 0.12);
+  --icon:    rgba(204, 236, 226, 0.74);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.65);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.42);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.50);
+  --shadow-lg: 0 16px 44px rgba(0, 0, 0, 0.58);
 }
 
 /* Dark overrides per-palette */
 [data-theme="dark"][data-palette="tuscan-sunset"],
 [data-theme="dark"]:not([data-palette]) {
-  --bg-base:     #130A07;
-  --bg-sunken:   #0C0705;
+  --bg-base:     #0D1411;
+  --bg-sunken:   #0A100D;
+  --bg-gradient-1: #0F1814;
+  --bg-gradient-2: #0A120E;
+  --ambient-1: #1A7D63;
+  --ambient-2: #7C4D99;
+  --ambient-3: #2F916F;
   --divider-solid:  rgba(237, 217, 204, 0.12);
   --divider-strong: rgba(212, 184, 168, 0.20);
-  --accent-soft:  rgba(196, 74, 50, 0.15);
+  --accent-soft:  rgba(44, 170, 127, 0.16);
 }
 [data-theme="dark"][data-palette="desert-dusk"] {
-  --bg-base:   #120810;
-  --bg-sunken: #0A0608;
+  --bg-base:   #120E16;
+  --bg-sunken: #0C0910;
+  --bg-gradient-1: #17111F;
+  --bg-gradient-2: #100C16;
+  --ambient-1: #9A4CC8;
+  --ambient-2: #D56D86;
+  --ambient-3: #6C3DA8;
   --divider-solid: rgba(237, 207, 216, 0.12);
   --accent-soft:   rgba(153, 58, 139, 0.15);
 }
 [data-theme="dark"][data-palette="lavender-fields"] {
-  --bg-base:   #0E0C06;
-  --bg-sunken: #080600;
+  --bg-base:   #121110;
+  --bg-sunken: #0B0A0A;
+  --bg-gradient-1: #181615;
+  --bg-gradient-2: #10100F;
+  --ambient-1: #A774DB;
+  --ambient-2: #6D74D1;
+  --ambient-3: #7B8650;
   --divider-solid: rgba(224, 222, 192, 0.12);
   --accent-soft:   rgba(168, 78, 212, 0.15);
 }
 [data-theme="dark"][data-palette="cactus-flower"] {
-  --bg-base:   #060E0A;
-  --bg-sunken: #040A06;
+  --bg-base:   #0A1310;
+  --bg-sunken: #07100D;
+  --bg-gradient-1: #101A16;
+  --bg-gradient-2: #0A1410;
+  --ambient-1: #2FA57A;
+  --ambient-2: #C7728A;
+  --ambient-3: #4D8E72;
   --divider-solid: rgba(200, 232, 216, 0.12);
   --accent-soft:   rgba(61, 171, 122, 0.15);
 }
 [data-theme="dark"][data-palette="mountain-mist"] {
-  --bg-base:   #060A0E;
-  --bg-sunken: #04080C;
+  --bg-base:   #0A1116;
+  --bg-sunken: #070D12;
+  --bg-gradient-1: #101823;
+  --bg-gradient-2: #091118;
+  --ambient-1: #208E88;
+  --ambient-2: #4A6DA1;
+  --ambient-3: #2D8578;
   --divider-solid: rgba(200, 212, 224, 0.12);
   --accent-soft:   rgba(1, 121, 111, 0.15);
 }
 [data-theme="dark"][data-palette="graphite"] {
-  --bg-base:   #0E0D0C;
-  --bg-sunken: #080706;
+  --bg-base:   #101517;
+  --bg-sunken: #0C1012;
+  --bg-gradient-1: #161D20;
+  --bg-gradient-2: #0F1417;
+  --ambient-1: #3E799C;
+  --ambient-2: #4F6C7F;
+  --ambient-3: #42737A;
   --divider-solid: rgba(224, 220, 218, 0.12);
   --accent-soft:   rgba(58, 110, 168, 0.15);
 }
 [data-theme="dark"][data-palette="ocean-glass"] {
-  --bg-base:   #040E18;
-  --bg-sunken: #020A12;
+  --bg-base:   #07121D;
+  --bg-sunken: #050D16;
+  --bg-gradient-1: #0B1A2A;
+  --bg-gradient-2: #06101A;
+  --ambient-1: #0A8CC8;
+  --ambient-2: #5479D6;
+  --ambient-3: #19A0AA;
   --divider-solid: rgba(192, 218, 240, 0.12);
   --accent-soft:   rgba(2, 132, 199, 0.15);
 }
 [data-theme="dark"][data-palette="mono"] {
-  --bg-base:   #111111;
-  --bg-sunken: #080808;
+  --bg-base:   #121416;
+  --bg-sunken: #0D1012;
+  --bg-gradient-1: #171A1D;
+  --bg-gradient-2: #101214;
+  --ambient-1: #34414A;
+  --ambient-2: #24313A;
+  --ambient-3: #2D3A43;
   --divider-solid: rgba(229, 231, 235, 0.12);
   --accent-soft:   rgba(75, 85, 99, 0.15);
 }
@@ -532,19 +574,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 #app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100svh;
   max-width: var(--content-max-width);
   margin: 0 auto;
   position: relative;
   overflow: hidden;
   z-index: 1; /* sits above ambient blob layer */
 }
+@supports (height: 100dvh) {
+  #app { height: 100dvh; }
+}
 
 /* iOS Standalone status bar spacer */
 .status-bar-spacer {
-  height: var(--safe-top);
+  display: none;
+  height: var(--safe-top-ui);
   background: transparent;
   flex-shrink: 0;
+}
+[data-standalone="true"] {
+  --safe-top-ui: var(--safe-top);
+  --safe-bottom-ui: var(--safe-bottom);
+}
+[data-standalone="true"] .status-bar-spacer {
+  display: block;
 }
 
 /* ============================================================
@@ -619,9 +672,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .tab-bar {
   flex-shrink: 0;
   /* Total height: visual bar + safe-area below home indicator */
-  height: calc(var(--tab-bar-height) + var(--safe-bottom));
+  height: calc(var(--tab-bar-height) + var(--safe-bottom-ui));
   /* Pad the bottom so the home indicator area is just background */
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: var(--safe-bottom-ui);
   background: var(--glass-fill);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -760,13 +813,41 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    SCROLLABLE VIEW PADDING
    ============================================================ */
 .view-content {
-  padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--safe-bottom));
+  padding: var(--space-4) var(--space-4) calc(var(--space-8) + var(--safe-bottom-ui));
   max-width: 100%;
 }
 
 @media (min-width: 480px) {
   .view-content {
-    padding: var(--space-5) var(--space-6) calc(var(--space-10) + var(--safe-bottom));
+    padding: var(--space-5) var(--space-6) calc(var(--space-10) + var(--safe-bottom-ui));
+  }
+}
+
+/* iOS Safari rendering/perf fallback: avoid heavy blur filter boxes */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    --glass-blur: 14px;
+  }
+
+  .app-header,
+  .tab-bar {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .ambient-blob {
+    filter: none;
+    opacity: 0.24;
+  }
+
+  .ambient-blob--1 {
+    background: radial-gradient(circle at 50% 50%, var(--ambient-1) 0%, transparent 70%);
+  }
+  .ambient-blob--2 {
+    background: radial-gradient(circle at 50% 50%, var(--ambient-2) 0%, transparent 70%);
+  }
+  .ambient-blob--3 {
+    background: radial-gradient(circle at 50% 50%, var(--ambient-3) 0%, transparent 70%);
   }
 }
 
