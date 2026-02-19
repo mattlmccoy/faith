@@ -15,7 +15,7 @@
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
-import { handleAIPlan, handleAIPhrase, handleAIModels } from './ai.js';
+import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders } from './ai.js';
 
 // CORS — allow GitHub Pages origin + local dev
 const ALLOWED_ORIGINS = [
@@ -57,7 +57,7 @@ export default {
 
     try {
       if (url.pathname === '/health') {
-        return json({ status: 'ok', version: '2.1.0', service: 'abide-worker' }, 200, origin);
+        return json({ status: 'ok', version: '2.2.0', service: 'abide-worker' }, 200, origin);
       }
 
       if (url.pathname.startsWith('/bible')) {
@@ -81,6 +81,11 @@ export default {
       // AI model diagnostics
       if (url.pathname === '/ai/models') {
         return handleAIModels(request, url, env, origin, json);
+      }
+
+      // AI provider diagnostics
+      if (url.pathname === '/ai/providers') {
+        return handleAIProviders(request, url, env, origin, json);
       }
 
       if (url.pathname.startsWith('/push')) {

@@ -414,6 +414,40 @@ export async function handleAIModels(request, url, env, origin, json) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// GET /ai/providers
+// Returns configured AI providers and plan provider order
+// ---------------------------------------------------------------------------
+export async function handleAIProviders(request, url, env, origin, json) {
+  if (request.method !== 'GET') return json({ error: 'GET required' }, 405, origin);
+
+  const planProviderOrder = buildPlanProviderOrder(env);
+  return json({
+    ok: true,
+    planProviderOrder,
+    providers: {
+      gemini: {
+        configured: !!env.GEMINI_API_KEY,
+        model: env.GEMINI_MODEL || null,
+        planModel: env.GEMINI_PLAN_MODEL || null,
+      },
+      openrouter: {
+        configured: !!env.OPENROUTER_API_KEY,
+        model: env.OPENROUTER_MODEL || null,
+        planModel: env.OPENROUTER_PLAN_MODEL || null,
+      },
+      groq: {
+        configured: !!env.GROQ_API_KEY,
+        model: env.GROQ_MODEL || null,
+        planModel: env.GROQ_PLAN_MODEL || null,
+      },
+      cloudflareAi: {
+        configured: !!(env.AI && typeof env.AI.run === 'function'),
+      },
+    },
+  }, 200, origin);
+}
+
 function extractFirstJsonObject(input) {
   const text = String(input || '');
   let inString = false;
