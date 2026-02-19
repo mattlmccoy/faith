@@ -235,6 +235,13 @@ const Store = (() => {
       .map(([date, entry]) => ({ date, ...entry }));
   }
 
+  function getAllJournalEntries() {
+    const entries = _state.journalEntries || {};
+    return Object.entries(entries)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, entry]) => ({ date, ...entry }));
+  }
+
   // --- Plan ---
   function savePlan(plan) {
     set('currentWeekPlan', plan);
@@ -321,6 +328,11 @@ const Store = (() => {
     const lib = _state.savedDevotionLibrary || {};
     return Object.values(lib)
       .sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
+  }
+
+  function getSavedDevotionById(id) {
+    if (!id) return null;
+    return (_state.savedDevotionLibrary || {})[id] || null;
   }
 
   function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '') {
@@ -485,6 +497,7 @@ const Store = (() => {
     saveJournalEntry,
     getJournalEntry,
     getRecentJournalEntries,
+    getAllJournalEntries,
     savePlan,
     getPlan,
     getPlanDayKeys,
@@ -496,6 +509,7 @@ const Store = (() => {
     toggleSavedDevotion,
     isSavedDevotion,
     getSavedDevotionLibrary,
+    getSavedDevotionById,
     exportSavedDevotionsSnapshot,
     importSavedDevotionsSnapshot,
     getTrustedPastors,

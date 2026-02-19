@@ -3,6 +3,22 @@
    ============================================================ */
 
 const DevotionView = (() => {
+  let openSavedId = '';
+  let syncingLibrary = false;
+
+  function escapeHtml(text = '') {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(text = '') {
+    return escapeHtml(text).replace(/"/g, '&quot;');
+  }
+
   function render(container) {
     Router.setTitle('Devotion');
     Router.clearHeaderActions();
@@ -20,6 +36,7 @@ const DevotionView = (() => {
           <div class="empty-state__description">Build this week's plan to get started.</div>
           <button class="btn btn-primary" onclick="Router.navigate('/settings')">Build Plan</button>
         </div>
+        ${renderSavedLibrarySection()}
       `;
       container.innerHTML = '';
       container.appendChild(div);
@@ -181,6 +198,8 @@ const DevotionView = (() => {
           ${isSaved ? 'Saved ✓' : 'Save This Devotion'}
         </button>
       </div>
+
+      ${renderSavedLibrarySection()}
     `;
 
     // Session toggle
@@ -194,6 +213,80 @@ const DevotionView = (() => {
     container.innerHTML = '';
     container.appendChild(div);
     hydrateScripture(div, sessionData, selectedDate);
+  }
+
+  function renderSavedLibrarySection() {
+    const saved = Store.getSavedDevotionLibrary();
+    const googleConnected = !!Store.get('googleProfile');
+    const openEntry = openSavedId ? Store.getSavedDevotionById(openSavedId) : null;
+
+    return `
+      <div class="section-header" style="margin-top:10px;">
+        <span class="section-title">Saved Devotionals</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${syncingLibrary ? `<span class="text-xs text-secondary">Refreshing...</span>` : ''}
+          ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="DevotionView.syncLibrary()">Refresh from Drive</button>` : ''}
+        </div>
+      </div>
+      ${saved.length ? `
+      <div class="devotion-library-list">
+        ${saved.map((item) => {
+          const isOpen = item.id === openSavedId;
+          const title = item.title || item.openingVerse?.reference || 'Saved devotion';
+          const when = `${DateUtils.format(item.dateKey || DateUtils.today(), 'short')} · ${item.session || ''}`;
+          return `
+            <div class="devotion-library-item">
+              <div class="devotion-library-item__meta">${escapeHtml(when)}</div>
+              <div class="devotion-library-item__title">${escapeHtml(title)}</div>
+              ${item.theme ? `<div class="devotion-library-item__theme">${escapeHtml(item.theme)}</div>` : ''}
+              <div style="margin-top:10px;">
+                <button class="btn btn-secondary btn-sm" onclick="DevotionView.openSaved('${escapeAttr(item.id)}')">${isOpen ? 'Hide' : 'Open'}</button>
+              </div>
+              ${isOpen ? renderSavedDetail(openEntry || item) : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+      ` : `<div class="text-sm text-secondary" style="margin-bottom:20px;">No saved devotionals yet.</div>`}
+    `;
+  }
+
+  function renderSavedDetail(entry) {
+    if (!entry) return '';
+    const devotionData = entry.devotionData || {};
+    const sessionData = devotionData[entry.session] || {};
+    const body = Array.isArray(sessionData.body) ? sessionData.body : [];
+    const prompts = Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : (entry.reflectionPrompts || []);
+    return `
+      <div class="devotion-library-detail">
+        ${sessionData.opening_verse?.text || entry.openingVerse?.text ? `
+          <div class="scripture-card scripture-card--${entry.session === 'evening' ? 'evening' : 'morning'}" style="margin-top:10px;">
+            <div class="scripture-card__text">${escapeHtml(sessionData.opening_verse?.text || entry.openingVerse?.text || '')}</div>
+            <div class="scripture-card__reference">${escapeHtml(sessionData.opening_verse?.reference || entry.openingVerse?.reference || '')}</div>
+          </div>
+        ` : ''}
+        ${body.length ? `<div class="devotion-body" style="margin-top:12px;">${renderBody(body)}</div>` : ''}
+        ${prompts.length ? `
+          <div class="devotion-reflection" style="margin-top:12px;">
+            <div class="devotion-reflection-title">Questions</div>
+            <div class="devotion-prompts-list">
+              ${prompts.map((p, i) => `
+                <div class="prompt-card">
+                  <div class="prompt-card__number">${i + 1}</div>
+                  <div class="prompt-card__text">${escapeHtml(p)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${(sessionData.prayer || entry.prayer) ? `
+          <div class="prayer-card" style="margin-top:12px;">
+            <div class="prayer-card__label">A Prayer</div>
+            <div class="prayer-card__text">${escapeHtml(sessionData.prayer || entry.prayer || '')}</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
   }
 
   function renderBody(body) {
@@ -262,7 +355,26 @@ const DevotionView = (() => {
     render(document.getElementById('view-container'));
   }
 
-  return { render, toggleSave, shiftDay };
+  function openSaved(id) {
+    openSavedId = openSavedId === id ? '' : id;
+    render(document.getElementById('view-container'));
+  }
+
+  async function syncLibrary() {
+    if (syncingLibrary) return;
+    syncingLibrary = true;
+    render(document.getElementById('view-container'));
+    try {
+      await Sync.pullSavedDevotions();
+    } catch (err) {
+      alert(`Drive refresh failed: ${err.message}`);
+    } finally {
+      syncingLibrary = false;
+      render(document.getElementById('view-container'));
+    }
+  }
+
+  return { render, toggleSave, shiftDay, openSaved, syncLibrary };
 })();
 
 window.DevotionView = DevotionView;

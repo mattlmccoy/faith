@@ -4,6 +4,21 @@
 
 const JournalView = (() => {
   let saveTimeout = null;
+  let openPastDate = '';
+  let syncingHistory = false;
+
+  function escapeHtml(text = '') {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(text = '') {
+    return escapeHtml(text).replace(/"/g, '&quot;');
+  }
 
   function render(container) {
     Router.setTitle('Journal');
@@ -12,8 +27,9 @@ const JournalView = (() => {
     const today = DateUtils.today();
     const devotionData = Store.getTodayDevotionData();
     const existingEntry = Store.getJournalEntry(today);
-    const recentEntries = Store.getRecentJournalEntries(5).filter(e => e.date !== today);
+    const pastEntries = Store.getAllJournalEntries().filter(e => e.date !== today);
     const streak = Store.get('currentStreak');
+    const googleConnected = !!Store.get('googleProfile');
 
     // Get prompt from today's devotion or use a fallback
     const prompt = devotionData?.faith_stretch?.journal_prompt || getFallbackPrompt(today);
@@ -76,18 +92,28 @@ const JournalView = (() => {
       </div>
 
       <!-- Past entries -->
-      ${recentEntries.length > 0 ? `
+      ${pastEntries.length > 0 ? `
       <div class="journal-past">
         <div class="section-header">
           <span class="section-title">Past Entries</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${syncingHistory ? `<span class="text-xs text-secondary">Refreshing...</span>` : ''}
+            ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="JournalView.syncHistory()">Refresh from Drive</button>` : ''}
+          </div>
         </div>
-        ${recentEntries.map(e => `
+        ${pastEntries.map(e => {
+          const isOpen = openPastDate === e.date;
+          return `
           <div class="journal-past-item">
             <div class="journal-past-item__date">${DateUtils.format(e.date)}</div>
-            ${e.prompt ? `<div class="journal-past-item__preview" style="color:var(--color-text-muted);font-style:italic;margin-bottom:4px;">${e.prompt.slice(0, 80)}${e.prompt.length > 80 ? '…' : ''}</div>` : ''}
-            <div class="journal-past-item__preview">${e.text || '(no entry)'}</div>
+            ${e.prompt ? `<div class="journal-past-item__preview" style="color:var(--color-text-muted);font-style:italic;margin-bottom:4px;">${escapeHtml(isOpen ? e.prompt : `${e.prompt.slice(0, 80)}${e.prompt.length > 80 ? '…' : ''}`)}</div>` : ''}
+            <div class="journal-past-item__preview ${isOpen ? 'journal-past-item__preview--open' : ''}">${escapeHtml(e.text || '(no entry)')}</div>
+            <div style="margin-top:10px;">
+              <button class="btn btn-secondary btn-sm" onclick="JournalView.togglePast('${escapeAttr(e.date)}')">${isOpen ? 'Collapse' : 'Open'}</button>
+            </div>
           </div>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
       ` : ''}
     `;
@@ -195,7 +221,26 @@ const JournalView = (() => {
     return DateUtils.format(DateUtils.toKey(then), 'short');
   }
 
-  return { render, saveEntry, usePrompt };
+  function togglePast(dateKey) {
+    openPastDate = openPastDate === dateKey ? '' : dateKey;
+    render(document.getElementById('view-container'));
+  }
+
+  async function syncHistory() {
+    if (syncingHistory) return;
+    syncingHistory = true;
+    render(document.getElementById('view-container'));
+    try {
+      await Sync.pullSavedDevotions();
+    } catch (err) {
+      alert(`Drive refresh failed: ${err.message}`);
+    } finally {
+      syncingHistory = false;
+      render(document.getElementById('view-container'));
+    }
+  }
+
+  return { render, saveEntry, usePrompt, togglePast, syncHistory };
 })();
 
 window.JournalView = JournalView;
