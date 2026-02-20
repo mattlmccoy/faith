@@ -479,10 +479,48 @@ const HomeView = (() => {
   async function shareCurrentDevotion() {
     const dateKey = Store.getSelectedDevotionDate();
     const dayData = Store.getDevotionData(dateKey);
+    const sessionData = dayData?.[currentSession];
     const payload = DevotionShare.fromCurrentDay(dayData, currentSession, dateKey);
     if (!payload) {
       alert('No devotion loaded to share yet.');
       return;
+    }
+    if (Store.get('googleProfile')) {
+      try {
+        const entry = {
+          id: `${dateKey}-${currentSession}`,
+          dateKey,
+          session: currentSession,
+          title: sessionData?.title || sessionData?.opening_verse?.reference || '',
+          theme: dayData?.theme || '',
+          openingVerse: sessionData?.opening_verse || null,
+          body: sessionData?.body || [],
+          reflectionPrompts: sessionData?.reflection_prompts || [],
+          prayer: sessionData?.prayer || '',
+          devotionData: JSON.parse(JSON.stringify({
+            theme: dayData?.theme || '',
+            sources: Array.isArray(dayData?.sources) ? dayData.sources : [],
+            faith_stretch: dayData?.faith_stretch || null,
+            morning: dayData?.morning || null,
+            evening: dayData?.evening || null,
+          })),
+        };
+        const shared = await Sync.createSharedDevotionLink(entry);
+        const linkShare = await DevotionShare.shareLink({
+          title: payload.title,
+          text: 'Open this shared devotional from Abide',
+          url: shared.shareUrl,
+        });
+        if (!linkShare.ok && !linkShare.aborted) {
+          alert(`Share failed: ${linkShare.error || 'Could not share devotion link.'}`);
+          return;
+        }
+        if (linkShare.method === 'clipboard') alert('Share link copied to clipboard.');
+        return;
+      } catch (err) {
+        alert(`Google share failed: ${err.message}`);
+        return;
+      }
     }
     const result = await DevotionShare.share(payload);
     if (!result.ok && !result.aborted) {

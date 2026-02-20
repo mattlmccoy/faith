@@ -270,10 +270,48 @@ const DevotionView = (() => {
     const selectedDate = Store.getSelectedDevotionDate();
     const devotionData = Store.getDevotionData(selectedDate);
     const session = Store.get('_sessionOverride') || DateUtils.session();
+    const sessionData = devotionData?.[session];
     const payload = DevotionShare.fromCurrentDay(devotionData, session, selectedDate);
     if (!payload) {
       alert('No devotion loaded to share yet.');
       return;
+    }
+    if (Store.get('googleProfile')) {
+      try {
+        const entry = {
+          id: `${selectedDate}-${session}`,
+          dateKey: selectedDate,
+          session,
+          title: sessionData?.title || sessionData?.opening_verse?.reference || '',
+          theme: devotionData?.theme || '',
+          openingVerse: sessionData?.opening_verse || null,
+          body: sessionData?.body || [],
+          reflectionPrompts: sessionData?.reflection_prompts || [],
+          prayer: sessionData?.prayer || '',
+          devotionData: JSON.parse(JSON.stringify({
+            theme: devotionData?.theme || '',
+            sources: Array.isArray(devotionData?.sources) ? devotionData.sources : [],
+            faith_stretch: devotionData?.faith_stretch || null,
+            morning: devotionData?.morning || null,
+            evening: devotionData?.evening || null,
+          })),
+        };
+        const shared = await Sync.createSharedDevotionLink(entry);
+        const linkShare = await DevotionShare.shareLink({
+          title: payload.title,
+          text: 'Open this shared devotional from Abide',
+          url: shared.shareUrl,
+        });
+        if (!linkShare.ok && !linkShare.aborted) {
+          alert(`Share failed: ${linkShare.error || 'Could not share devotion link.'}`);
+          return;
+        }
+        if (linkShare.method === 'clipboard') alert('Share link copied to clipboard.');
+        return;
+      } catch (err) {
+        alert(`Google share failed: ${err.message}`);
+        return;
+      }
     }
     const result = await DevotionShare.share(payload);
     if (!result.ok && !result.aborted) {

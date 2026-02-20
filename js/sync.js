@@ -352,6 +352,119 @@ const Sync = (() => {
     };
   }
 
+  function parseDriveFileId(linkOrId = '') {
+    const value = String(linkOrId || '').trim();
+    if (!value) return '';
+    if (/^[A-Za-z0-9_-]{20,}$/.test(value)) return value;
+    const patterns = [
+      /\/d\/([A-Za-z0-9_-]{20,})/i,
+      /[?&]id=([A-Za-z0-9_-]{20,})/i,
+      /\/file\/d\/([A-Za-z0-9_-]{20,})/i,
+    ];
+    for (const re of patterns) {
+      const match = value.match(re);
+      if (match?.[1]) return match[1];
+    }
+    return '';
+  }
+
+  async function getFileLinks(fileId) {
+    const fields = encodeURIComponent('id,name,webViewLink,webContentLink');
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=${fields}`;
+    const res = await driveFetch(url);
+    return res.json();
+  }
+
+  async function setAnyoneReaderPermission(fileId) {
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions?sendNotificationEmail=false`;
+    await driveFetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({
+        role: 'reader',
+        type: 'anyone',
+      }),
+    });
+  }
+
+  async function createSharedDevotionLink(entry = {}) {
+    const folderId = await findOrCreateFolderId();
+    if (!folderId) throw new Error('Could not create/find Google Drive folder');
+
+    const profile = Store.get('googleProfile') || {};
+    const now = new Date();
+    const datePart = now.toISOString().slice(0, 10);
+    const random = Math.random().toString(36).slice(2, 8);
+    const safeTitle = String(entry.title || entry.openingVerse?.reference || 'devotion')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 36) || 'devotion';
+    const fileName = `abide-share-${datePart}-${safeTitle}-${random}.json`;
+
+    const payload = {
+      type: 'abide-shared-devotion',
+      version: 1,
+      sharedAt: now.toISOString(),
+      from: {
+        name: profile.name || '',
+        email: profile.email || '',
+        sub: profile.sub || '',
+      },
+      entry,
+    };
+
+    const fileId = await createFile(payload, folderId, fileName);
+    if (!fileId) throw new Error('Could not create share file');
+    await setAnyoneReaderPermission(fileId);
+    const links = await getFileLinks(fileId);
+
+    return {
+      fileId,
+      fileName,
+      shareUrl: links.webViewLink || links.webContentLink || `https://drive.google.com/file/d/${fileId}/view`,
+    };
+  }
+
+  async function importSharedDevotion(linkOrId = '') {
+    const fileId = parseDriveFileId(linkOrId);
+    if (!fileId) throw new Error('Could not parse a Google Drive file ID from that link');
+
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
+    const res = await driveFetch(url);
+    const payload = normalizeJsonPayload(await res.text());
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Shared file did not contain valid JSON');
+    }
+
+    let entry = null;
+    if (payload.type === 'abide-shared-devotion' && payload.entry && typeof payload.entry === 'object') {
+      entry = payload.entry;
+    } else if (payload.devotion && typeof payload.devotion === 'object') {
+      entry = payload.devotion;
+    } else if (payload.id && typeof payload === 'object') {
+      entry = payload;
+    }
+
+    if (!entry) throw new Error('This file is not a supported shared devotional format');
+
+    const id = String(entry.id || `${entry.dateKey || DateUtils.today()}-${entry.session || 'morning'}-shared-${fileId.slice(-6)}`);
+    const normalizedEntry = { ...entry, id, importedFromShare: fileId };
+
+    Store.importSavedDevotionsSnapshot({
+      savedDevotions: [id],
+      savedDevotionLibrary: { [id]: normalizedEntry },
+    });
+
+    return {
+      imported: true,
+      id,
+      fileId,
+      title: normalizedEntry.title || normalizedEntry.openingVerse?.reference || 'Shared devotion',
+      from: payload.from || null,
+    };
+  }
+
   async function pushSavedDevotions() {
     const devotions = Store.exportDevotionsSnapshot();
     const journals = Store.exportJournalSnapshot();
@@ -477,6 +590,8 @@ const Sync = (() => {
     ensureGoogleClient,
     pushSavedDevotions,
     pullSavedDevotions,
+    createSharedDevotionLink,
+    importSharedDevotion,
     clearSession,
     getDebugState,
   };

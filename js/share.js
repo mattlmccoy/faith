@@ -106,10 +106,29 @@ const DevotionShare = (() => {
     }
   }
 
+  async function shareLink({ title = 'Abide Devotion', text = '', url = '' } = {}) {
+    const shareData = { title: clean(title), text: clean(text), url: String(url || '').trim() };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return { ok: true, method: 'native' };
+      }
+    } catch (err) {
+      if (String(err?.name || '') === 'AbortError') return { ok: false, aborted: true };
+    }
+    try {
+      await navigator.clipboard.writeText([shareData.title, shareData.text, shareData.url].filter(Boolean).join('\n\n'));
+      return { ok: true, method: 'clipboard' };
+    } catch (err) {
+      return { ok: false, error: err?.message || 'share-link-failed' };
+    }
+  }
+
   return {
     fromCurrentDay,
     fromSavedEntry,
     share,
+    shareLink,
   };
 })();
 

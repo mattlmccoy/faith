@@ -34,6 +34,7 @@ const SavedView = (() => {
         <span class="section-title">Saved Devotionals (${saved.length})</span>
         <div style="display:flex;gap:8px;align-items:center;">
           ${syncing ? `<span class="text-xs text-secondary">Syncing...</span>` : ''}
+          ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.importSharedLinkPrompt()">Import Shared</button>` : ''}
           ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.download()">Download</button>` : ''}
           ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.upload()">Upload</button>` : ''}
           ${!googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.connectGoogle()">Connect Google</button>` : ''}
@@ -144,6 +145,29 @@ const SavedView = (() => {
       alert('Could not find that saved devotion.');
       return;
     }
+    const googleConnected = !!Store.get('googleProfile');
+    if (googleConnected) {
+      try {
+        const shared = await Sync.createSharedDevotionLink(entry);
+        const result = await DevotionShare.shareLink({
+          title: entry.title || 'Shared Abide Devotion',
+          text: 'Open this shared devotional from Abide',
+          url: shared.shareUrl,
+        });
+        if (!result.ok && !result.aborted) {
+          alert(`Share failed: ${result.error || 'Could not share devotion link.'}`);
+          return;
+        }
+        if (result.method === 'clipboard') {
+          alert('Share link copied to clipboard.');
+        }
+        return;
+      } catch (err) {
+        alert(`Google share failed: ${err.message}`);
+        return;
+      }
+    }
+
     const payload = DevotionShare.fromSavedEntry(entry);
     const result = await DevotionShare.share(payload);
     if (!result.ok && !result.aborted) {
@@ -152,6 +176,18 @@ const SavedView = (() => {
     }
     if (result.method === 'clipboard') {
       alert('Devotion copied to clipboard.');
+    }
+  }
+
+  async function importSharedLinkPrompt() {
+    const link = window.prompt('Paste a Google Drive shared devotional link or file ID:');
+    if (!link) return;
+    try {
+      const result = await Sync.importSharedDevotion(link);
+      alert(`Imported shared devotion: ${result.title || 'Untitled'}`);
+      render(document.getElementById('view-container'));
+    } catch (err) {
+      alert(`Import failed: ${err.message}`);
     }
   }
 
@@ -198,7 +234,7 @@ const SavedView = (() => {
     }
   }
 
-  return { render, openSaved, goToDay, shareSaved, upload, download, connectGoogle };
+  return { render, openSaved, goToDay, shareSaved, importSharedLinkPrompt, upload, download, connectGoogle };
 })();
 
 window.SavedView = SavedView;
