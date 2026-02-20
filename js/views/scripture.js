@@ -7,6 +7,7 @@ const ScriptureView = (() => {
   let searchTimeout = null;
   let currentRef = '';
   let searchMode = 'reference'; // 'reference' | 'phrase'
+  let activePhraseContext = null; // { phrase, refs, aiWhy, usedAI, aiLabel }
 
   const QUICK_REFS = [
     'Psalm 23', 'John 3:16', 'Romans 8:28', 'Philippians 4:6-7',
@@ -314,6 +315,7 @@ const ScriptureView = (() => {
     }
 
     if (!matchedRefs.length) {
+      activePhraseContext = null;
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state__title">No matching passages</div>
@@ -324,6 +326,17 @@ const ScriptureView = (() => {
       return;
     }
 
+    activePhraseContext = { phrase, refs: matchedRefs, aiWhy, usedAI, aiLabel };
+    renderPhraseResults(container, activePhraseContext);
+  }
+
+  function renderPhraseResults(container, context) {
+    const phrase = context?.phrase || '';
+    const matchedRefs = Array.isArray(context?.refs) ? context.refs : [];
+    const aiWhy = context?.aiWhy || {};
+    const usedAI = !!context?.usedAI;
+    const aiLabel = context?.aiLabel || '';
+
     container.innerHTML = `
       <div style="margin-bottom:var(--space-4);">
         <div class="section-header">
@@ -332,7 +345,7 @@ const ScriptureView = (() => {
         </div>
         <div style="display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2);">
           ${matchedRefs.map(ref => `
-            <button class="quick-link-btn" onclick="ScriptureView.loadPassage('${ref}')"
+            <button class="quick-link-btn" onclick="ScriptureView.loadPassageFromPhrase('${ref.replace(/'/g, "\\'")}')"
               style="display:flex;align-items:center;justify-content:space-between;text-align:left;padding:var(--space-3) var(--space-4);">
               <span style="font-weight:600;">${ref}</span>
               ${aiWhy[ref] ? `<span style="font-size:var(--text-xs);color:var(--color-text-muted);margin-left:8px;flex:1;text-align:right;line-height:1.3;">${aiWhy[ref]}</span>` : ''}
@@ -360,9 +373,11 @@ const ScriptureView = (() => {
 
   // --- Passage loading ---
 
-  async function loadPassage(ref) {
+  async function loadPassage(ref, options = {}) {
+    const preservePhraseContext = !!options.preservePhraseContext;
     currentRef = ref;
     searchMode = 'reference';
+    if (!preservePhraseContext) activePhraseContext = null;
     const container = document.getElementById('passage-container');
     const quickLinks = document.getElementById('quick-links');
     if (!container) return;
@@ -378,7 +393,7 @@ const ScriptureView = (() => {
 
     try {
       const data = await API.getPassage(ref);
-      renderPassage(container, data, ref);
+      renderPassage(container, data, ref, preservePhraseContext);
     } catch (err) {
       container.innerHTML = `
         <div class="empty-state">
@@ -390,7 +405,7 @@ const ScriptureView = (() => {
     }
   }
 
-  function renderPassage(container, data, ref) {
+  function renderPassage(container, data, ref, fromPhraseResults = false) {
     const verses = data.verses || [];
     const reference = data.reference || ref;
     const translationId = (data.translation_id || API.bibleTranslation()).toLowerCase();
@@ -413,11 +428,11 @@ const ScriptureView = (() => {
           </div>
           <div class="flex gap-2">
             ${chapter > 1 ? `
-            <button class="icon-btn" title="Previous chapter" onclick="ScriptureView.loadPassage('${bookName} ${chapter - 1}')">
+            <button class="icon-btn" title="Previous chapter" onclick="ScriptureView.${fromPhraseResults ? 'loadPassageFromPhrase' : 'loadPassage'}('${bookName} ${chapter - 1}')">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             ` : ''}
-            <button class="icon-btn" title="Next chapter" onclick="ScriptureView.loadPassage('${bookName} ${chapter + 1}')">
+            <button class="icon-btn" title="Next chapter" onclick="ScriptureView.${fromPhraseResults ? 'loadPassageFromPhrase' : 'loadPassage'}('${bookName} ${chapter + 1}')">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
             <button class="icon-btn" title="Clear" onclick="ScriptureView.clearPassage()">
@@ -445,10 +460,27 @@ const ScriptureView = (() => {
         ` : ''}
 
         <div style="margin-top:24px;">
+          ${fromPhraseResults && activePhraseContext ? `
+          <button class="btn btn-secondary btn-sm" onclick="ScriptureView.backToPhraseResults()">← Back to Results</button>
+          ` : ''}
           <button class="btn btn-ghost btn-sm" onclick="ScriptureView.clearPassage()">← Search again</button>
         </div>
       </div>
     `;
+  }
+
+  function loadPassageFromPhrase(ref) {
+    return loadPassage(ref, { preservePhraseContext: true });
+  }
+
+  function backToPhraseResults() {
+    const container = document.getElementById('passage-container');
+    const quickLinks = document.getElementById('quick-links');
+    if (!container || !activePhraseContext) return;
+    if (quickLinks) quickLinks.style.display = 'none';
+    currentRef = '';
+    searchMode = 'phrase';
+    renderPhraseResults(container, activePhraseContext);
   }
 
   function clearPassage() {
@@ -461,7 +493,7 @@ const ScriptureView = (() => {
     if (input) { input.value = ''; input.focus(); }
   }
 
-  return { render, loadPassage, clearPassage, searchPhrase };
+  return { render, loadPassage, loadPassageFromPhrase, backToPhraseResults, clearPassage, searchPhrase };
 })();
 
 window.ScriptureView = ScriptureView;
