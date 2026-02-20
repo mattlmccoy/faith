@@ -683,16 +683,28 @@ const HomeView = (() => {
         let left = rect.left + rect.width / 2 - CALLOUT_WIDTH / 2;
         left = Math.max(12, Math.min(left, window.innerWidth - CALLOUT_WIDTH - 12));
 
-        calloutEl.style.width  = CALLOUT_WIDTH + 'px';
-        calloutEl.style.left   = left + 'px';
-        calloutEl.style.removeProperty('top');
+        calloutEl.style.width = CALLOUT_WIDTH + 'px';
+        calloutEl.style.left = left + 'px';
         calloutEl.style.removeProperty('bottom');
+        calloutEl.style.top = '12px';
 
-        if (step.calloutPos === 'above') {
-          calloutEl.style.bottom = (window.innerHeight - rect.top + pad + 8) + 'px';
-        } else {
-          calloutEl.style.top = (rect.bottom + pad + 8) + 'px';
-        }
+        const tabBarHeight = document.getElementById('tab-bar')?.offsetHeight || 0;
+        const maxHeight = Math.max(220, window.innerHeight - tabBarHeight - 24);
+        calloutEl.style.maxHeight = `${maxHeight}px`;
+
+        const calloutHeight = calloutEl.offsetHeight || 320;
+        const safeTop = 12;
+        const safeBottom = tabBarHeight + 12;
+        const preferAbove = step.calloutPos === 'above';
+        const aboveTop = rect.top - calloutHeight - pad - 8;
+        const belowTop = rect.bottom + pad + 8;
+
+        let top = preferAbove ? aboveTop : belowTop;
+        const minTop = safeTop;
+        const maxTop = Math.max(minTop, window.innerHeight - safeBottom - calloutHeight);
+        if (top > maxTop) top = maxTop;
+        if (top < minTop) top = minTop;
+        calloutEl.style.top = `${top}px`;
       } else {
         // No target found — show centered callout with no spotlight
         highlightEl.classList.remove('tour-highlight--visible');
@@ -721,6 +733,9 @@ const HomeView = (() => {
         calloutEl.style.removeProperty('top');
         calloutEl.style.removeProperty('bottom');
         calloutEl.style.width = CALLOUT_WIDTH + 'px';
+        const tabBarHeight = document.getElementById('tab-bar')?.offsetHeight || 0;
+        const maxHeight = Math.max(220, window.innerHeight - tabBarHeight - 24);
+        calloutEl.style.maxHeight = `${maxHeight}px`;
       }
 
       requestAnimationFrame(() => calloutEl.classList.add('tour-callout--visible'));

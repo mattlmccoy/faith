@@ -50,7 +50,6 @@ const DevotionShare = (() => {
     return {
       title: heading,
       text,
-      url: window.location.href,
     };
   }
 
@@ -90,7 +89,6 @@ const DevotionShare = (() => {
     const shareData = {
       title: payload.title || 'Abide Devotion',
       text: payload.text || '',
-      url: payload.url || window.location.href,
     };
     try {
       if (navigator.share) {
@@ -101,7 +99,7 @@ const DevotionShare = (() => {
       if (String(err?.name || '') === 'AbortError') return { ok: false, aborted: true };
     }
     try {
-      await navigator.clipboard.writeText([shareData.title, shareData.text, shareData.url].filter(Boolean).join('\n\n'));
+      await navigator.clipboard.writeText([shareData.title, shareData.text].filter(Boolean).join('\n\n'));
       return { ok: true, method: 'clipboard' };
     } catch (err) {
       return { ok: false, error: err?.message || 'share-failed' };
