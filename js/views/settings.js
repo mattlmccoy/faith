@@ -115,7 +115,7 @@ const SettingsView = (() => {
               </select>
             </div>
           </div>
-          <div class="settings-row" style="flex-direction:column;align-items:flex-start;">
+          <div class="settings-row" id="settings-appearance-row" style="flex-direction:column;align-items:flex-start;">
             <div style="display:flex;align-items:center;gap:var(--space-3);width:100%;margin-bottom:var(--space-3);">
               <div class="settings-row__label">Color Theme</div>
             </div>
@@ -128,7 +128,7 @@ const SettingsView = (() => {
               `).join('')}
             </div>
           </div>
-          <div class="settings-row">
+          <div class="settings-row" id="settings-translation-row">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             </div>
@@ -157,7 +157,7 @@ const SettingsView = (() => {
       <div class="settings-section">
         <div class="settings-section-title">5) Notifications</div>
         <div class="settings-group">
-          <div class="settings-row">
+          <div class="settings-row" id="settings-notifications-row">
             <div class="settings-row__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>

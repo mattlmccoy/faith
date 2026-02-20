@@ -499,19 +499,14 @@ const HomeView = (() => {
   function showTutorialWalkthrough(container) {
     const STEPS = [
       {
-        route: '/', selector: '.home-greeting', calloutPos: 'below', highlightPadding: 10,
-        title: 'Your Daily Devotional Home',
-        body: "This is your Today page. Each day is organized into morning and evening devotion moments with Scripture, reflection, prayer, and practical next steps.",
-      },
-      {
-        route: '/', selector: '#home-session-toggle', calloutPos: 'below', highlightPadding: 10,
-        title: 'Morning & Evening Sessions',
-        body: "Switch between your morning and evening devotion here. Each session has its own scripture focus and reflection prompts for the same day.",
+        route: '/', selector: '[data-tab="home"]', calloutPos: 'above', highlightPadding: 8,
+        title: 'Start On Today',
+        body: "The Today tab is your home base for daily devotion, scripture, and reflection.",
       },
       {
         route: '/', selector: '#home-build-btn', calloutPos: 'below', highlightPadding: 10,
-        title: 'Build This Week',
-        body: "Tap + to generate a fresh 7-day plan. You can choose a topic, tune your content settings, and rebuild whenever needed.",
+        title: 'Build A Weekly Plan',
+        body: "Tap + to generate a fresh 7-day plan. You can rebuild anytime with a new topic.",
       },
       {
         route: '/', selector: '#home-google-btn', calloutPos: 'below', highlightPadding: 10,
@@ -519,9 +514,14 @@ const HomeView = (() => {
         body: "Connect Google to back up devotions, journals, and settings to your Drive so you can restore them on another device.",
       },
       {
-        route: '/scripture', selector: '#scripture-search', calloutPos: 'below', highlightPadding: 10,
-        title: 'Look Up Any Scripture',
-        body: 'Search by reference (for example, "John 3:16") or topic. Translation defaults to WEB and can be changed in Settings.',
+        route: '/', selector: '#home-session-toggle', calloutPos: 'below', highlightPadding: 10,
+        title: 'Morning & Evening Sessions',
+        body: "Switch between your morning and evening devotion here.",
+      },
+      {
+        route: '/scripture', selector: '[data-tab="scripture"]', calloutPos: 'above', highlightPadding: 8,
+        title: 'Scripture Search',
+        body: 'Use Scripture to search verses by reference or topic and change translations in Settings.',
       },
       {
         route: '/prayer', selector: '[data-tab="prayer"]', calloutPos: 'above', highlightPadding: 8,
@@ -534,17 +534,17 @@ const HomeView = (() => {
         body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
       },
       {
-        route: '/settings', selector: '#palette-grid', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-translation-row', calloutPos: 'below', highlightPadding: 10,
         title: 'Appearance & Translation',
         body: "Choose your color palette and app theme. You can also pick Bible translation: WEB is public-domain default; ESV is available for personal devotional use.",
       },
       {
-        route: '/settings', selector: '#notif-toggle', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-notifications-row', calloutPos: 'below', highlightPadding: 10,
         title: 'Daily Reminders',
         body: "Enable notifications for morning/evening reminders and Sunday plan prompts. iOS will ask for permission when you save.",
       },
       {
-        route: '/settings', selector: '#trusted-pastor-list', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#trusted-pastor-list [data-pastor-row]', calloutPos: 'below', highlightPadding: 10,
         title: 'Your Trusted Pastors',
         body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
       },
@@ -583,8 +583,8 @@ const HomeView = (() => {
       function showStep() {
         const target = document.querySelector(step.selector);
         if (!target) {
-          // Element not found — show callout centered without a spotlight
-          positionCoachMark(step, null);
+          // Skip missing targets (prevents blank/odd states on dynamic views)
+          goToStep(stepIndex + 1);
           return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
