@@ -951,6 +951,13 @@
 }
 .tour-highlight--visible { opacity: 1; }
 
+.tour-blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 915;
+  background: transparent;
+}
+
 .tour-callout {
   position: fixed;
   z-index: 920;

@@ -140,7 +140,7 @@ const HomeView = (() => {
 
       <!-- Session toggle -->
       <div class="home-session-toggle card-enter">
-        <div class="session-toggle">
+        <div class="session-toggle" id="home-session-toggle">
           <button class="session-toggle__btn ${session === 'morning' ? 'session-toggle__btn--active' : ''}" data-session="morning">
             ☀️ Morning
           </button>
@@ -499,61 +499,51 @@ const HomeView = (() => {
   function showTutorialWalkthrough(container) {
     const STEPS = [
       {
-        // Step 1 — always on screen regardless of plan state
-        route: '/', selector: '#home-build-btn', calloutPos: 'below', highlightPadding: 10,
-        title: 'Start Here: Build a Plan',
-        body: "Tap this + button to generate a 7-day devotion plan from any topic. Every Sunday you'll get a reminder to build the next week — so you're never without content.",
+        route: '/', selector: '.home-greeting', calloutPos: 'below', highlightPadding: 10,
+        title: 'Your Daily Devotional Home',
+        body: "This is your Today page. Each day is organized into morning and evening devotion moments with Scripture, reflection, prayer, and practical next steps.",
       },
       {
-        // Step 2 — Google sync button in header, always present
-        route: '/', selector: '#home-google-btn', calloutPos: 'below', highlightPadding: 10,
-        title: 'Save to Google Drive',
-        body: "Connect your Google account to automatically back up your devotions, journal entries, and settings to your personal Drive — so nothing is lost if you switch devices.",
-      },
-      {
-        // Step 3 — on the plan page
-        route: '/plan', selector: '#build-btn', calloutPos: 'above', highlightPadding: 12,
-        title: 'The Plan Builder',
-        body: "Enter any topic — a theme, a life season, a scripture passage, or just how you're feeling — then tap Build. AI will generate a full week of morning & evening devotions. You can even dictate your topic.",
-      },
-      {
-        // Step 4 — back to home; target the actual session toggle (not the day-nav which shares the class)
-        route: '/', selector: '.session-toggle', calloutPos: 'below', highlightPadding: 10,
+        route: '/', selector: '#home-session-toggle', calloutPos: 'below', highlightPadding: 10,
         title: 'Morning & Evening Sessions',
-        body: "Every day has two sessions. Toggle between them here — morning for opening your day with scripture, evening for reflection and Lectio Divina.",
+        body: "Switch between your morning and evening devotion here. Each session has its own scripture focus and reflection prompts for the same day.",
       },
       {
-        // Step 5 — scripture tab
+        route: '/', selector: '#home-build-btn', calloutPos: 'below', highlightPadding: 10,
+        title: 'Build This Week',
+        body: "Tap + to generate a fresh 7-day plan. You can choose a topic, tune your content settings, and rebuild whenever needed.",
+      },
+      {
+        route: '/', selector: '#home-google-btn', calloutPos: 'below', highlightPadding: 10,
+        title: 'Google Drive Sync',
+        body: "Connect Google to back up devotions, journals, and settings to your Drive so you can restore them on another device.",
+      },
+      {
         route: '/scripture', selector: '#scripture-search', calloutPos: 'below', highlightPadding: 10,
         title: 'Look Up Any Scripture',
-        body: 'Search any verse or passage by reference (e.g. "John 3:16") or topic. Default translation is WEB (public domain). You can switch to ESV, KJV, or others in Settings.',
+        body: 'Search by reference (for example, "John 3:16") or topic. Translation defaults to WEB and can be changed in Settings.',
       },
       {
-        // Step 6 — prayer tab; spotlight the tab bar item (always present)
         route: '/prayer', selector: '[data-tab="prayer"]', calloutPos: 'above', highlightPadding: 8,
         title: 'Guided Prayer',
-        body: "The Prayer tab offers structured prayer frameworks — ACTS, Examen, and more — to guide you through focused time with God. Each framework walks you step by step.",
+        body: "Use Prayer to walk through structured prayer frameworks and stay consistent when you don't know where to start.",
       },
       {
-        // Step 7 — journal tab
         route: '/journal', selector: '[data-tab="journal"]', calloutPos: 'above', highlightPadding: 8,
         title: 'Personal Journal',
-        body: "Write dated journal entries tied to your devotion. Everything is saved locally on your device and never deleted — your private space to process and reflect.",
+        body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
       },
       {
-        // Step 8 — settings: appearance + translation
         route: '/settings', selector: '#palette-grid', calloutPos: 'below', highlightPadding: 10,
         title: 'Appearance & Translation',
-        body: "Pick from 8 color palettes and light/dark mode. For Bible translation, WEB is the default (public domain, always free). ESV and KJV are also available — ESV is copyrighted so it's for personal devotional use only.",
+        body: "Choose your color palette and app theme. You can also pick Bible translation: WEB is public-domain default; ESV is available for personal devotional use.",
       },
       {
-        // Step 9 — settings: notifications (same route, no nav)
         route: '/settings', selector: '#notif-toggle', calloutPos: 'below', highlightPadding: 10,
         title: 'Daily Reminders',
-        body: "Turn on notifications to get a morning and evening nudge at times you choose. You'll also get a Sunday reminder to build the next week's plan. On iOS, install to Home Screen first.",
+        body: "Enable notifications for morning/evening reminders and Sunday plan prompts. iOS will ask for permission when you save.",
       },
       {
-        // Step 10 — settings: trusted pastors (same route, no nav)
         route: '/settings', selector: '#trusted-pastor-list', calloutPos: 'below', highlightPadding: 10,
         title: 'Your Trusted Pastors',
         body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
@@ -566,6 +556,13 @@ const HomeView = (() => {
     const highlightEl = document.createElement('div');
     highlightEl.className = 'tour-highlight';
     document.body.appendChild(highlightEl);
+
+    // Interaction blocker (prevents accidental taps on underlying UI)
+    const blockerEl = document.createElement('div');
+    blockerEl.className = 'tour-blocker';
+    blockerEl.addEventListener('click', (e) => e.preventDefault());
+    blockerEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    document.body.appendChild(blockerEl);
 
     // Callout tooltip div
     const calloutEl = document.createElement('div');
@@ -683,6 +680,7 @@ const HomeView = (() => {
       calloutEl.classList.remove('tour-callout--visible');
       setTimeout(() => {
         highlightEl.remove();
+        blockerEl.remove();
         calloutEl.remove();
         Router.navigate('/');
         setTimeout(() => {
