@@ -416,9 +416,34 @@ const Store = (() => {
   }
 
   function importSavedDevotionsSnapshot(snapshot = {}) {
-    const list = Array.isArray(snapshot.savedDevotions) ? snapshot.savedDevotions : [];
-    const lib = snapshot.savedDevotionLibrary && typeof snapshot.savedDevotionLibrary === 'object'
-      ? snapshot.savedDevotionLibrary
+    if (Array.isArray(snapshot)) {
+      snapshot = { savedDevotionLibrary: snapshot };
+    }
+    if (snapshot && typeof snapshot === 'object' && snapshot.data && typeof snapshot.data === 'object') {
+      snapshot = snapshot.data;
+    }
+
+    let normalizedSnapshot = snapshot && typeof snapshot === 'object' ? { ...snapshot } : {};
+    if (normalizedSnapshot.saved && !normalizedSnapshot.savedDevotions) {
+      normalizedSnapshot.savedDevotions = normalizedSnapshot.saved;
+    }
+    if (normalizedSnapshot.items && !normalizedSnapshot.savedDevotionLibrary) {
+      normalizedSnapshot.savedDevotionLibrary = normalizedSnapshot.items;
+    }
+
+    if (Array.isArray(normalizedSnapshot.savedDevotionLibrary)) {
+      const arrayLib = {};
+      normalizedSnapshot.savedDevotionLibrary.forEach((entry) => {
+        const id = String(entry?.id || '').trim();
+        if (!id) return;
+        arrayLib[id] = { ...entry };
+      });
+      normalizedSnapshot.savedDevotionLibrary = arrayLib;
+    }
+
+    const list = Array.isArray(normalizedSnapshot.savedDevotions) ? normalizedSnapshot.savedDevotions : [];
+    const lib = normalizedSnapshot.savedDevotionLibrary && typeof normalizedSnapshot.savedDevotionLibrary === 'object'
+      ? normalizedSnapshot.savedDevotionLibrary
       : {};
 
     const mergedIds = new Set([
@@ -428,7 +453,7 @@ const Store = (() => {
     ]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
-    const incomingProfile = snapshot.profile && typeof snapshot.profile === 'object' ? snapshot.profile : {};
+    const incomingProfile = normalizedSnapshot.profile && typeof normalizedSnapshot.profile === 'object' ? normalizedSnapshot.profile : {};
     if (incomingProfile.userName && !_state.userName) {
       _state.userName = String(incomingProfile.userName).trim();
     }
@@ -454,8 +479,8 @@ const Store = (() => {
       if (!sessionData) return;
       _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData);
     });
-    const incomingJournal = snapshot.journalEntries && typeof snapshot.journalEntries === 'object'
-      ? snapshot.journalEntries
+    const incomingJournal = normalizedSnapshot.journalEntries && typeof normalizedSnapshot.journalEntries === 'object'
+      ? normalizedSnapshot.journalEntries
       : {};
     const currentJournal = _state.journalEntries && typeof _state.journalEntries === 'object'
       ? _state.journalEntries
@@ -514,6 +539,9 @@ const Store = (() => {
   }
 
   function importDevotionsSnapshot(snapshot = {}) {
+    if (snapshot && typeof snapshot === 'object' && snapshot.devotions && typeof snapshot.devotions === 'object') {
+      snapshot = snapshot.devotions;
+    }
     const base = importSavedDevotionsSnapshot({
       savedDevotions: snapshot.savedDevotions,
       savedDevotionLibrary: snapshot.savedDevotionLibrary,
