@@ -1031,6 +1031,16 @@
 
 .tour-callout__next { width: 100%; }
 
+.tour-callout__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tour-callout__back,
+.tour-callout__next {
+  width: 100%;
+}
+
 .tour-callout--centered {
   left: 50% !important;
   top: 50% !important;

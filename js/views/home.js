@@ -596,7 +596,7 @@ const HomeView = (() => {
       highlightEl.classList.remove('tour-highlight--visible');
 
       function showStep() {
-        const target = document.querySelector(step.selector);
+        const target = findTarget(step.selector);
         if (!target) {
           // Skip missing targets (prevents blank/odd states on dynamic views)
           goToStep(stepIndex + 1);
@@ -612,6 +612,13 @@ const HomeView = (() => {
       } else {
         setTimeout(showStep, 80);
       }
+    }
+
+    function findTarget(selector) {
+      const scoped = Array.from(document.querySelectorAll(`#view-container ${selector}`))
+        .filter(el => !el.closest('.view-exit'));
+      if (scoped.length) return scoped[scoped.length - 1];
+      return document.querySelector(selector);
     }
 
     function positionCoachMark(step, target) {
@@ -638,9 +645,14 @@ const HomeView = (() => {
           <div class="tour-callout__dots">
             ${STEPS.map((_, i) => `<span class="tour-callout__dot${i === stepIndex ? ' active' : ''}"></span>`).join('')}
           </div>
-          <button class="btn btn-primary tour-callout__next">
-            ${isLast ? 'Done ✓' : 'Next →'}
-          </button>
+          <div class="tour-callout__actions">
+            <button class="btn btn-secondary tour-callout__back" ${stepIndex === 0 ? 'disabled' : ''}>
+              ← Back
+            </button>
+            <button class="btn btn-primary tour-callout__next">
+              ${isLast ? 'Done ✓' : 'Next →'}
+            </button>
+          </div>
         `;
 
         // Horizontal: centred on target, clamped to viewport edges
@@ -671,9 +683,14 @@ const HomeView = (() => {
           <div class="tour-callout__dots">
             ${STEPS.map((_, i) => `<span class="tour-callout__dot${i === stepIndex ? ' active' : ''}"></span>`).join('')}
           </div>
-          <button class="btn btn-primary tour-callout__next">
-            ${isLast ? 'Done ✓' : 'Next →'}
-          </button>
+          <div class="tour-callout__actions">
+            <button class="btn btn-secondary tour-callout__back" ${stepIndex === 0 ? 'disabled' : ''}>
+              ← Back
+            </button>
+            <button class="btn btn-primary tour-callout__next">
+              ${isLast ? 'Done ✓' : 'Next →'}
+            </button>
+          </div>
         `;
 
         calloutEl.style.removeProperty('left');
@@ -685,6 +702,9 @@ const HomeView = (() => {
       requestAnimationFrame(() => calloutEl.classList.add('tour-callout--visible'));
 
       calloutEl.querySelector('.tour-callout__skip').addEventListener('click', dismissTour);
+      calloutEl.querySelector('.tour-callout__back')?.addEventListener('click', () => {
+        if (stepIndex > 0) goToStep(stepIndex - 1);
+      });
       calloutEl.querySelector('.tour-callout__next').addEventListener('click', () => goToStep(stepIndex + 1));
     }
 
