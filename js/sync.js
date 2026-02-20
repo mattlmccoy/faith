@@ -9,6 +9,7 @@ const Sync = (() => {
   const PROFILE_SCOPE = 'openid email profile';
   const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   let _accessToken = '';
+  let _accessTokenExpiresAt = 0;
   let _tokenClient = null;
   let _googleScriptPromise = null;
 
@@ -80,7 +81,7 @@ const Sync = (() => {
   }
 
   async function requestToken(interactive = true) {
-    if (_accessToken) return _accessToken;
+    if (_accessToken && Date.now() < (_accessTokenExpiresAt - 30_000)) return _accessToken;
     const clientId = await ensureClientConfig();
 
     if (!_tokenClient) {
@@ -95,22 +96,32 @@ const Sync = (() => {
       _tokenClient.callback = (resp) => {
         if (resp?.error) return reject(new Error(resp.error));
         if (!resp?.access_token) return reject(new Error('No access token returned'));
-        resolve(resp.access_token);
+        resolve(resp);
       };
       _tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
     });
 
-    _accessToken = token;
-    return token;
+    _accessToken = token.access_token;
+    _accessTokenExpiresAt = Date.now() + (Number(token.expires_in || 3600) * 1000);
+    return _accessToken;
   }
 
-  async function driveFetch(url, options = {}) {
+  function clearToken() {
+    _accessToken = '';
+    _accessTokenExpiresAt = 0;
+  }
+
+  async function driveFetch(url, options = {}, retry = true) {
     const token = await requestToken(true);
     const headers = {
       Authorization: `Bearer ${token}`,
       ...(options.headers || {}),
     };
     const res = await fetch(url, { ...options, headers });
+    if ((res.status === 401 || res.status === 403) && retry) {
+      clearToken();
+      return driveFetch(url, options, false);
+    }
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`Drive API ${res.status}: ${body.slice(0, 180)}`);
@@ -298,7 +309,7 @@ const Sync = (() => {
   }
 
   function clearSession() {
-    _accessToken = '';
+    clearToken();
     Store.update({
       googleProfile: null,
       googleConnectedAt: null,

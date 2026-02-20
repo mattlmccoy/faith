@@ -11,7 +11,7 @@ const Notifications = (() => {
 
   // Detect if running as installed PWA on iOS
   function isInstalledPWA() {
-    return window.navigator.standalone === true;
+    return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
   }
 
   // iOS 16.4+ supports push; check Safari version
@@ -103,6 +103,7 @@ const Notifications = (() => {
         morningMinute: Store.get('morningMinute'),
         eveningHour: Store.get('eveningHour'),
         eveningMinute: Store.get('eveningMinute'),
+        sundayReminderEnabled: Store.get('sundayReminderEnabled') !== false,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
 

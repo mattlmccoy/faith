@@ -188,6 +188,21 @@ const SettingsView = (() => {
               <input type="time" id="evening-time" class="settings-time-input" value="${String(state.eveningHour).padStart(2, '0')}:${String(state.eveningMinute).padStart(2, '0')}" />
             </div>
           </div>
+          <div class="settings-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Sunday New Week Reminder</div>
+              <div class="settings-row__value">Prompt to generate next week’s devotion plan</div>
+            </div>
+            <div class="settings-row__action settings-row__action--toggle">
+              <label class="toggle__switch">
+                <input type="checkbox" id="sunday-reminder-toggle" ${state.sundayReminderEnabled !== false ? 'checked' : ''} />
+                <div class="toggle__track"></div>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -198,7 +213,11 @@ const SettingsView = (() => {
             <div class="settings-row__value">
               Saved devotions and journal entries are stored locally on this device in browser storage. Use Advanced to sync to your visible Google Drive folder <strong>abidefaith-docs</strong> for cross-device access.
             </div>
-            <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/saved')" type="button">Open Saved Devotionals</button>
+              <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/settings-advanced')" type="button">Open Sync & Backup</button>
+              <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
+            </div>
           </div>
         </div>
       </div>
@@ -253,6 +272,7 @@ const SettingsView = (() => {
       const theme = root.querySelector('#theme-select')?.value || 'auto';
       const bibleTranslation = root.querySelector('#translation-select')?.value || 'web';
       const notifEnabled = root.querySelector('#notif-toggle')?.checked || false;
+      const sundayReminderEnabled = root.querySelector('#sunday-reminder-toggle')?.checked || false;
       const morningTime = root.querySelector('#morning-time')?.value || '06:30';
       const eveningTime = root.querySelector('#evening-time')?.value || '20:00';
       const selectedPalette = document.documentElement.dataset.palette || 'tuscan-sunset';
@@ -279,6 +299,7 @@ const SettingsView = (() => {
         eveningHour: eh,
         eveningMinute: em,
         notificationsEnabled: notifEnabled,
+        sundayReminderEnabled,
         palette: selectedPalette,
       });
       Store.setTrustedPastors(trustedPastors);

@@ -59,7 +59,7 @@ export default {
 
     try {
       if (url.pathname === '/health') {
-        return json({ status: 'ok', version: '2.2.0', service: 'abide-worker' }, 200, origin);
+        return json({ status: 'ok', version: '2.3.0', service: 'abide-worker' }, 200, origin);
       }
 
       if (url.pathname.startsWith('/bible')) {

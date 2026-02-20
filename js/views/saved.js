@@ -36,6 +36,7 @@ const SavedView = (() => {
           ${syncing ? `<span class="text-xs text-secondary">Syncing...</span>` : ''}
           ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.download()">Download</button>` : ''}
           ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.upload()">Upload</button>` : ''}
+          ${!googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.connectGoogle()">Connect Google</button>` : ''}
         </div>
       </div>
 
@@ -170,7 +171,16 @@ const SavedView = (() => {
     }
   }
 
-  return { render, openSaved, goToDay, upload, download };
+  async function connectGoogle() {
+    try {
+      await Sync.connectGoogle();
+      render(document.getElementById('view-container'));
+    } catch (err) {
+      alert(`Google sign-in failed: ${err.message}`);
+    }
+  }
+
+  return { render, openSaved, goToDay, upload, download, connectGoogle };
 })();
 
 window.SavedView = SavedView;

@@ -30,6 +30,7 @@ const Store = (() => {
     eveningHour: 20,
     eveningMinute: 0,
     notificationsEnabled: false,
+    sundayReminderEnabled: true,
     pushSubscription: null,
     currentWeekPlan: null,    // Full week plan object from plan builder
     journalEntries: {},       // { 'YYYY-MM-DD': { prompt, text, savedAt } }
@@ -392,6 +393,12 @@ const Store = (() => {
     return {
       version: 2,
       exportedAt: new Date().toISOString(),
+      profile: {
+        userName: _state.userName || '',
+        bibleTranslation: _state.bibleTranslation || 'web',
+        palette: _state.palette || 'tuscan-sunset',
+        trustedPastors: getTrustedPastors(),
+      },
       savedDevotions: uniqueIds,
       savedDevotionLibrary: lib,
       journalEntries: _state.journalEntries || {},
@@ -411,6 +418,20 @@ const Store = (() => {
     ]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
+    const incomingProfile = snapshot.profile && typeof snapshot.profile === 'object' ? snapshot.profile : {};
+    if (incomingProfile.userName && !_state.userName) {
+      _state.userName = String(incomingProfile.userName).trim();
+    }
+    if (incomingProfile.bibleTranslation && !_state.bibleTranslation) {
+      _state.bibleTranslation = String(incomingProfile.bibleTranslation).toLowerCase();
+    }
+    if (incomingProfile.palette && !_state.palette) {
+      _state.palette = String(incomingProfile.palette);
+    }
+    if (Array.isArray(incomingProfile.trustedPastors) && incomingProfile.trustedPastors.length) {
+      const mergedPastors = [...getTrustedPastors(), ...incomingProfile.trustedPastors];
+      _state.trustedPastors = normalizeTrustedPastors(mergedPastors);
+    }
     // Backfill library entries from current plan when older snapshots only contain IDs.
     _state.savedDevotions.forEach((id) => {
       if (_state.savedDevotionLibrary[id]) return;
