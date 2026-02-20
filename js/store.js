@@ -42,6 +42,7 @@ const Store = (() => {
     lastOpenedDate: null,
     workerUrl: '',            // Set in settings after deploying worker
     onboardingDone: false,
+    tutorialSeen: false,
     bibleTranslation: 'web',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby'
     palette: 'tuscan-sunset', // Color palette / theme
     trustedPastors: DEFAULT_TRUSTED_PASTORS,

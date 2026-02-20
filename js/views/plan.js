@@ -42,6 +42,15 @@ const PlanView = (() => {
       .replace(/'/g, '&#39;');
   }
 
+  function summarizeTopic(raw) {
+    if (!raw || raw.length <= 40) return raw;
+    // Extract the first sentence fragment or first 6 words — whichever is shorter
+    const firstSentence = raw.split(/[.!?]/)[0].trim();
+    const words = firstSentence.split(/\s+/).slice(0, 6).join(' ');
+    // Trim trailing minor words (prepositions, articles, conjunctions)
+    return words.replace(/\s+(a|an|the|in|of|on|and|but|or|for|to)$/i, '').trim();
+  }
+
   function paragraphsFromSession(session = {}) {
     if (Array.isArray(session.body)) {
       return session.body
@@ -125,9 +134,12 @@ const PlanView = (() => {
       <!-- Custom topic input -->
       <div class="plan-custom-input">
         <div class="section-header"><span class="section-title">Or type anything</span></div>
-        <input id="custom-topic" class="input" type="text"
-          placeholder="e.g. 'Why does God allow suffering', 'being a father', 'Psalm 23'…"
-          value="${selectedTopic && !SUGGESTED_TOPICS.find(t => t.label === selectedTopic) ? selectedTopic : ''}" />
+        <div class="plan-dictation-row">
+          <input id="custom-topic" class="input plan-topic-input" type="text"
+            placeholder="e.g. 'Why does God allow suffering', 'being a father', 'Psalm 23'…"
+            value="${selectedTopic && !SUGGESTED_TOPICS.find(t => t.label === selectedTopic) ? selectedTopic : ''}" />
+          <button class="plan-mic-btn" id="btn-mic" title="Dictate your topic" aria-label="Start voice dictation" type="button">🎙️</button>
+        </div>
       </div>
 
       <!-- Build button -->
@@ -179,18 +191,81 @@ const PlanView = (() => {
       });
     }
 
+    // Voice dictation
+    const micBtn = root.querySelector('#btn-mic');
+    if (micBtn) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        micBtn.remove();
+      } else {
+        let recognition = null;
+        let isRecording = false;
+        let fullTranscript = '';
+
+        micBtn.addEventListener('click', () => {
+          if (isRecording) {
+            recognition?.stop();
+            return;
+          }
+
+          recognition = new SR();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+
+          isRecording = true;
+          fullTranscript = customInput ? customInput.value.trim() : '';
+          micBtn.classList.add('recording');
+          micBtn.setAttribute('aria-label', 'Stop recording');
+
+          recognition.onresult = (e) => {
+            let interim = '';
+            let finalChunk = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+              if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript;
+              else interim += e.results[i][0].transcript;
+            }
+            if (finalChunk) fullTranscript = (fullTranscript ? fullTranscript + ' ' : '') + finalChunk.trim();
+            if (customInput) customInput.value = (fullTranscript + (interim ? ' ' + interim : '')).trim();
+            // Keep selectedTopic in sync
+            selectedTopic = customInput ? customInput.value.trim() : fullTranscript;
+            root.querySelectorAll('.topic-chip[data-topic]').forEach(c => c.classList.remove('selected'));
+          };
+
+          recognition.onend = () => {
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            micBtn.setAttribute('aria-label', 'Start voice dictation');
+            if (customInput) customInput.value = fullTranscript;
+            selectedTopic = fullTranscript;
+          };
+
+          recognition.onerror = (e) => {
+            console.warn('Speech recognition error:', e.error);
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            micBtn.setAttribute('aria-label', 'Start voice dictation');
+          };
+
+          recognition.start();
+        });
+      }
+    }
+
   }
 
   async function startBuild() {
     const customInput = document.getElementById('custom-topic');
-    const topic = customInput?.value?.trim() || selectedTopic;
+    const rawTopic = customInput?.value?.trim() || selectedTopic;
 
-    if (!topic) {
+    if (!rawTopic) {
       alert('Please choose or type a theme first.');
       return;
     }
 
-    selectedTopic = topic;
+    const topic = rawTopic;               // full text sent to AI
+    const displayTopic = summarizeTopic(rawTopic); // short title for plan theme
+    selectedTopic = rawTopic;
 
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
     if (!trustedPastors.length) {
@@ -232,9 +307,9 @@ const PlanView = (() => {
         if (lengthIssues.length) {
           throw new Error(`Plan too short: ${lengthIssues.slice(0, 2).join('; ')}`);
         }
-        const plan = convertAIPlanToAppFormat(topic, aiPlan, trustedPastors);
+        const plan = convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors);
         Store.savePlan(plan);
-        showSuccess(results, topic, true, formatPlanModelLabel(aiPlan?.ai_meta));
+        showSuccess(results, displayTopic, true, formatPlanModelLabel(aiPlan?.ai_meta));
       } else {
         throw new Error('AI returned empty plan');
       }
@@ -362,7 +437,7 @@ const PlanView = (() => {
     `;
   }
 
-  function convertAIPlanToAppFormat(topic, aiPlan, trustedPastors = []) {
+  function convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors = []) {
     const weekStart = DateUtils.weekStart(DateUtils.today());
     const keys = DateUtils.weekKeys(weekStart);
     const translation = API.translationLabel(Store.get('bibleTranslation') || 'web');
@@ -425,7 +500,7 @@ const PlanView = (() => {
 
     return {
       week: weekStart,
-      theme: topic,
+      theme: displayTopic || topic,
       aiGenerated: true,
       aiMeta: aiPlan?.ai_meta || null,
       days,

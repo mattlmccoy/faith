@@ -216,6 +216,7 @@ const SettingsView = (() => {
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/saved')" type="button">Open Saved Devotionals</button>
               <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/settings-advanced')" type="button">Open Sync & Backup</button>
+              <button class="btn btn-secondary btn-sm" id="btn-view-tutorial" type="button">View Tutorial</button>
               <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
             </div>
           </div>
@@ -248,7 +249,7 @@ const SettingsView = (() => {
 
       <div style="text-align:center;padding:var(--space-5) 0 var(--space-3);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
-        <p class="text-xs text-muted" id="settings-version" style="margin-top:4px;cursor:default;">Version: ${appVersion}</p>
+        <p class="text-xs text-muted settings-version-footer" id="settings-version" style="margin-top:4px;cursor:default;">${(() => { const swv = window.__ABIDE_SW_VERSION__ || ''; return `v${appVersion}${swv ? ' · SW ' + swv : ''}`; })()}</p>
       </div>
 
       <button class="btn btn-primary btn-full" id="save-settings">Save Settings</button>
@@ -359,6 +360,11 @@ const SettingsView = (() => {
       try { localStorage.clear(); } catch {}
       try { sessionStorage.clear(); } catch {}
       window.location.reload();
+    });
+
+    root.querySelector('#btn-view-tutorial')?.addEventListener('click', () => {
+      Store.set('tutorialSeen', false);
+      window.location.hash = '#/';
     });
 
     const versionEl = root.querySelector('#settings-version');
