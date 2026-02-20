@@ -10,25 +10,78 @@ const Sync = (() => {
   const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
   let _accessToken = '';
   let _tokenClient = null;
+  let _googleScriptPromise = null;
 
   function hasGoogleClient() {
     return !!window.google?.accounts?.oauth2;
+  }
+
+  function loadGoogleScript() {
+    if (hasGoogleClient()) return Promise.resolve();
+    if (_googleScriptPromise) return _googleScriptPromise;
+
+    _googleScriptPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-google-gsi="1"]');
+      if (existing) {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          if (hasGoogleClient()) {
+            clearInterval(timer);
+            resolve();
+            return;
+          }
+          if (Date.now() - start > 8000) {
+            clearInterval(timer);
+            reject(new Error('Google Sign-In script not loaded'));
+          }
+        }, 120);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleGsi = '1';
+      script.onload = () => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          if (hasGoogleClient()) {
+            clearInterval(timer);
+            resolve();
+            return;
+          }
+          if (Date.now() - start > 8000) {
+            clearInterval(timer);
+            reject(new Error('Google Sign-In script not loaded'));
+          }
+        }, 120);
+      };
+      script.onerror = () => reject(new Error('Could not load Google Sign-In script'));
+      document.head.appendChild(script);
+    }).finally(() => {
+      if (hasGoogleClient()) return;
+      _googleScriptPromise = null;
+    });
+
+    return _googleScriptPromise;
   }
 
   function getClientId() {
     return (Store.get('googleClientId') || DEFAULT_GOOGLE_CLIENT_ID || '').trim();
   }
 
-  function ensureClientConfig() {
+  async function ensureClientConfig() {
     const clientId = getClientId();
     if (!clientId) throw new Error('Missing Google Client ID in Settings → Advanced');
+    if (!hasGoogleClient()) await loadGoogleScript();
     if (!hasGoogleClient()) throw new Error('Google Sign-In script not loaded');
     return clientId;
   }
 
   async function requestToken(interactive = true) {
     if (_accessToken) return _accessToken;
-    const clientId = ensureClientConfig();
+    const clientId = await ensureClientConfig();
 
     if (!_tokenClient) {
       _tokenClient = google.accounts.oauth2.initTokenClient({
