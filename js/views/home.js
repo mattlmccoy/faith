@@ -509,14 +509,14 @@ const HomeView = (() => {
         body: "Tap + to generate a fresh 7-day plan. You can rebuild anytime with a new topic.",
       },
       {
-        route: '/plan', selector: '.plan-dictation-row', calloutPos: 'below', highlightPadding: 10,
-        title: 'Enter Your Topic',
-        body: "Pick a suggested topic or type your own. You can also use the mic button to dictate your topic.",
-      },
-      {
         route: '/plan', selector: '#pastor-chips', calloutPos: 'below', highlightPadding: 10,
         title: 'Trusted Pastor Influence',
         body: "These teachers shape the generated devotional tone and references. Manage this list in Settings.",
+      },
+      {
+        route: '/plan', selector: '.plan-dictation-row', calloutPos: 'below', highlightPadding: 10,
+        title: 'Enter Your Topic',
+        body: "Pick a suggested topic or type your own. You can also use the mic button to dictate your topic.",
       },
       {
         route: '/plan', selector: '#build-btn', calloutPos: 'above', highlightPadding: 10,
