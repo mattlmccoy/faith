@@ -138,7 +138,14 @@ const PlanView = (() => {
           <input id="custom-topic" class="input plan-topic-input" type="text"
             placeholder="e.g. 'Why does God allow suffering', 'being a father', 'Psalm 23'…"
             value="${selectedTopic && !SUGGESTED_TOPICS.find(t => t.label === selectedTopic) ? selectedTopic : ''}" />
-          <button class="plan-mic-btn" id="btn-mic" title="Dictate your topic" aria-label="Start voice dictation" type="button">🎙️</button>
+          <button class="plan-mic-btn" id="btn-mic" title="Dictate your topic" aria-label="Start voice dictation" type="button">
+            <svg class="plan-mic-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="2" width="6" height="12" rx="3"/>
+              <path d="M5 10a7 7 0 0 0 14 0"/>
+              <line x1="12" y1="17" x2="12" y2="22"/>
+              <line x1="8" y1="22" x2="16" y2="22"/>
+            </svg>
+          </button>
         </div>
       </div>
 
