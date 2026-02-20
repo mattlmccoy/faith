@@ -242,7 +242,8 @@ const SettingsView = (() => {
         <p class="text-xs text-muted" style="margin-top:4px;">Version: ${appVersion}</p>
       </div>
 
-      <button class="btn btn-primary btn-full" id="save-settings" style="margin-bottom:var(--space-6);">Save Settings</button>
+      <button class="btn btn-primary btn-full" id="save-settings">Save Settings</button>
+      <p id="settings-save-hint" class="text-xs text-muted" style="margin:8px 2px var(--space-6);">Saving here updates this device. Use Upload in Saved Devotionals or Advanced Sync to back up to Drive.</p>
     `;
 
     container.innerHTML = '';
@@ -318,12 +319,15 @@ const SettingsView = (() => {
       }
 
       const btn = root.querySelector('#save-settings');
+      const hint = root.querySelector('#settings-save-hint');
       if (btn) {
         btn.textContent = 'Saved ✓';
         btn.style.background = 'var(--color-success)';
+        if (hint) hint.textContent = 'Saved locally. Upload to Drive to sync this metadata across devices.';
         setTimeout(() => {
           btn.textContent = 'Save Settings';
           btn.style.background = '';
+          if (hint) hint.textContent = 'Saving here updates this device. Use Upload in Saved Devotionals or Advanced Sync to back up to Drive.';
         }, 1400);
       }
     });

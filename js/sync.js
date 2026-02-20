@@ -3,7 +3,10 @@
    ============================================================ */
 
 const Sync = (() => {
-  const FILE_NAME = 'abide-saved-devotions.json';
+  const LEGACY_FILE_NAME = 'abide-saved-devotions.json';
+  const DEVOTIONS_FILE_NAME = 'abide-devotions.json';
+  const JOURNALS_FILE_NAME = 'abide-journals.json';
+  const SETTINGS_FILE_NAME = 'abide-settings.json';
   const FOLDER_NAME = 'abidefaith-docs';
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const PROFILE_SCOPE = 'openid email profile';
@@ -213,10 +216,10 @@ const Sync = (() => {
     return folderId;
   }
 
-  async function findFileId(folderId) {
+  async function findFileIdByName(folderId, fileName) {
     if (!folderId) return '';
     const q = encodeURIComponent(
-      `name='${escapeQueryValue(FILE_NAME)}' and '${escapeQueryValue(folderId)}' in parents and trashed=false`
+      `name='${escapeQueryValue(fileName)}' and '${escapeQueryValue(folderId)}' in parents and trashed=false`
     );
     const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1`;
     const res = await driveFetch(url);
@@ -224,10 +227,10 @@ const Sync = (() => {
     return data?.files?.[0]?.id || '';
   }
 
-  async function createFile(jsonBody, folderId) {
+  async function createFile(jsonBody, folderId, fileName) {
     const boundary = 'abide_boundary_' + Date.now();
     const metadata = {
-      name: FILE_NAME,
+      name: fileName,
       parents: [folderId],
       mimeType: 'application/json',
     };
@@ -263,47 +266,109 @@ const Sync = (() => {
     return fileId;
   }
 
+  async function upsertJsonFile(folderId, fileName, jsonBody) {
+    let fileId = await findFileIdByName(folderId, fileName);
+    if (fileId) {
+      await updateFile(fileId, jsonBody);
+      return fileId;
+    }
+    return createFile(jsonBody, folderId, fileName);
+  }
+
+  async function readJsonFile(folderId, fileName) {
+    const fileId = await findFileIdByName(folderId, fileName);
+    if (!fileId) return { found: false, fileId: '', data: null };
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
+    const res = await driveFetch(url);
+    const data = await res.json();
+    return { found: true, fileId, data };
+  }
+
   async function pushSavedDevotions() {
-    const snapshot = Store.exportSavedDevotionsSnapshot();
+    const devotions = Store.exportDevotionsSnapshot();
+    const journals = Store.exportJournalSnapshot();
+    const settings = Store.exportSettingsSnapshot();
     const folderId = await findOrCreateFolderId();
     if (!folderId) throw new Error('Could not create/find Google Drive folder');
-    let fileId = (Store.get('googleDriveFileId') || '').trim();
-    if (!fileId) fileId = await findFileId(folderId);
-    if (fileId) {
-      await updateFile(fileId, snapshot);
-    } else {
-      fileId = await createFile(snapshot, folderId);
-    }
+
+    const [devotionsFileId, journalsFileId, settingsFileId] = await Promise.all([
+      upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions),
+      upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals),
+      upsertJsonFile(folderId, SETTINGS_FILE_NAME, settings),
+    ]);
+
     Store.update({
       googleDriveFolderId: folderId,
-      googleDriveFileId: fileId,
+      googleDriveFileId: devotionsFileId,
+      googleDriveFiles: { devotions: devotionsFileId, journals: journalsFileId, settings: settingsFileId },
       lastDriveSyncAt: new Date().toISOString(),
     });
-    return { fileId, count: (snapshot.savedDevotions || []).length };
+    return {
+      fileId: devotionsFileId,
+      count: (devotions.savedDevotions || []).length,
+      journals: Object.keys(journals.journalEntries || {}).length,
+      pastors: Array.isArray(settings.trustedPastors) ? settings.trustedPastors.length : 0,
+      files: 3,
+    };
   }
 
   async function pullSavedDevotions() {
     const folderId = await findExistingFolderId();
     if (!folderId) return { fileId: '', count: 0, imported: false };
-    let fileId = (Store.get('googleDriveFileId') || '').trim();
-    if (!fileId) fileId = await findFileId(folderId);
-    if (!fileId) return { fileId: '', count: 0, imported: false };
 
-    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
-    const res = await driveFetch(url);
-    const data = await res.json();
-    const result = Store.importSavedDevotionsSnapshot(data || {});
+    const [devotionsFile, journalsFile, settingsFile] = await Promise.all([
+      readJsonFile(folderId, DEVOTIONS_FILE_NAME),
+      readJsonFile(folderId, JOURNALS_FILE_NAME),
+      readJsonFile(folderId, SETTINGS_FILE_NAME),
+    ]);
+
+    let imported = false;
+    let devResult = { count: 0, importedIds: 0, importedLibrary: 0, importedPlanDays: 0 };
+    let journalResult = { importedJournal: 0 };
+    let settingsResult = { importedSettings: false, importedPastors: 0 };
+
+    if (devotionsFile.found && devotionsFile.data) {
+      devResult = Store.importDevotionsSnapshot(devotionsFile.data || {});
+      imported = true;
+    }
+    if (journalsFile.found && journalsFile.data) {
+      journalResult = Store.importJournalSnapshot(journalsFile.data || {});
+      imported = true;
+    }
+    if (settingsFile.found && settingsFile.data) {
+      settingsResult = Store.importSettingsSnapshot(settingsFile.data || {});
+      imported = true;
+    }
+
+    // Backward compatibility with old single-file sync.
+    if (!imported) {
+      const legacy = await readJsonFile(folderId, LEGACY_FILE_NAME);
+      if (legacy.found && legacy.data) {
+        devResult = Store.importSavedDevotionsSnapshot(legacy.data || {});
+        imported = true;
+      }
+    }
+
+    if (!imported) return { fileId: '', count: 0, imported: false };
+
     Store.update({
       googleDriveFolderId: folderId,
-      googleDriveFileId: fileId,
+      googleDriveFileId: devotionsFile.fileId || '',
+      googleDriveFiles: {
+        devotions: devotionsFile.fileId || '',
+        journals: journalsFile.fileId || '',
+        settings: settingsFile.fileId || '',
+      },
       lastDriveSyncAt: new Date().toISOString(),
     });
     return {
-      fileId,
-      count: result.count || 0,
-      importedIds: result.importedIds || 0,
-      importedLibrary: result.importedLibrary || 0,
-      importedJournal: result.importedJournal || 0,
+      fileId: devotionsFile.fileId || '',
+      count: devResult.count || 0,
+      importedIds: devResult.importedIds || 0,
+      importedLibrary: devResult.importedLibrary || 0,
+      importedJournal: journalResult.importedJournal || devResult.importedJournal || 0,
+      importedPastors: settingsResult.importedPastors || 0,
+      importedPlanDays: devResult.importedPlanDays || 0,
       imported: true,
     };
   }

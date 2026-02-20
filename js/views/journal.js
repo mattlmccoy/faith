@@ -232,7 +232,7 @@ const JournalView = (() => {
     render(document.getElementById('view-container'));
     try {
       const result = await Sync.pushSavedDevotions();
-      alert(`Uploaded ${result.count || 0} saved devotionals and journal entries.`);
+      alert(`Uploaded ${result.count || 0} saved devotionals, ${result.journals || 0} journal entries, and settings metadata.`);
     } catch (err) {
       alert(`Upload failed: ${err.message}`);
     } finally {
@@ -251,7 +251,7 @@ const JournalView = (() => {
         alert('No synced Drive file found yet.');
         return;
       }
-      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals and ${result.importedJournal || 0} journal entries.`);
+      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals, ${result.importedJournal || 0} journal entries, and settings metadata.`);
     } catch (err) {
       alert(`Download failed: ${err.message}`);
     } finally {

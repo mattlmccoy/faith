@@ -368,7 +368,7 @@ const HomeView = (() => {
   async function syncSavedNow() {
     try {
       const result = await Sync.pushSavedDevotions();
-      alert(`Uploaded ${result.count || 0} saved devotionals and journal entries to Google Drive.`);
+      alert(`Uploaded ${result.count || 0} saved devotionals, ${result.journals || 0} journal entries, and settings metadata to Google Drive.`);
     } catch (err) {
       alert(`Upload failed: ${err.message}`);
     }
@@ -381,7 +381,7 @@ const HomeView = (() => {
         alert('No synced Drive file found yet.');
         return;
       }
-      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals and ${result.importedJournal || 0} journal entries.`);
+      alert(`Downloaded ${result.importedLibrary || 0} saved devotionals, ${result.importedJournal || 0} journal entries, and settings metadata.`);
     } catch (err) {
       alert(`Download failed: ${err.message}`);
     }

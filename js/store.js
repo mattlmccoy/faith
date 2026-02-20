@@ -65,6 +65,7 @@ const Store = (() => {
     googleClientId: DEFAULT_GOOGLE_CLIENT_ID,
     googleDriveFolderId: '',
     googleDriveFileId: '',
+    googleDriveFiles: { devotions: '', journals: '', settings: '' },
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
@@ -87,6 +88,15 @@ const Store = (() => {
       _state.usageLimits = normalizeUsageLimits(_state.usageLimits);
       if (!_state.googleClientId || !_state.googleClientId.trim()) {
         _state.googleClientId = DEFAULT_GOOGLE_CLIENT_ID;
+      }
+      if (!_state.googleDriveFiles || typeof _state.googleDriveFiles !== 'object') {
+        _state.googleDriveFiles = { devotions: '', journals: '', settings: '' };
+      } else {
+        _state.googleDriveFiles = {
+          devotions: String(_state.googleDriveFiles.devotions || ''),
+          journals: String(_state.googleDriveFiles.journals || ''),
+          settings: String(_state.googleDriveFiles.settings || ''),
+        };
       }
     } catch (e) {
       _state = { ...defaults };
@@ -473,6 +483,134 @@ const Store = (() => {
     };
   }
 
+  function exportDevotionsSnapshot() {
+    const base = exportSavedDevotionsSnapshot();
+    return {
+      version: 1,
+      exportedAt: base.exportedAt,
+      savedDevotions: base.savedDevotions,
+      savedDevotionLibrary: base.savedDevotionLibrary,
+      currentWeekPlan: _state.currentWeekPlan || null,
+      selectedDevotionDate: _state.selectedDevotionDate || null,
+      sessionOverride: _state._sessionOverride || null,
+    };
+  }
+
+  function mergePlan(currentPlan, incomingPlan) {
+    if (!incomingPlan || typeof incomingPlan !== 'object') return currentPlan || null;
+    if (!currentPlan || typeof currentPlan !== 'object') return JSON.parse(JSON.stringify(incomingPlan));
+    const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
+    const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
+    // Preserve local days when keys overlap; only fill missing days from incoming.
+    const mergedDays = { ...incomingDays, ...currentDays };
+    return {
+      ...incomingPlan,
+      ...currentPlan,
+      days: mergedDays,
+      sources: Array.isArray(currentPlan.sources) && currentPlan.sources.length
+        ? currentPlan.sources
+        : (Array.isArray(incomingPlan.sources) ? incomingPlan.sources : []),
+    };
+  }
+
+  function importDevotionsSnapshot(snapshot = {}) {
+    const base = importSavedDevotionsSnapshot({
+      savedDevotions: snapshot.savedDevotions,
+      savedDevotionLibrary: snapshot.savedDevotionLibrary,
+    });
+
+    const mergedPlan = mergePlan(_state.currentWeekPlan, snapshot.currentWeekPlan);
+    if (mergedPlan) _state.currentWeekPlan = mergedPlan;
+
+    if (!_state.selectedDevotionDate && snapshot.selectedDevotionDate) {
+      _state.selectedDevotionDate = String(snapshot.selectedDevotionDate);
+    }
+    if (!_state._sessionOverride && snapshot.sessionOverride) {
+      _state._sessionOverride = String(snapshot.sessionOverride);
+    }
+
+    save();
+    return {
+      ...base,
+      importedPlanDays: Object.keys(snapshot.currentWeekPlan?.days || {}).length,
+    };
+  }
+
+  function exportJournalSnapshot() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      journalEntries: _state.journalEntries || {},
+    };
+  }
+
+  function importJournalSnapshot(snapshot = {}) {
+    const incomingJournal = snapshot.journalEntries && typeof snapshot.journalEntries === 'object'
+      ? snapshot.journalEntries
+      : {};
+    const currentJournal = _state.journalEntries && typeof _state.journalEntries === 'object'
+      ? _state.journalEntries
+      : {};
+    Object.entries(incomingJournal).forEach(([dateKey, entry]) => {
+      const existing = currentJournal[dateKey];
+      const inSavedAt = String(entry?.savedAt || '');
+      const exSavedAt = String(existing?.savedAt || '');
+      if (!existing || inSavedAt > exSavedAt) {
+        currentJournal[dateKey] = {
+          prompt: String(entry?.prompt || ''),
+          text: String(entry?.text || ''),
+          savedAt: inSavedAt || new Date().toISOString(),
+        };
+      }
+    });
+    _state.journalEntries = currentJournal;
+    save();
+    return { importedJournal: Object.keys(incomingJournal).length };
+  }
+
+  function exportSettingsSnapshot() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: {
+        userName: _state.userName || '',
+        bibleTranslation: _state.bibleTranslation || 'web',
+        palette: _state.palette || 'tuscan-sunset',
+        theme: _state.theme || 'auto',
+        morningHour: _state.morningHour,
+        morningMinute: _state.morningMinute,
+        eveningHour: _state.eveningHour,
+        eveningMinute: _state.eveningMinute,
+        notificationsEnabled: !!_state.notificationsEnabled,
+        sundayReminderEnabled: _state.sundayReminderEnabled !== false,
+      },
+      trustedPastors: getTrustedPastors(),
+    };
+  }
+
+  function importSettingsSnapshot(snapshot = {}) {
+    const s = snapshot.settings && typeof snapshot.settings === 'object' ? snapshot.settings : {};
+    const merged = {
+      userName: _state.userName || String(s.userName || ''),
+      bibleTranslation: _state.bibleTranslation || String(s.bibleTranslation || 'web').toLowerCase(),
+      palette: _state.palette || String(s.palette || 'tuscan-sunset'),
+      theme: _state.theme || String(s.theme || 'auto'),
+      morningHour: Number.isFinite(Number(_state.morningHour)) ? _state.morningHour : Number(s.morningHour || 6),
+      morningMinute: Number.isFinite(Number(_state.morningMinute)) ? _state.morningMinute : Number(s.morningMinute || 30),
+      eveningHour: Number.isFinite(Number(_state.eveningHour)) ? _state.eveningHour : Number(s.eveningHour || 20),
+      eveningMinute: Number.isFinite(Number(_state.eveningMinute)) ? _state.eveningMinute : Number(s.eveningMinute || 0),
+      notificationsEnabled: !!_state.notificationsEnabled,
+      sundayReminderEnabled: _state.sundayReminderEnabled !== false,
+    };
+    Object.assign(_state, merged);
+
+    if (Array.isArray(snapshot.trustedPastors) && snapshot.trustedPastors.length) {
+      _state.trustedPastors = normalizeTrustedPastors([...(snapshot.trustedPastors || []), ...getTrustedPastors()]);
+    }
+    save();
+    return { importedSettings: true, importedPastors: Array.isArray(snapshot.trustedPastors) ? snapshot.trustedPastors.length : 0 };
+  }
+
   // --- Pastors ---
   function getTrustedPastors() {
     return normalizeTrustedPastors(_state.trustedPastors);
@@ -545,6 +683,12 @@ const Store = (() => {
     getSavedDevotionById,
     exportSavedDevotionsSnapshot,
     importSavedDevotionsSnapshot,
+    exportDevotionsSnapshot,
+    importDevotionsSnapshot,
+    exportJournalSnapshot,
+    importJournalSnapshot,
+    exportSettingsSnapshot,
+    importSettingsSnapshot,
     getTrustedPastors,
     setTrustedPastors,
     trackUsage,

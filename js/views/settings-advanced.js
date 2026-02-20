@@ -177,7 +177,7 @@ const SettingsAdvancedView = (() => {
       const statusEl = root.querySelector('#sync-status');
       try {
         const result = await Sync.pushSavedDevotions();
-        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions and journal entries to Google Drive folder "abidefaith-docs".`;
+        if (statusEl) statusEl.textContent = `Uploaded ${result.count} saved devotions, ${result.journals || 0} journal entries, and settings metadata to 3 files in "abidefaith-docs".`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Upload failed: ${err.message}`;
       }
@@ -191,7 +191,7 @@ const SettingsAdvancedView = (() => {
           if (statusEl) statusEl.textContent = 'No existing Drive file found yet.';
           return;
         }
-        if (statusEl) statusEl.textContent = `Downloaded ${result.importedLibrary || 0} saved devotional records and ${result.importedJournal || 0} journal entries. Library total: ${result.count}.`;
+        if (statusEl) statusEl.textContent = `Downloaded ${result.importedLibrary || 0} saved devotional records, ${result.importedJournal || 0} journal entries, ${result.importedPastors || 0} pastors, ${result.importedPlanDays || 0} plan days. Library total: ${result.count}.`;
       } catch (err) {
         if (statusEl) statusEl.textContent = `Download failed: ${err.message}`;
       }
