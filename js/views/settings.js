@@ -51,7 +51,7 @@ const SettingsView = (() => {
         </div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-section" id="settings-pastors-section">
         <div class="settings-section-title">2) Trusted Pastors & Teachers</div>
         <div class="settings-group">
           <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
@@ -99,7 +99,7 @@ const SettingsView = (() => {
         </div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-section" id="settings-appearance-section">
         <div class="settings-section-title">4) Appearance</div>
         <div class="settings-group">
           <div class="settings-row">
@@ -154,7 +154,7 @@ const SettingsView = (() => {
         </div>
       </div>
 
-      <div class="settings-section">
+      <div class="settings-section" id="settings-notifications-section">
         <div class="settings-section-title">5) Notifications</div>
         <div class="settings-group">
           <div class="settings-row" id="settings-notifications-row">

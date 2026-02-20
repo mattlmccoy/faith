@@ -619,17 +619,47 @@ const Store = (() => {
 
   function importSettingsSnapshot(snapshot = {}) {
     const s = snapshot.settings && typeof snapshot.settings === 'object' ? snapshot.settings : {};
+    const has = (key) => Object.prototype.hasOwnProperty.call(s, key);
+    const normalizeHour = (value, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(0, Math.min(23, Math.round(n))) : fallback;
+    };
+    const normalizeMinute = (value, fallback) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(0, Math.min(59, Math.round(n))) : fallback;
+    };
+
     const merged = {
-      userName: _state.userName || String(s.userName || ''),
-      bibleTranslation: _state.bibleTranslation || String(s.bibleTranslation || 'web').toLowerCase(),
-      palette: _state.palette || String(s.palette || 'tuscan-sunset'),
-      theme: _state.theme || String(s.theme || 'auto'),
-      morningHour: Number.isFinite(Number(_state.morningHour)) ? _state.morningHour : Number(s.morningHour || 6),
-      morningMinute: Number.isFinite(Number(_state.morningMinute)) ? _state.morningMinute : Number(s.morningMinute || 30),
-      eveningHour: Number.isFinite(Number(_state.eveningHour)) ? _state.eveningHour : Number(s.eveningHour || 20),
-      eveningMinute: Number.isFinite(Number(_state.eveningMinute)) ? _state.eveningMinute : Number(s.eveningMinute || 0),
-      notificationsEnabled: !!_state.notificationsEnabled,
-      sundayReminderEnabled: _state.sundayReminderEnabled !== false,
+      userName: has('userName') && String(s.userName || '').trim()
+        ? String(s.userName || '').trim()
+        : (_state.userName || ''),
+      bibleTranslation: has('bibleTranslation') && s.bibleTranslation
+        ? String(s.bibleTranslation || 'web').toLowerCase()
+        : (_state.bibleTranslation || 'web'),
+      palette: has('palette') && s.palette
+        ? String(s.palette || 'tuscan-sunset')
+        : (_state.palette || 'tuscan-sunset'),
+      theme: has('theme') && s.theme
+        ? String(s.theme || 'auto')
+        : (_state.theme || 'auto'),
+      morningHour: has('morningHour')
+        ? normalizeHour(s.morningHour, Number(_state.morningHour || 6))
+        : Number(_state.morningHour || 6),
+      morningMinute: has('morningMinute')
+        ? normalizeMinute(s.morningMinute, Number(_state.morningMinute || 30))
+        : Number(_state.morningMinute || 30),
+      eveningHour: has('eveningHour')
+        ? normalizeHour(s.eveningHour, Number(_state.eveningHour || 20))
+        : Number(_state.eveningHour || 20),
+      eveningMinute: has('eveningMinute')
+        ? normalizeMinute(s.eveningMinute, Number(_state.eveningMinute || 0))
+        : Number(_state.eveningMinute || 0),
+      notificationsEnabled: has('notificationsEnabled')
+        ? !!s.notificationsEnabled
+        : !!_state.notificationsEnabled,
+      sundayReminderEnabled: has('sundayReminderEnabled')
+        ? s.sundayReminderEnabled !== false
+        : _state.sundayReminderEnabled !== false,
     };
     Object.assign(_state, merged);
 

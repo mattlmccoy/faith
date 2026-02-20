@@ -549,17 +549,17 @@ const HomeView = (() => {
         body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
       },
       {
-        route: '/settings', selector: '#translation-select', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-appearance-section', calloutPos: 'below', highlightPadding: 10,
         title: 'Appearance & Translation',
         body: "Choose your color palette and app theme. You can also pick Bible translation: WEB is public-domain default; ESV is available for personal devotional use.",
       },
       {
-        route: '/settings', selector: '#notif-toggle', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-notifications-section', calloutPos: 'below', highlightPadding: 10,
         title: 'Daily Reminders',
         body: "Enable notifications for morning/evening reminders and Sunday plan prompts. iOS will ask for permission when you save.",
       },
       {
-        route: '/settings', selector: '#trusted-pastor-list .pastor-enabled', calloutPos: 'below', highlightPadding: 8,
+        route: '/settings', selector: '#settings-pastors-section', calloutPos: 'below', highlightPadding: 10,
         title: 'Your Trusted Pastors',
         body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
       },
