@@ -8,14 +8,8 @@ const HomeView = (() => {
 
   function render(container) {
     Router.setTitle('Abide');
-    Router.setHeaderActions(`
-      <button class="icon-btn" title="Build This Week" onclick="Router.navigate('/plan')" aria-label="Build This Week">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-      </button>
-    `);
+    const profile = Store.get('googleProfile');
+    Router.setHeaderActions(renderHeaderActions(profile));
 
     currentSession = Store.get('_sessionOverride') || DateUtils.session();
 
@@ -327,27 +321,27 @@ const HomeView = (() => {
   function renderGooglePanel() {
     const profile = Store.get('googleProfile');
     if (profile?.email || profile?.name) {
+      if (!googlePanelExpanded) return '';
       const avatar = profile.picture
         ? `<img src="${profile.picture}" alt="Google avatar" class="google-avatar" />`
         : `<div class="google-avatar google-avatar--fallback">${(profile.name || profile.email || 'U').slice(0,1).toUpperCase()}</div>`;
+      const displayName = profile.name || profile.email || 'Google account';
       return `
         <div class="google-panel-wrap card-enter">
           <div class="google-panel">
-            <button class="google-panel__left google-panel__trigger" onclick="HomeView.toggleGooglePanel()" aria-label="Toggle sync controls">
+            <div class="google-panel__left">
               ${avatar}
               <div class="google-panel__meta">
-                <div class="google-panel__title">Google connected</div>
-                <div class="google-panel__email">${profile.name || profile.email || ''}</div>
+                <div class="google-panel__title">${displayName}</div>
+                <div class="google-panel__email">Google Drive sync</div>
               </div>
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="HomeView.toggleGooglePanel()">${googlePanelExpanded ? 'Hide' : 'Sync'}</button>
-          </div>
-          ${googlePanelExpanded ? `
-            <div class="google-panel__actions">
-              <button class="btn btn-ghost btn-sm" onclick="HomeView.syncDownloadNow()">Download</button>
-              <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Upload</button>
             </div>
-          ` : ''}
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.toggleGooglePanel()">Close</button>
+          </div>
+          <div class="google-panel__actions">
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncDownloadNow()">Download</button>
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Upload</button>
+          </div>
         </div>
       `;
     }
@@ -375,6 +369,42 @@ const HomeView = (() => {
   function toggleGooglePanel() {
     googlePanelExpanded = !googlePanelExpanded;
     render(document.getElementById('view-container'));
+  }
+
+  function renderHeaderActions(profile) {
+    const hasGoogle = !!(profile?.email || profile?.name);
+    const avatar = hasGoogle
+      ? (profile.picture
+        ? `<img src="${profile.picture}" alt="Google account" class="header-google-avatar" />`
+        : `<span class="header-google-avatar header-google-avatar--fallback">${(profile.name || profile.email || 'U').slice(0,1).toUpperCase()}</span>`)
+      : `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M8 12h8"></path>
+        </svg>
+      `;
+
+    const googleAction = hasGoogle
+      ? `
+      <button class="icon-btn" title="Google Sync" onclick="HomeView.toggleGooglePanel()" aria-label="Google Sync">
+        ${avatar}
+      </button>
+      `
+      : `
+      <button class="icon-btn" title="Connect Google" onclick="HomeView.connectGoogle()" aria-label="Connect Google">
+        ${avatar}
+      </button>
+      `;
+
+    return `
+      ${googleAction}
+      <button class="icon-btn" title="Build This Week" onclick="Router.navigate('/plan')" aria-label="Build This Week">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    `;
   }
 
   async function syncSavedNow() {

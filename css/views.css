@@ -914,6 +914,24 @@
   gap: var(--space-2);
 }
 
+.header-google-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: var(--weight-semibold);
+}
+
+.header-google-avatar--fallback {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .debug-output {
   margin: 0;
   max-height: 46vh;

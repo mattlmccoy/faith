@@ -4,7 +4,7 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.20.2';
+  const APP_VERSION = '2026.02.20.3';
   window.__ABIDE_VERSION__ = APP_VERSION;
 
   function getBasePath() {
