@@ -154,9 +154,6 @@ const PlanView = (() => {
         <button class="btn btn-primary btn-full" id="build-btn" onclick="PlanView.startBuild()">
           ✨ Build This Week's Plan
         </button>
-        <button class="btn btn-ghost btn-full" id="quick-test-btn" onclick="PlanView.startQuickTest()" style="margin-top:var(--space-2);">
-          Run Quick 1-Day AI Test (cheap)
-        </button>
         <p class="text-xs text-muted" style="text-align:center;margin-top:var(--space-2);line-height:1.5;">
           Takes 15–30 seconds. Uses AI to write original devotions inspired by your approved pastors.
         </p>
@@ -347,79 +344,6 @@ const PlanView = (() => {
     }
   }
 
-  async function startQuickTest() {
-    const customInput = document.getElementById('custom-topic');
-    const topic = customInput?.value?.trim() || selectedTopic || 'Grace';
-    selectedTopic = topic;
-
-    const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
-    if (!trustedPastors.length) {
-      alert('Select at least one trusted pastor in Settings first.');
-      return;
-    }
-
-    const results = document.getElementById('plan-results');
-    const quickBtn = document.getElementById('quick-test-btn');
-    if (!results) return;
-
-    const startedAt = Date.now();
-    if (quickBtn) {
-      quickBtn.disabled = true;
-      quickBtn.textContent = 'Running quick test...';
-    }
-
-    results.innerHTML = `
-      <div class="plan-searching">
-        <div class="plan-searching__spinner"></div>
-        <p class="text-sm text-secondary" style="text-align:center;max-width:260px;">
-          Running a low-cost 1-day generation test for "${topic}"...
-        </p>
-      </div>
-    `;
-
-    try {
-      const aiPlan = await API.buildAIPlan(topic, trustedPastors, {
-        daysCount: 1,
-        minMorningWords: 150,
-        minEveningWords: 110,
-        minMorningParagraphs: 3,
-        minEveningParagraphs: 2,
-      });
-
-      const day = aiPlan?.days?.[0];
-      if (!day) throw new Error('No day returned');
-
-      const mWords = textWordCount(paragraphsFromSession(day.morning).join(' '));
-      const eWords = textWordCount(paragraphsFromSession(day.evening).join(' '));
-      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-      const modelLine = formatPlanModelLabel(aiPlan?.ai_meta);
-
-      results.innerHTML = `
-        <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);">
-          <div class="text-xs font-bold text-brand" style="text-transform:uppercase;letter-spacing:.08em;margin-bottom:var(--space-2);">Quick Test Passed</div>
-          <div class="font-serif text-xl" style="margin-bottom:var(--space-2);">${escapeHtml(day.title || 'Day 1')}</div>
-          <p class="text-sm text-secondary" style="line-height:1.6;margin-bottom:var(--space-3);">
-            Generated in ${elapsed}s. Morning ${mWords} words, Evening ${eWords} words.
-          </p>
-          ${modelLine ? `<p class="text-xs text-muted" style="margin-bottom:var(--space-3);">${escapeHtml(modelLine)}</p>` : ''}
-          <p class="text-xs text-muted">Now run "Build This Week's Plan" for a full 7-day save.</p>
-        </div>
-      `;
-    } catch (err) {
-      const reason = escapeHtml(err?.message || 'generation error');
-      results.innerHTML = `
-        <div style="background:var(--color-accent-warm);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);text-align:center;">
-          <p class="text-sm"><strong>Quick test failed.</strong><br>Reason: ${reason}</p>
-        </div>
-      `;
-    }
-
-    if (quickBtn) {
-      quickBtn.disabled = false;
-      quickBtn.textContent = 'Run Quick 1-Day AI Test (cheap)';
-    }
-  }
-
   function formatPlanModelLabel(meta = null) {
     if (!meta?.provider) return '';
     const provider = String(meta.provider).trim();
@@ -567,7 +491,7 @@ const PlanView = (() => {
   // Keep for backward compatibility
   async function startSearch() { return startBuild(); }
 
-  return { render, startBuild, startQuickTest, startSearch, loadSeedPlan };
+  return { render, startBuild, startSearch, loadSeedPlan };
 })();
 
 window.PlanView = PlanView;

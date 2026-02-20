@@ -14,13 +14,6 @@ const HomeView = (() => {
 
     currentSession = Store.get('_sessionOverride') || DateUtils.session();
 
-    // Show tutorial on very first open (before anything else)
-    if (!Store.get('tutorialSeen') && !_tourActive) {
-      _tourActive = true;
-      showTutorialWalkthrough(container);
-      return;
-    }
-
     const selectedDate = Store.getSelectedDevotionDate();
     const devotionData = Store.getDevotionData(selectedDate);
     const userName = Store.get('userName');
@@ -43,6 +36,13 @@ const HomeView = (() => {
 
     // Update streak
     Store.updateStreak();
+
+    // Auto tutorial only after today's content is actually present.
+    const hasTodayContent = !!(devotionData && (devotionData.morning || devotionData.evening));
+    if (!Store.get('tutorialSeen') && !_tourActive && hasTodayContent) {
+      _tourActive = true;
+      setTimeout(() => showTutorialWalkthrough(container), 200);
+    }
   }
 
   function renderSetup(container, userName) {
@@ -509,6 +509,21 @@ const HomeView = (() => {
         body: "Tap + to generate a fresh 7-day plan. You can rebuild anytime with a new topic.",
       },
       {
+        route: '/plan', selector: '.plan-dictation-row', calloutPos: 'below', highlightPadding: 10,
+        title: 'Enter Your Topic',
+        body: "Pick a suggested topic or type your own. You can also use the mic button to dictate your topic.",
+      },
+      {
+        route: '/plan', selector: '#pastor-chips', calloutPos: 'below', highlightPadding: 10,
+        title: 'Trusted Pastor Influence',
+        body: "These teachers shape the generated devotional tone and references. Manage this list in Settings.",
+      },
+      {
+        route: '/plan', selector: '#build-btn', calloutPos: 'above', highlightPadding: 10,
+        title: 'Generate The Week',
+        body: "Tap Build to generate a full week of morning and evening content. When done, return to Today to read each day.",
+      },
+      {
         route: '/', selector: '#home-google-btn', calloutPos: 'below', highlightPadding: 10,
         title: 'Google Drive Sync',
         body: "Connect Google to back up devotions, journals, and settings to your Drive so you can restore them on another device.",
@@ -534,17 +549,17 @@ const HomeView = (() => {
         body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
       },
       {
-        route: '/settings', selector: '#settings-translation-row', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#translation-select', calloutPos: 'below', highlightPadding: 10,
         title: 'Appearance & Translation',
         body: "Choose your color palette and app theme. You can also pick Bible translation: WEB is public-domain default; ESV is available for personal devotional use.",
       },
       {
-        route: '/settings', selector: '#settings-notifications-row', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#notif-toggle', calloutPos: 'below', highlightPadding: 10,
         title: 'Daily Reminders',
         body: "Enable notifications for morning/evening reminders and Sunday plan prompts. iOS will ask for permission when you save.",
       },
       {
-        route: '/settings', selector: '#trusted-pastor-list [data-pastor-row]', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#trusted-pastor-list .pastor-enabled', calloutPos: 'below', highlightPadding: 8,
         title: 'Your Trusted Pastors',
         body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
       },
