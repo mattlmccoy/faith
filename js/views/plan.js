@@ -6,6 +6,7 @@
    ============================================================ */
 
 const PlanView = (() => {
+  const DEFAULT_WEEK_THEME = 'Grace';
   const MIN_MORNING_WORDS = 260;
   const MIN_EVENING_WORDS = 190;
   const MIN_MORNING_PARAS = 4;
@@ -90,23 +91,27 @@ const PlanView = (() => {
     Router.clearHeaderActions();
 
     const currentPlan = Store.getPlan();
-    const weekStart = DateUtils.weekStart(DateUtils.today());
+    const defaultWeekStart = DateUtils.weekStart(DateUtils.today());
+    const currentWeekTheme = String(currentPlan?.theme || '').trim() || DEFAULT_WEEK_THEME;
+    const currentWeekStart = currentPlan?.week || defaultWeekStart;
+    const isDefaultWeek = !currentPlan || !String(currentPlan?.theme || '').trim();
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
 
     div.innerHTML = `
-      ${currentPlan ? `
       <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div class="text-xs font-bold text-brand" style="text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Current Week</div>
-          <div class="font-serif text-xl">${currentPlan.theme || 'This Week\'s Devotions'}</div>
-          <div class="text-sm text-secondary">Week of ${DateUtils.format(weekStart)}</div>
+          <div class="text-xs font-bold text-brand" style="text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">
+            ${isDefaultWeek ? 'Current Week (Default)' : 'Current Week'}
+          </div>
+          <div class="font-serif text-xl">${escapeHtml(currentWeekTheme)}</div>
+          <div class="text-sm text-secondary">Week of ${DateUtils.format(currentWeekStart)}</div>
+          ${isDefaultWeek ? '<div class="text-xs text-muted" style="margin-top:4px;">Build a new plan any time to replace this default week.</div>' : ''}
         </div>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
       </div>
-      ` : ''}
 
       <!-- Pastor transparency -->
       <div style="background:var(--glass-fill);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);">
