@@ -173,6 +173,11 @@ const Sync = (() => {
     return fetchGoogleProfile();
   }
 
+  async function ensureGoogleClient() {
+    await ensureClientConfig();
+    return true;
+  }
+
   function escapeQueryValue(value = '') {
     return String(value).replace(/'/g, "\\'");
   }
@@ -381,13 +386,30 @@ const Sync = (() => {
     });
   }
 
+  function getDebugState() {
+    const state = Store.get();
+    return {
+      hasGoogleClient: hasGoogleClient(),
+      scriptTagPresent: !!document.querySelector('script[data-google-gsi="1"]'),
+      clientIdConfigured: !!getClientId(),
+      tokenCached: !!_accessToken,
+      tokenExpiresInSec: _accessTokenExpiresAt ? Math.max(0, Math.round((_accessTokenExpiresAt - Date.now()) / 1000)) : 0,
+      connectedProfile: !!state.googleProfile,
+      googleDriveFolderId: state.googleDriveFolderId || '',
+      googleDriveFiles: state.googleDriveFiles || { devotions: '', journals: '', settings: '' },
+      lastDriveSyncAt: state.lastDriveSyncAt || null,
+    };
+  }
+
   return {
     requestToken,
     fetchGoogleProfile,
     connectGoogle,
+    ensureGoogleClient,
     pushSavedDevotions,
     pullSavedDevotions,
     clearSession,
+    getDebugState,
   };
 })();
 

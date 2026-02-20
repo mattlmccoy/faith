@@ -4,6 +4,7 @@
 
 const HomeView = (() => {
   let currentSession = DateUtils.session();
+  let googlePanelExpanded = false;
 
   function render(container) {
     Router.setTitle('Abide');
@@ -330,18 +331,23 @@ const HomeView = (() => {
         ? `<img src="${profile.picture}" alt="Google avatar" class="google-avatar" />`
         : `<div class="google-avatar google-avatar--fallback">${(profile.name || profile.email || 'U').slice(0,1).toUpperCase()}</div>`;
       return `
-        <div class="google-panel card-enter">
-          <div class="google-panel__left">
-            ${avatar}
-            <div class="google-panel__meta">
-              <div class="google-panel__title">Google connected</div>
-              <div class="google-panel__email">${profile.name || profile.email || ''}</div>
+        <div class="google-panel-wrap card-enter">
+          <div class="google-panel">
+            <button class="google-panel__left google-panel__trigger" onclick="HomeView.toggleGooglePanel()" aria-label="Toggle sync controls">
+              ${avatar}
+              <div class="google-panel__meta">
+                <div class="google-panel__title">Google connected</div>
+                <div class="google-panel__email">${profile.name || profile.email || ''}</div>
+              </div>
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="HomeView.toggleGooglePanel()">${googlePanelExpanded ? 'Hide' : 'Sync'}</button>
+          </div>
+          ${googlePanelExpanded ? `
+            <div class="google-panel__actions">
+              <button class="btn btn-ghost btn-sm" onclick="HomeView.syncDownloadNow()">Download</button>
+              <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Upload</button>
             </div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncDownloadNow()">Download</button>
-            <button class="btn btn-ghost btn-sm" onclick="HomeView.syncSavedNow()">Upload</button>
-          </div>
+          ` : ''}
         </div>
       `;
     }
@@ -359,10 +365,16 @@ const HomeView = (() => {
   async function connectGoogle() {
     try {
       await Sync.connectGoogle();
+      googlePanelExpanded = true;
       render(document.getElementById('view-container'));
     } catch (err) {
       alert(`Google sign-in failed: ${err.message}`);
     }
+  }
+
+  function toggleGooglePanel() {
+    googlePanelExpanded = !googlePanelExpanded;
+    render(document.getElementById('view-container'));
   }
 
   async function syncSavedNow() {
@@ -446,7 +458,7 @@ const HomeView = (() => {
     }
   }
 
-  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow };
+  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel };
 })();
 
 // Global collapsible toggle helper

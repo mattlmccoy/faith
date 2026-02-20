@@ -4,7 +4,7 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.19.2';
+  const APP_VERSION = '2026.02.20.1';
   window.__ABIDE_VERSION__ = APP_VERSION;
 
   function getBasePath() {
@@ -94,6 +94,11 @@
     Router.register('/settings-advanced', (container) => {
       Router.setTitle('Advanced');
       SettingsAdvancedView.render(container);
+    });
+
+    Router.register('/debug', (container) => {
+      Router.setTitle('Debug');
+      DebugView.render(container);
     });
   }
 

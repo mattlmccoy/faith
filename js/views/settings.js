@@ -239,7 +239,7 @@ const SettingsView = (() => {
 
       <div style="text-align:center;padding:var(--space-5) 0 var(--space-3);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
-        <p class="text-xs text-muted" style="margin-top:4px;">Version: ${appVersion}</p>
+        <p class="text-xs text-muted" id="settings-version" style="margin-top:4px;cursor:default;">Version: ${appVersion}</p>
       </div>
 
       <button class="btn btn-primary btn-full" id="save-settings">Save Settings</button>
@@ -351,6 +351,24 @@ const SettingsView = (() => {
       try { sessionStorage.clear(); } catch {}
       window.location.reload();
     });
+
+    const versionEl = root.querySelector('#settings-version');
+    if (versionEl) {
+      let taps = 0;
+      let tapStart = 0;
+      versionEl.addEventListener('click', () => {
+        const now = Date.now();
+        if (!tapStart || (now - tapStart) > 2200) {
+          tapStart = now;
+          taps = 1;
+          return;
+        }
+        taps += 1;
+        if (taps >= 7) {
+          Router.navigate('/debug');
+        }
+      });
+    }
   }
 
   function applyTheme(theme) {

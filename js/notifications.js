@@ -8,6 +8,11 @@
    ============================================================ */
 
 const Notifications = (() => {
+  let _lastError = '';
+
+  function setLastError(message = '') {
+    _lastError = String(message || '');
+  }
 
   // Detect if running as installed PWA on iOS
   function isInstalledPWA() {
@@ -40,20 +45,25 @@ const Notifications = (() => {
   // Returns { granted, reason } — reason explains any failure
   async function requestPermission() {
     if (!await isSupported()) {
+      setLastError('not-supported');
       return { granted: false, reason: 'not-supported' };
     }
 
     // On iOS, must be installed as PWA
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
       if (!isInstalledPWA()) {
+        setLastError('not-installed');
         return { granted: false, reason: 'not-installed' };
       }
       if (!isiOSPushSupported()) {
+        setLastError('ios-too-old');
         return { granted: false, reason: 'ios-too-old' };
       }
     }
 
     const result = await Notification.requestPermission();
+    if (result !== 'granted') setLastError(result);
+    else setLastError('');
     return { granted: result === 'granted', reason: result };
   }
 
@@ -62,11 +72,13 @@ const Notifications = (() => {
 
     if (!granted) {
       console.warn('Push permission not granted:', reason);
+      setLastError(`permission:${reason}`);
       return null;
     }
 
     if (!API.hasWorker()) {
       console.warn('No worker URL configured');
+      setLastError('worker-missing');
       return null;
     }
 
@@ -76,6 +88,7 @@ const Notifications = (() => {
       // Ensure push manager is available (iOS installed PWA check)
       if (!reg.pushManager) {
         console.warn('PushManager not available — app may not be installed to home screen');
+        setLastError('push-manager-missing');
         return null;
       }
 
@@ -109,9 +122,11 @@ const Notifications = (() => {
 
       Store.set('notificationsEnabled', true);
       Store.set('pushSubscription', subscription.toJSON());
+      setLastError('');
       return subscription;
     } catch (err) {
       console.error('Push subscription failed:', err);
+      setLastError(err?.message || 'subscribe-failed');
       return null;
     }
   }
@@ -123,8 +138,10 @@ const Notifications = (() => {
       if (sub) await sub.unsubscribe();
       Store.set('notificationsEnabled', false);
       Store.set('pushSubscription', null);
+      setLastError('');
     } catch (err) {
       console.error('Unsubscribe failed:', err);
+      setLastError(err?.message || 'unsubscribe-failed');
     }
   }
 
@@ -165,6 +182,50 @@ const Notifications = (() => {
     return '🔔 Tap Enable to receive morning & evening reminders.';
   }
 
+  async function getDiagnostics() {
+    const report = {
+      supported: await isSupported(),
+      permission: typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+      installedPWA: isInstalledPWA(),
+      iosPushSupported: isiOSPushSupported(),
+      hasPushManager: 'PushManager' in window,
+      hasServiceWorker: 'serviceWorker' in navigator,
+      serviceWorkerController: !!navigator.serviceWorker?.controller,
+      workerConfigured: API.hasWorker(),
+      workerUrl: API.workerUrl(),
+      notificationsEnabled: !!Store.get('notificationsEnabled'),
+      lastError: _lastError || null,
+      storedSubscription: !!Store.get('pushSubscription'),
+    };
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager?.getSubscription();
+      report.serviceWorkerReady = true;
+      report.liveSubscription = !!sub;
+      if (sub?.endpoint) {
+        report.subscriptionEndpointHint = sub.endpoint.slice(-32);
+      }
+    } catch (err) {
+      report.serviceWorkerReady = false;
+      report.readyError = err?.message || 'service-worker-not-ready';
+    }
+
+    return report;
+  }
+
+  async function sendTestPush() {
+    try {
+      const response = await API.sendTestPush();
+      setLastError('');
+      return { ok: true, response };
+    } catch (err) {
+      const message = err?.message || 'test-push-failed';
+      setLastError(message);
+      return { ok: false, error: message };
+    }
+  }
+
   return {
     isSupported,
     isInstalledPWA,
@@ -175,6 +236,8 @@ const Notifications = (() => {
     unsubscribe,
     showLocal,
     getStatusMessage,
+    getDiagnostics,
+    sendTestPush,
   };
 })();
 

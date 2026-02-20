@@ -843,11 +843,28 @@
   margin-bottom: var(--space-3);
 }
 
+.google-panel-wrap {
+  margin-bottom: var(--space-3);
+}
+
+.google-panel-wrap .google-panel {
+  margin-bottom: 0;
+}
+
 .google-panel__left {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
+}
+
+.google-panel__trigger {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
 }
 
 .google-panel__meta {
@@ -884,4 +901,29 @@
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: var(--weight-bold);
+}
+
+.google-panel__actions {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.debug-output {
+  margin: 0;
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--bg-sunken);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
