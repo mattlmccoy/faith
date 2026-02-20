@@ -54,6 +54,7 @@ const SavedView = (() => {
               <div style="display:flex;gap:8px;margin-top:10px;">
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.openSaved('${escapeAttr(item.id)}')">${isOpen ? 'Hide' : 'Open'}</button>
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.goToDay('${escapeAttr(item.dateKey)}','${escapeAttr(item.session || 'morning')}')">Go to day</button>
+                <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSaved('${escapeAttr(item.id)}')">Share</button>
               </div>
               ${isOpen ? renderSavedDetail(openEntry || item) : ''}
             </div>
@@ -137,6 +138,23 @@ const SavedView = (() => {
     Router.navigate('/');
   }
 
+  async function shareSaved(id) {
+    const entry = Store.getSavedDevotionById(id);
+    if (!entry) {
+      alert('Could not find that saved devotion.');
+      return;
+    }
+    const payload = DevotionShare.fromSavedEntry(entry);
+    const result = await DevotionShare.share(payload);
+    if (!result.ok && !result.aborted) {
+      alert(`Share failed: ${result.error || 'Could not share devotion.'}`);
+      return;
+    }
+    if (result.method === 'clipboard') {
+      alert('Devotion copied to clipboard.');
+    }
+  }
+
   async function upload() {
     if (syncing) return;
     syncing = true;
@@ -180,7 +198,7 @@ const SavedView = (() => {
     }
   }
 
-  return { render, openSaved, goToDay, upload, download, connectGoogle };
+  return { render, openSaved, goToDay, shareSaved, upload, download, connectGoogle };
 })();
 
 window.SavedView = SavedView;

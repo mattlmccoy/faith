@@ -181,6 +181,9 @@ const DevotionView = (() => {
         <button class="btn ${isSaved ? 'btn-primary' : 'btn-secondary'} btn-full" id="save-devotion-btn" onclick="DevotionView.toggleSave()">
           ${isSaved ? 'Saved ✓' : 'Save This Devotion'}
         </button>
+        <button class="btn btn-secondary btn-full" style="margin-top:10px;" onclick="DevotionView.shareCurrent()">
+          Share Devotion
+        </button>
       </div>
     `;
 
@@ -263,7 +266,26 @@ const DevotionView = (() => {
     render(document.getElementById('view-container'));
   }
 
-  return { render, toggleSave, shiftDay };
+  async function shareCurrent() {
+    const selectedDate = Store.getSelectedDevotionDate();
+    const devotionData = Store.getDevotionData(selectedDate);
+    const session = Store.get('_sessionOverride') || DateUtils.session();
+    const payload = DevotionShare.fromCurrentDay(devotionData, session, selectedDate);
+    if (!payload) {
+      alert('No devotion loaded to share yet.');
+      return;
+    }
+    const result = await DevotionShare.share(payload);
+    if (!result.ok && !result.aborted) {
+      alert(`Share failed: ${result.error || 'Could not share devotion.'}`);
+      return;
+    }
+    if (result.method === 'clipboard') {
+      alert('Devotion copied to clipboard.');
+    }
+  }
+
+  return { render, toggleSave, shiftDay, shareCurrent };
 })();
 
 window.DevotionView = DevotionView;

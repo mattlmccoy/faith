@@ -254,6 +254,12 @@ const HomeView = (() => {
         </button>
       </div>
 
+      <div class="home-complete-row card-enter" style="margin-top:10px;">
+        <button class="btn btn-secondary btn-full" onclick="HomeView.shareCurrentDevotion()">
+          Share Devotion
+        </button>
+      </div>
+
       <!-- Complete button -->
       <div class="home-complete-row card-enter">
         <button class="complete-btn ${isCompleted ? 'completed' : ''}" id="complete-btn" onclick="HomeView.toggleComplete()">
@@ -468,6 +474,24 @@ const HomeView = (() => {
     const next = Store.shiftSelectedDevotionDay(offset);
     if (!next) return;
     render(document.getElementById('view-container'));
+  }
+
+  async function shareCurrentDevotion() {
+    const dateKey = Store.getSelectedDevotionDate();
+    const dayData = Store.getDevotionData(dateKey);
+    const payload = DevotionShare.fromCurrentDay(dayData, currentSession, dateKey);
+    if (!payload) {
+      alert('No devotion loaded to share yet.');
+      return;
+    }
+    const result = await DevotionShare.share(payload);
+    if (!result.ok && !result.aborted) {
+      alert(`Share failed: ${result.error || 'Could not share devotion.'}`);
+      return;
+    }
+    if (result.method === 'clipboard') {
+      alert('Devotion copied to clipboard.');
+    }
   }
 
   async function hydrateOpeningVerse(root, sessionData, selectedDate) {
@@ -729,7 +753,7 @@ const HomeView = (() => {
     goToStep(0);
   }
 
-  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel };
+  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel, shareCurrentDevotion };
 })();
 
 // Global collapsible toggle helper
