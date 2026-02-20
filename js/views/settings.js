@@ -234,6 +234,15 @@ const SettingsView = (() => {
               <div class="settings-row__value">Usage, provider routing checks, worker URL, Google Drive sync</div>
             </div>
           </div>
+          <div class="settings-row" style="cursor:pointer;" onclick="Router.navigate('/debug')">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v10H4z"/><path d="M8 20h8"/><path d="M12 14v6"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Open Debug Tools</div>
+              <div class="settings-row__value">Notification tests, worker health, copy diagnostics JSON</div>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -4,7 +4,7 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.20.3';
+  const APP_VERSION = '2026.02.20.4';
   window.__ABIDE_VERSION__ = APP_VERSION;
 
   function getBasePath() {
@@ -39,9 +39,13 @@
   function registerSW() {
     if ('serviceWorker' in navigator) {
       const basePath = getBasePath();
-      navigator.serviceWorker.register(`${basePath}sw.js`, { scope: basePath })
+      navigator.serviceWorker.register(`${basePath}sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
+        scope: basePath,
+        updateViaCache: 'none',
+      })
         .then(reg => {
           console.log('[Abide] SW registered:', reg.scope);
+          reg.update().catch(() => {});
         })
         .catch(err => {
           console.warn('[Abide] SW registration failed:', err);
