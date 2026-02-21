@@ -44,7 +44,7 @@ const Store = (() => {
     onboardingDone: false,
     tutorialSeen: false,
     bibleTranslation: 'esv',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby' | 'esv'
-    palette: 'cactus-flower', // Color palette / theme
+    palette: 'mountain-mist', // Color palette / theme
     trustedPastors: DEFAULT_TRUSTED_PASTORS,
     usageStats: {
       monthKey: '',
@@ -70,7 +70,7 @@ const Store = (() => {
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
-    _defaultsVersion: 2,
+    _defaultsVersion: 3,
   };
 
   let _state = null;
@@ -101,16 +101,16 @@ const Store = (() => {
           settings: String(_state.googleDriveFiles.settings || ''),
         };
       }
-      if (Number(_state._defaultsVersion || 0) < 2) {
+      if (Number(_state._defaultsVersion || 0) < 3) {
         if (!_state.bibleTranslation || _state.bibleTranslation === 'web') {
           _state.bibleTranslation = 'esv';
           migrated = true;
         }
-        if (!_state.palette || _state.palette === 'tuscan-sunset') {
-          _state.palette = 'cactus-flower';
+        if (!_state.palette || _state.palette === 'tuscan-sunset' || _state.palette === 'cactus-flower') {
+          _state.palette = 'mountain-mist';
           migrated = true;
         }
-        _state._defaultsVersion = 2;
+        _state._defaultsVersion = 3;
         migrated = true;
       }
     } catch (e) {
@@ -457,7 +457,7 @@ const Store = (() => {
       profile: {
         userName: _state.userName || '',
         bibleTranslation: _state.bibleTranslation || 'web',
-        palette: _state.palette || 'tuscan-sunset',
+        palette: _state.palette || 'mountain-mist',
         trustedPastors: getTrustedPastors(),
       },
       savedDevotions: uniqueIds,
@@ -654,7 +654,7 @@ const Store = (() => {
       settings: {
         userName: _state.userName || '',
         bibleTranslation: _state.bibleTranslation || 'web',
-        palette: _state.palette || 'tuscan-sunset',
+        palette: _state.palette || 'mountain-mist',
         theme: _state.theme || 'auto',
         morningHour: _state.morningHour,
         morningMinute: _state.morningMinute,
@@ -687,8 +687,8 @@ const Store = (() => {
         ? String(s.bibleTranslation || 'web').toLowerCase()
         : (_state.bibleTranslation || 'web'),
       palette: has('palette') && s.palette
-        ? String(s.palette || 'tuscan-sunset')
-        : (_state.palette || 'tuscan-sunset'),
+        ? String(s.palette || 'mountain-mist')
+        : (_state.palette || 'mountain-mist'),
       theme: has('theme') && s.theme
         ? String(s.theme || 'auto')
         : (_state.theme || 'auto'),

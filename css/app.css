@@ -1,7 +1,7 @@
 /* ============================================================
    ABIDE - Design System
    Arc-inspired soft glass modern design language.
-   Semantic tokens, 8 selectable palettes, glass surfaces,
+   Semantic tokens, selectable palettes, glass surfaces,
    ambient blobs, Inter + Playfair Display.
    ============================================================ */
 
@@ -368,6 +368,114 @@
   --focus-ring:     rgba(75, 85, 99, 0.20);
 }
 
+/* --- 9. Evergreen --- */
+[data-palette="evergreen"] {
+  --bg-base:     #F4FBF7;
+  --bg-sunken:   #E7F2EC;
+  --bg-gradient-1: #EDF7F1;
+  --bg-gradient-2: #F4FBF7;
+
+  --ambient-1: #1F8A70;
+  --ambient-2: #A8D5BA;
+  --ambient-3: #2D4A3A;
+
+  --accent:       #1F8A70;
+  --accent-light: #2DA183;
+  --accent-muted: #4BB08F;
+  --accent-soft:  rgba(31, 138, 112, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #2D4A3A;
+  --accent2-light: #4E6A5A;
+  --accent2-soft:  rgba(45, 74, 58, 0.12);
+  --accent2-faint: #EEF5F1;
+
+  --divider-solid:  #C8DED2;
+  --divider-strong: #A9C3B6;
+  --focus-ring:     rgba(31, 138, 112, 0.28);
+}
+
+/* --- 10. Sage Paper --- */
+[data-palette="sage-paper"] {
+  --bg-base:     #FAFBF8;
+  --bg-sunken:   #EEF2ED;
+  --bg-gradient-1: #F4F7F3;
+  --bg-gradient-2: #FAFBF8;
+
+  --ambient-1: #5F8D7A;
+  --ambient-2: #C8D8C4;
+  --ambient-3: #8FA7A0;
+
+  --accent:       #5F8D7A;
+  --accent-light: #75A18E;
+  --accent-muted: #92B3A6;
+  --accent-soft:  rgba(95, 141, 122, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #8FA7A0;
+  --accent2-light: #A8BCB6;
+  --accent2-soft:  rgba(143, 167, 160, 0.12);
+  --accent2-faint: #F3F7F5;
+
+  --divider-solid:  #D4DDD4;
+  --divider-strong: #BCC8BE;
+  --focus-ring:     rgba(95, 141, 122, 0.26);
+}
+
+/* --- 11. Riverstone --- */
+[data-palette="riverstone"] {
+  --bg-base:     #F4F8FC;
+  --bg-sunken:   #E8EFF6;
+  --bg-gradient-1: #EEF4FA;
+  --bg-gradient-2: #F4F8FC;
+
+  --ambient-1: #3A6EA5;
+  --ambient-2: #8FB3D9;
+  --ambient-3: #2F4858;
+
+  --accent:       #3A6EA5;
+  --accent-light: #4E82BB;
+  --accent-muted: #7199C6;
+  --accent-soft:  rgba(58, 110, 165, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #2F4858;
+  --accent2-light: #486273;
+  --accent2-soft:  rgba(47, 72, 88, 0.12);
+  --accent2-faint: #EEF3F7;
+
+  --divider-solid:  #C9D7E6;
+  --divider-strong: #AFC1D4;
+  --focus-ring:     rgba(58, 110, 165, 0.28);
+}
+
+/* --- 12. Slate Rose --- */
+[data-palette="slate-rose"] {
+  --bg-base:     #F7F8FA;
+  --bg-sunken:   #ECEFF3;
+  --bg-gradient-1: #F1F3F7;
+  --bg-gradient-2: #F7F8FA;
+
+  --ambient-1: #4A5568;
+  --ambient-2: #A0AEC0;
+  --ambient-3: #7F9AA2;
+
+  --accent:       #4A5568;
+  --accent-light: #5C687D;
+  --accent-muted: #7A869A;
+  --accent-soft:  rgba(74, 85, 104, 0.10);
+  --accent-contrast: #FFFFFF;
+
+  --accent2:       #7F9AA2;
+  --accent2-light: #9BB0B6;
+  --accent2-soft:  rgba(127, 154, 162, 0.12);
+  --accent2-faint: #F1F5F6;
+
+  --divider-solid:  #D6DCE5;
+  --divider-strong: #BCC5D2;
+  --focus-ring:     rgba(74, 85, 104, 0.26);
+}
+
 /* ============================================================
    DARK MODE OVERLAY
    Applied on top of any palette when data-theme="dark"
@@ -481,6 +589,50 @@
   --ambient-3: #2D3A43;
   --divider-solid: rgba(229, 231, 235, 0.12);
   --accent-soft:   rgba(75, 85, 99, 0.15);
+}
+[data-theme="dark"][data-palette="evergreen"] {
+  --bg-base:   #08130F;
+  --bg-sunken: #050E0B;
+  --bg-gradient-1: #0D1914;
+  --bg-gradient-2: #08120E;
+  --ambient-1: #1E8F73;
+  --ambient-2: #4E7E66;
+  --ambient-3: #2E5A45;
+  --divider-solid: rgba(200, 222, 210, 0.12);
+  --accent-soft:   rgba(31, 138, 112, 0.16);
+}
+[data-theme="dark"][data-palette="sage-paper"] {
+  --bg-base:   #0D1311;
+  --bg-sunken: #090F0D;
+  --bg-gradient-1: #131A17;
+  --bg-gradient-2: #0C1310;
+  --ambient-1: #5E8E78;
+  --ambient-2: #4F6C61;
+  --ambient-3: #7C9890;
+  --divider-solid: rgba(212, 221, 212, 0.12);
+  --accent-soft:   rgba(95, 141, 122, 0.16);
+}
+[data-theme="dark"][data-palette="riverstone"] {
+  --bg-base:   #09111A;
+  --bg-sunken: #060C14;
+  --bg-gradient-1: #0F1824;
+  --bg-gradient-2: #08111A;
+  --ambient-1: #3E76AE;
+  --ambient-2: #5C7E9F;
+  --ambient-3: #35576A;
+  --divider-solid: rgba(201, 215, 230, 0.12);
+  --accent-soft:   rgba(58, 110, 165, 0.16);
+}
+[data-theme="dark"][data-palette="slate-rose"] {
+  --bg-base:   #0F1218;
+  --bg-sunken: #0B0E13;
+  --bg-gradient-1: #151922;
+  --bg-gradient-2: #0E1117;
+  --ambient-1: #5B697D;
+  --ambient-2: #6B7F96;
+  --ambient-3: #6D8B93;
+  --divider-solid: rgba(214, 220, 229, 0.12);
+  --accent-soft:   rgba(74, 85, 104, 0.16);
 }
 
 /* ============================================================

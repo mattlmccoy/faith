@@ -18,6 +18,10 @@ const SettingsView = (() => {
     { id: 'lavender-fields', name: 'Lavender',  dots: ['#CF6DFC', '#C1BFFF', '#BDB96A'] },
     { id: 'cactus-flower',   name: 'Cactus',    dots: ['#92E4BA', '#E491A6', '#845763'] },
     { id: 'mountain-mist',   name: 'Mountain',  dots: ['#6D8196', '#B0C4DE', '#01796F'] },
+    { id: 'evergreen',       name: 'Evergreen', dots: ['#1F8A70', '#A8D5BA', '#2D4A3A'] },
+    { id: 'sage-paper',      name: 'Sage',      dots: ['#5F8D7A', '#C8D8C4', '#8FA7A0'] },
+    { id: 'riverstone',      name: 'River',     dots: ['#3A6EA5', '#8FB3D9', '#2F4858'] },
+    { id: 'slate-rose',      name: 'Slate',     dots: ['#4A5568', '#A0AEC0', '#7F9AA2'] },
     { id: 'graphite',        name: 'Graphite',  dots: ['#4A90D9', '#8C9BAB', '#C8D2DC'] },
     { id: 'ocean-glass',     name: 'Ocean',     dots: ['#0EA5E9', '#22D3EE', '#64748B'] },
     { id: 'mono',            name: 'Mono',      dots: ['#6B7280', '#9CA3AF', '#D1D5DB'] },
@@ -30,7 +34,7 @@ const SettingsView = (() => {
     const state = Store.get();
     const trustedPastors = Store.getTrustedPastors();
     const appVersion = window.__ABIDE_VERSION__ || 'dev';
-    const currentPalette = state.palette || 'tuscan-sunset';
+    const currentPalette = state.palette || 'mountain-mist';
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -286,7 +290,7 @@ const SettingsView = (() => {
       const sundayReminderEnabled = root.querySelector('#sunday-reminder-toggle')?.checked || false;
       const morningTime = root.querySelector('#morning-time')?.value || '06:30';
       const eveningTime = root.querySelector('#evening-time')?.value || '20:00';
-      const selectedPalette = document.documentElement.dataset.palette || 'tuscan-sunset';
+      const selectedPalette = document.documentElement.dataset.palette || 'mountain-mist';
       const [mh, mm] = morningTime.split(':').map(Number);
       const [eh, em] = eveningTime.split(':').map(Number);
       const trustedPastors = Array.from(root.querySelectorAll('[data-pastor-row]'))
