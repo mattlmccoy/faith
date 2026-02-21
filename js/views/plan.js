@@ -96,6 +96,14 @@ const PlanView = (() => {
     const currentWeekStart = currentPlan?.week || defaultWeekStart;
     const isDefaultWeek = !currentPlan || !String(currentPlan?.theme || '').trim();
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
+    const dayKeys = Object.keys(currentPlan?.days || {}).sort((a, b) => a.localeCompare(b));
+    const totalSessions = dayKeys.length * 2;
+    const savedSessions = dayKeys.reduce((count, key) => {
+      let next = count;
+      if (Store.isSavedDevotion(key, 'morning')) next += 1;
+      if (Store.isSavedDevotion(key, 'evening')) next += 1;
+      return next;
+    }, 0);
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -109,8 +117,12 @@ const PlanView = (() => {
           <div class="font-serif text-xl">${escapeHtml(currentWeekTheme)}</div>
           <div class="text-sm text-secondary">Week of ${DateUtils.format(currentWeekStart)}</div>
           ${isDefaultWeek ? '<div class="text-xs text-muted" style="margin-top:4px;">Build a new plan any time to replace this default week.</div>' : ''}
+          ${totalSessions ? `<div class="text-xs text-muted" style="margin-top:6px;">Saved devotions from this week: ${savedSessions} of ${totalSessions}</div>` : ''}
         </div>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          ${totalSessions ? `<button class="btn btn-secondary btn-sm" onclick="PlanView.saveWholeWeek()">${savedSessions >= totalSessions ? 'Week Saved ✓' : 'Save Full Week'}</button>` : ''}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
       </div>
 
       <!-- Pastor transparency -->
@@ -496,7 +508,18 @@ const PlanView = (() => {
   // Keep for backward compatibility
   async function startSearch() { return startBuild(); }
 
-  return { render, startBuild, startSearch, loadSeedPlan };
+  function saveWholeWeek() {
+    const result = Store.saveEntirePlan();
+    if (!result.total) {
+      alert('No current weekly plan found to save yet.');
+      return;
+    }
+    alert(`Saved ${result.total} devotion sessions for this week. (${result.added} new)`);
+    const container = document.getElementById('view-container');
+    if (container) render(container);
+  }
+
+  return { render, startBuild, startSearch, loadSeedPlan, saveWholeWeek };
 })();
 
 window.PlanView = PlanView;

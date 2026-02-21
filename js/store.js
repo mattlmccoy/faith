@@ -332,6 +332,41 @@ const Store = (() => {
     return !has;
   }
 
+  function saveDevotion(dateKey, session, persist = true) {
+    const id = `${dateKey}-${session}`;
+    const day = getDevotionData(dateKey) || {};
+    const sessionData = day?.[session] || null;
+    if (!sessionData) return false;
+
+    if (!_state.savedDevotions.includes(id)) {
+      _state.savedDevotions = [..._state.savedDevotions, id];
+    }
+    const existingSavedAt = _state.savedDevotionLibrary?.[id]?.savedAt || '';
+    _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt);
+    if (persist) save();
+    return true;
+  }
+
+  function saveEntirePlan() {
+    const plan = getPlan();
+    const keys = Object.keys(plan?.days || {}).sort((a, b) => a.localeCompare(b));
+    if (!keys.length) return { added: 0, total: 0, saved: (_state.savedDevotions || []).length };
+
+    let added = 0;
+    const total = keys.length * 2;
+
+    keys.forEach((dateKey) => {
+      ['morning', 'evening'].forEach((session) => {
+        const id = `${dateKey}-${session}`;
+        const alreadySaved = _state.savedDevotions.includes(id);
+        const ok = saveDevotion(dateKey, session, false);
+        if (ok && !alreadySaved) added += 1;
+      });
+    });
+    save();
+    return { added, total, saved: (_state.savedDevotions || []).length };
+  }
+
   function isSavedDevotion(dateKey, session) {
     return _state.savedDevotions.includes(`${dateKey}-${session}`);
   }
@@ -737,6 +772,8 @@ const Store = (() => {
     shiftSelectedDevotionDay,
     getTodayDevotionData,
     toggleSavedDevotion,
+    saveDevotion,
+    saveEntirePlan,
     isSavedDevotion,
     getSavedDevotionLibrary,
     getSavedDevotionById,

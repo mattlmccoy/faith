@@ -24,10 +24,9 @@
     overflow: hidden;
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr);
-    grid-template-rows: var(--header-height) 32px 1fr auto;
+    grid-template-rows: var(--header-height) 1fr auto;
     grid-template-areas:
       "sidebar header"
-      "sidebar banner"
       "sidebar main"
       "sidebar legal";
     border: 1px solid var(--divider-solid);
@@ -43,15 +42,6 @@
     height: var(--header-height);
     border-bottom: 1px solid var(--divider-solid);
     border-left: 1px solid var(--divider-solid);
-  }
-
-  .home-legal-banner {
-    grid-area: banner;
-    border-left: 1px solid var(--divider-solid);
-    border-bottom: 1px solid var(--divider-solid);
-    border-top: 0;
-    padding: 6px var(--space-6);
-    justify-content: flex-start;
   }
 
   .header-content {
@@ -294,10 +284,9 @@
     border-top: 0;
     box-shadow: none;
     grid-template-columns: 1fr;
-    grid-template-rows: var(--header-height) 30px 64px 1fr auto;
+    grid-template-rows: var(--header-height) 64px 1fr auto;
     grid-template-areas:
       "header"
-      "banner"
       "sidebar"
       "main"
       "legal";
@@ -305,12 +294,6 @@
 
   .app-header {
     border-left: 0;
-  }
-
-  .home-legal-banner {
-    border-left: 0;
-    justify-content: center;
-    padding: 5px var(--space-8);
   }
 
   .tab-bar {

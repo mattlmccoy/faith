@@ -656,23 +656,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-shrink: 0;
 }
 
-.home-legal-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 6px var(--space-3);
-  border-bottom: 1px solid var(--divider);
-  background: var(--glass-fill);
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
-}
-
-.home-legal-banner a {
-  color: var(--text-secondary);
-  text-decoration: underline;
-}
-
 /* ============================================================
    VIEW CONTAINER
    ============================================================ */
