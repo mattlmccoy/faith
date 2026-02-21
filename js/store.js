@@ -33,6 +33,7 @@ const Store = (() => {
     sundayReminderEnabled: true,
     pushSubscription: null,
     currentWeekPlan: null,    // Full week plan object from plan builder
+    planHistory: [],          // [{ id, savedAt, reason, plan, selectedDate, sessionOverride }]
     journalEntries: {},       // { 'YYYY-MM-DD': { prompt, text, savedAt } }
     completedDevotions: [],   // ['YYYY-MM-DD-morning', 'YYYY-MM-DD-evening']
     savedDevotions: [],       // ['YYYY-MM-DD-morning', 'YYYY-MM-DD-evening']
@@ -83,6 +84,9 @@ const Store = (() => {
       _state.trustedPastors = normalizeTrustedPastors(_state.trustedPastors);
       if (!_state.savedDevotions || !Array.isArray(_state.savedDevotions)) {
         _state.savedDevotions = [];
+      }
+      if (!_state.planHistory || !Array.isArray(_state.planHistory)) {
+        _state.planHistory = [];
       }
       if (!_state.savedDevotionLibrary || typeof _state.savedDevotionLibrary !== 'object') {
         _state.savedDevotionLibrary = {};
@@ -271,12 +275,56 @@ const Store = (() => {
 
   // --- Plan ---
   function savePlan(plan) {
+    pushCurrentPlanToHistory('save-plan');
     set('currentWeekPlan', plan);
     const keys = getPlanDayKeys();
     if (!keys.length) return;
     const today = DateUtils.today();
     _state.selectedDevotionDate = keys.includes(today) ? today : keys[0];
     save();
+  }
+
+  function pushCurrentPlanToHistory(reason = 'replace-plan') {
+    if (!_state?.currentWeekPlan || typeof _state.currentWeekPlan !== 'object') return;
+    const snapshot = {
+      id: `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      savedAt: new Date().toISOString(),
+      reason: String(reason || 'replace-plan'),
+      plan: cloneValue(_state.currentWeekPlan),
+      selectedDate: _state.selectedDevotionDate || null,
+      sessionOverride: _state._sessionOverride || null,
+    };
+    const history = Array.isArray(_state.planHistory) ? _state.planHistory : [];
+    _state.planHistory = [snapshot, ...history].slice(0, 12);
+  }
+
+  function hasPlanHistory() {
+    return Array.isArray(_state.planHistory) && _state.planHistory.length > 0;
+  }
+
+  function restorePreviousPlan() {
+    const history = Array.isArray(_state.planHistory) ? _state.planHistory : [];
+    if (!history.length) return { ok: false };
+
+    const [previous, ...rest] = history;
+    if (!previous?.plan || typeof previous.plan !== 'object') {
+      _state.planHistory = rest;
+      save();
+      return { ok: false };
+    }
+
+    _state.currentWeekPlan = cloneValue(previous.plan);
+    _state.planHistory = rest;
+
+    const keys = Object.keys(_state.currentWeekPlan?.days || {}).sort((a, b) => a.localeCompare(b));
+    const today = DateUtils.today();
+    const preferredDate = previous.selectedDate || null;
+    _state.selectedDevotionDate = keys.includes(preferredDate)
+      ? preferredDate
+      : (keys.includes(today) ? today : (keys[0] || today));
+    _state._sessionOverride = previous.sessionOverride === 'evening' ? 'evening' : 'morning';
+    save();
+    return { ok: true, theme: _state.currentWeekPlan?.theme || '' };
   }
 
   function getPlan() {
@@ -489,6 +537,7 @@ const Store = (() => {
     if (!dayKeys.length) return { ok: false, reason: 'no-days' };
 
     const week = DateUtils.weekStart(dayKeys[0]);
+    pushCurrentPlanToHistory('use-saved-series');
     _state.currentWeekPlan = {
       week,
       theme,
@@ -863,6 +912,8 @@ const Store = (() => {
     getRecentJournalEntries,
     getAllJournalEntries,
     savePlan,
+    hasPlanHistory,
+    restorePreviousPlan,
     getPlan,
     getPlanDayKeys,
     getDevotionData,

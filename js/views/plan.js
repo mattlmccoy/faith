@@ -96,6 +96,7 @@ const PlanView = (() => {
     const currentWeekStart = currentPlan?.week || defaultWeekStart;
     const isDefaultWeek = !currentPlan || !String(currentPlan?.theme || '').trim();
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
+    const hasPreviousPlan = Store.hasPlanHistory();
     const dayKeys = Object.keys(currentPlan?.days || {}).sort((a, b) => a.localeCompare(b));
     const totalSessions = dayKeys.length * 2;
     const savedSessions = dayKeys.reduce((count, key) => {
@@ -122,6 +123,7 @@ const PlanView = (() => {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          ${hasPreviousPlan ? `<button class="btn btn-secondary btn-sm" onclick="PlanView.revertPreviousPlan()">Revert Previous</button>` : ''}
           <button class="btn btn-secondary btn-sm" onclick="PlanView.saveWholeWeek()">${totalSessions && savedSessions >= totalSessions ? 'Week Saved ✓' : 'Save Full Week'}</button>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </div>
@@ -521,7 +523,18 @@ const PlanView = (() => {
     if (container) render(container);
   }
 
-  return { render, startBuild, startSearch, loadSeedPlan, saveWholeWeek };
+  function revertPreviousPlan() {
+    const result = Store.restorePreviousPlan();
+    if (!result?.ok) {
+      alert('No previous plan is available to restore.');
+      return;
+    }
+    const container = document.getElementById('view-container');
+    if (container) render(container);
+    alert(`Restored previous plan${result.theme ? `: ${result.theme}` : ''}.`);
+  }
+
+  return { render, startBuild, startSearch, loadSeedPlan, saveWholeWeek, revertPreviousPlan };
 })();
 
 window.PlanView = PlanView;
