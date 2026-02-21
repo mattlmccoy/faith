@@ -31,6 +31,7 @@ const Router = (() => {
     const goingBack = newIdx < currentIdx;
 
     currentRoute = path;
+    document.body.dataset.route = path;
     updateTabBar(path);
     updateHeaderBack(path);
     renderRoute(path, goingBack);

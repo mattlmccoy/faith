@@ -23,7 +23,7 @@ const HomeView = (() => {
     }
 
     const div = document.createElement('div');
-    div.className = 'view-content tab-switch-enter';
+    div.className = 'view-content tab-switch-enter home-view';
 
     if (devotionData) {
       renderDevotion(div, devotionData, userName, selectedDate);
@@ -47,7 +47,7 @@ const HomeView = (() => {
 
   function renderSetup(container, userName) {
     const div = document.createElement('div');
-    div.className = 'view-content tab-switch-enter';
+    div.className = 'view-content tab-switch-enter home-view';
     div.innerHTML = `
       <div class="setup-prompt">
         <div class="setup-prompt__cross">

@@ -1,0 +1,438 @@
+/* ============================================================
+   ABIDE - Desktop Experience
+   True desktop layout layer (mobile remains unchanged)
+   ============================================================ */
+
+@media (min-width: 1024px) {
+  :root {
+    --header-height: 68px;
+    --tab-bar-height: 58px;
+  }
+
+  body {
+    padding: 20px;
+    background: var(--bg-sunken);
+    background-image: linear-gradient(150deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
+  }
+
+  #app {
+    width: min(1400px, calc(100vw - 40px));
+    max-width: none;
+    min-height: calc(100dvh - 40px);
+    margin: 0 auto;
+    border-radius: 24px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-rows: var(--header-height) 32px 1fr auto;
+    grid-template-areas:
+      "sidebar header"
+      "sidebar banner"
+      "sidebar main"
+      "sidebar legal";
+    border: 1px solid var(--divider-solid);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.12), 0 6px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .status-bar-spacer {
+    display: none !important;
+  }
+
+  .app-header {
+    grid-area: header;
+    height: var(--header-height);
+    border-bottom: 1px solid var(--divider-solid);
+    border-left: 1px solid var(--divider-solid);
+  }
+
+  .home-legal-banner {
+    grid-area: banner;
+    border-left: 1px solid var(--divider-solid);
+    border-bottom: 1px solid var(--divider-solid);
+    border-top: 0;
+    padding: 6px var(--space-6);
+    justify-content: flex-start;
+  }
+
+  .header-content {
+    padding: 0 var(--space-6);
+  }
+
+  .header-title {
+    font-size: var(--text-2xl);
+  }
+
+  .view-container {
+    grid-area: main;
+    border-left: 1px solid var(--divider-solid);
+    padding-bottom: 0;
+    scroll-padding-top: var(--space-4);
+  }
+
+  .view-content {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-8) var(--space-10);
+  }
+
+  .app-legal {
+    grid-area: legal;
+    justify-content: flex-start;
+    padding: var(--space-3) var(--space-8);
+    border-top: 1px solid var(--divider-solid);
+    border-left: 1px solid var(--divider-solid);
+  }
+
+  .tab-bar {
+    grid-area: sidebar;
+    position: relative;
+    left: auto;
+    transform: none;
+    bottom: auto;
+    width: auto;
+    height: auto;
+    padding: var(--space-5) var(--space-3);
+    border-top: none;
+    border-right: 1px solid var(--divider-solid);
+    background: var(--glass-fill);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .tab-bar::after {
+    display: none;
+  }
+
+  .tab-item {
+    flex: 0 0 auto;
+    height: 50px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 14px;
+    border-radius: 12px;
+  }
+
+  .tab-item:hover {
+    background: var(--accent-soft);
+  }
+
+  .tab-item.active {
+    background: var(--accent-soft);
+  }
+
+  .tab-item.active::before {
+    width: 3px;
+    height: 24px;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: 999px;
+  }
+
+  .tab-label {
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+  }
+
+  /* Today page desktop layout */
+  body[data-route="/"] .home-view {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.88fr);
+    column-gap: var(--space-8);
+    row-gap: var(--space-4);
+    align-items: start;
+  }
+
+  body[data-route="/"] .home-view > * {
+    grid-column: 1;
+    margin-bottom: 0;
+  }
+
+  body[data-route="/"] .home-view .google-panel,
+  body[data-route="/"] .home-view .google-panel-wrap,
+  body[data-route="/"] .home-view .setup-prompt,
+  body[data-route="/"] .home-view .empty-state {
+    grid-column: 1 / -1;
+  }
+
+  body[data-route="/"] .home-view .home-prompts,
+  body[data-route="/"] .home-view .home-midday,
+  body[data-route="/"] .home-view .home-prayer,
+  body[data-route="/"] .home-view .home-stretch,
+  body[data-route="/"] .home-view .home-actions,
+  body[data-route="/"] .home-view .home-complete-row {
+    grid-column: 2;
+  }
+
+  body[data-route="/"] .home-view .home-greeting__name {
+    font-size: clamp(2rem, 2.8vw, 3rem);
+  }
+
+  body[data-route="/"] .home-view .home-devotion-text {
+    -webkit-line-clamp: 12;
+    font-size: var(--text-lg);
+  }
+
+  body[data-route="/"] .home-view .setup-prompt,
+  body[data-route="/"] .home-view .empty-state {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  /* Plan page */
+  body[data-route="/plan"] .view-content {
+    max-width: 1180px;
+  }
+
+  body[data-route="/plan"] .plan-topics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  body[data-route="/plan"] .topic-chip {
+    font-size: var(--text-base);
+    padding: 14px 16px;
+  }
+
+  body[data-route="/plan"] .plan-dictation-row {
+    gap: var(--space-3);
+  }
+
+  body[data-route="/plan"] .plan-topic-input {
+    min-height: 52px;
+  }
+
+  /* Scripture page */
+  body[data-route="/scripture"] .view-content {
+    max-width: 1220px;
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  body[data-route="/scripture"] .scripture-search-bar {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  body[data-route="/scripture"] #quick-links {
+    grid-column: 1;
+    margin-top: 0;
+    position: sticky;
+    top: var(--space-6);
+  }
+
+  body[data-route="/scripture"] #passage-container {
+    grid-column: 2;
+    min-height: 320px;
+  }
+
+  /* Journal page */
+  body[data-route="/journal"] .view-content {
+    max-width: 1180px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  body[data-route="/journal"] .journal-past {
+    grid-column: 2;
+    position: sticky;
+    top: var(--space-6);
+  }
+
+  /* Settings page */
+  body[data-route="/settings"] .view-content {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5) var(--space-6);
+  }
+
+  body[data-route="/settings"] .settings-section {
+    margin-bottom: 0;
+  }
+
+  body[data-route="/settings"] #settings-pastors-section,
+  body[data-route="/settings"] #settings-appearance-section,
+  body[data-route="/settings"] #settings-notifications-section {
+    grid-column: 1 / -1;
+  }
+
+  body[data-route="/settings"] #save-settings,
+  body[data-route="/settings"] #settings-save-hint,
+  body[data-route="/settings"] .settings-version-footer {
+    grid-column: 1 / -1;
+  }
+
+  body[data-route="/settings"] .settings-row__value {
+    white-space: normal;
+  }
+}
+
+@media (min-width: 1280px) {
+  body {
+    padding: 0;
+    background: var(--bg-base);
+    background-image: linear-gradient(155deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 100%);
+  }
+
+  #app {
+    width: 100%;
+    min-height: 100dvh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) 30px 64px 1fr auto;
+    grid-template-areas:
+      "header"
+      "banner"
+      "sidebar"
+      "main"
+      "legal";
+  }
+
+  .app-header {
+    border-left: 0;
+  }
+
+  .home-legal-banner {
+    border-left: 0;
+    justify-content: center;
+    padding: 5px var(--space-8);
+  }
+
+  .tab-bar {
+    border-right: 0;
+    border-bottom: 1px solid var(--divider-solid);
+    padding: 0 var(--space-8);
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+
+  .tab-item {
+    min-width: 0;
+    height: 40px;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+    border-radius: 999px;
+  }
+
+  .tab-item .tab-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .tab-item .tab-label {
+    font-size: 1rem;
+    font-weight: var(--weight-medium);
+  }
+
+  .tab-item.active::before {
+    top: auto;
+    bottom: -7px;
+    left: 50%;
+    width: 20px;
+    height: 3px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+  }
+
+  .view-container {
+    border-left: 0;
+  }
+
+  .view-content {
+    max-width: min(1480px, calc(100vw - 120px));
+    padding: var(--space-8) var(--space-10) var(--space-12);
+  }
+
+  .app-legal {
+    border-left: 0;
+    justify-content: center;
+  }
+
+  body[data-route="/"] .home-view {
+    max-width: 1380px;
+    grid-template-columns: minmax(760px, 1fr) minmax(340px, 410px);
+    column-gap: var(--space-8);
+    row-gap: var(--space-5);
+  }
+
+  body[data-route="/"] .home-view .home-greeting,
+  body[data-route="/"] .home-view .home-session-toggle,
+  body[data-route="/"] .home-view .home-date-row,
+  body[data-route="/"] .home-view .home-verse,
+  body[data-route="/"] .home-view .home-devotion-excerpt,
+  body[data-route="/"] .home-view .home-prayer,
+  body[data-route="/"] .home-view .home-midday,
+  body[data-route="/"] .home-view .home-actions,
+  body[data-route="/"] .home-view .home-complete-row {
+    grid-column: 1;
+    max-width: 900px;
+  }
+
+  body[data-route="/"] .home-view .home-prompts,
+  body[data-route="/"] .home-view .home-stretch {
+    grid-column: 2;
+    max-width: 410px;
+  }
+
+  body[data-route="/"] .home-view .home-date-row {
+    justify-content: flex-start;
+    gap: var(--space-4);
+    margin-bottom: 0 !important;
+  }
+
+  body[data-route="/"] .home-view .home-session-toggle {
+    margin-bottom: 0;
+  }
+
+  body[data-route="/"] .home-view .home-devotion-text {
+    -webkit-line-clamp: 8;
+    font-size: 1.35rem;
+    line-height: 1.6;
+  }
+
+  body[data-route="/"] .home-view .home-prompts {
+    margin-top: 8px;
+  }
+
+  body[data-route="/"] .home-view .home-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body[data-route="/"] .home-view .home-complete-row .btn {
+    max-width: 560px;
+  }
+
+  body[data-route="/"] .home-view .scripture-card__text {
+    font-size: 2.05rem;
+    line-height: 1.45;
+  }
+
+  body[data-route="/plan"] .view-content,
+  body[data-route="/settings"] .view-content,
+  body[data-route="/scripture"] .view-content,
+  body[data-route="/journal"] .view-content {
+    max-width: min(1460px, calc(100vw - 120px));
+  }
+}

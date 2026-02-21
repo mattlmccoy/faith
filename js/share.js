@@ -7,6 +7,52 @@ const DevotionShare = (() => {
     return String(text || '').replace(/\s+/g, ' ').trim();
   }
 
+  async function writeClipboard(text = '') {
+    const value = String(text || '');
+    if (!value) return false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch (_) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function manualPromptCopy(value = '', label = 'Copy this and share it') {
+    const text = String(value || '').trim();
+    if (!text || typeof window.prompt !== 'function') return false;
+    try {
+      window.prompt(label, text);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function canInvokeNativeShare() {
+    if (!navigator.share) return false;
+    const ua = navigator.userActivation;
+    if (!ua) return true;
+    return !!ua.isActive;
+  }
+
   function fromBodyBlocks(body = []) {
     if (!Array.isArray(body)) return '';
     return body
@@ -91,37 +137,41 @@ const DevotionShare = (() => {
       text: payload.text || '',
     };
     try {
-      if (navigator.share) {
+      if (canInvokeNativeShare()) {
         await navigator.share(shareData);
         return { ok: true, method: 'native' };
       }
     } catch (err) {
       if (String(err?.name || '') === 'AbortError') return { ok: false, aborted: true };
     }
-    try {
-      await navigator.clipboard.writeText([shareData.title, shareData.text].filter(Boolean).join('\n\n'));
+    const copyText = [shareData.title, shareData.text].filter(Boolean).join('\n\n');
+    if (await writeClipboard(copyText)) {
       return { ok: true, method: 'clipboard' };
-    } catch (err) {
-      return { ok: false, error: err?.message || 'share-failed' };
     }
+    if (manualPromptCopy(copyText, 'Copy devotion text and share')) {
+      return { ok: true, method: 'manual' };
+    }
+    return { ok: false, error: 'share-failed' };
   }
 
   async function shareLink({ title = 'Abide Devotion', text = '', url = '' } = {}) {
     const shareData = { title: clean(title), text: clean(text), url: String(url || '').trim() };
     try {
-      if (navigator.share) {
+      if (canInvokeNativeShare()) {
         await navigator.share(shareData);
         return { ok: true, method: 'native' };
       }
     } catch (err) {
       if (String(err?.name || '') === 'AbortError') return { ok: false, aborted: true };
     }
-    try {
-      await navigator.clipboard.writeText([shareData.title, shareData.text, shareData.url].filter(Boolean).join('\n\n'));
+    const copyText = [shareData.title, shareData.text, shareData.url].filter(Boolean).join('\n\n');
+    if (await writeClipboard(copyText)) {
       return { ok: true, method: 'clipboard' };
-    } catch (err) {
-      return { ok: false, error: err?.message || 'share-link-failed' };
     }
+    if (manualPromptCopy(shareData.url || copyText, 'Copy share link')) {
+      return { ok: true, method: 'manual' };
+    }
+    return { ok: false, error: 'share-link-failed' };
   }
 
   return {
