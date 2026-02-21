@@ -684,6 +684,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--glass-fill);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  margin-bottom: var(--tab-total-height);
 }
 
 .app-legal a {

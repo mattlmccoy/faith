@@ -43,8 +43,8 @@ const Store = (() => {
     workerUrl: '',            // Set in settings after deploying worker
     onboardingDone: false,
     tutorialSeen: false,
-    bibleTranslation: 'web',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby'
-    palette: 'tuscan-sunset', // Color palette / theme
+    bibleTranslation: 'esv',  // 'web' | 'kjv' | 'net' | 'bbe' | 'darby' | 'esv'
+    palette: 'cactus-flower', // Color palette / theme
     trustedPastors: DEFAULT_TRUSTED_PASTORS,
     usageStats: {
       monthKey: '',
@@ -70,11 +70,13 @@ const Store = (() => {
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
+    _defaultsVersion: 2,
   };
 
   let _state = null;
 
   function load() {
+    let migrated = false;
     try {
       const raw = localStorage.getItem(KEY);
       _state = raw ? { ...defaults, ...JSON.parse(raw) } : { ...defaults };
@@ -99,9 +101,22 @@ const Store = (() => {
           settings: String(_state.googleDriveFiles.settings || ''),
         };
       }
+      if (Number(_state._defaultsVersion || 0) < 2) {
+        if (!_state.bibleTranslation || _state.bibleTranslation === 'web') {
+          _state.bibleTranslation = 'esv';
+          migrated = true;
+        }
+        if (!_state.palette || _state.palette === 'tuscan-sunset') {
+          _state.palette = 'cactus-flower';
+          migrated = true;
+        }
+        _state._defaultsVersion = 2;
+        migrated = true;
+      }
     } catch (e) {
       _state = { ...defaults };
     }
+    if (migrated) save();
     return _state;
   }
 

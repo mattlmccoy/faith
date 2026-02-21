@@ -117,10 +117,12 @@ const PlanView = (() => {
           <div class="font-serif text-xl">${escapeHtml(currentWeekTheme)}</div>
           <div class="text-sm text-secondary">Week of ${DateUtils.format(currentWeekStart)}</div>
           ${isDefaultWeek ? '<div class="text-xs text-muted" style="margin-top:4px;">Build a new plan any time to replace this default week.</div>' : ''}
-          ${totalSessions ? `<div class="text-xs text-muted" style="margin-top:6px;">Saved devotions from this week: ${savedSessions} of ${totalSessions}</div>` : ''}
+          <div class="text-xs text-muted" style="margin-top:6px;">
+            ${totalSessions ? `Saved devotions from this week: ${savedSessions} of ${totalSessions}` : 'No generated week found yet. Build a week, then save all 7 days at once.'}
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
-          ${totalSessions ? `<button class="btn btn-secondary btn-sm" onclick="PlanView.saveWholeWeek()">${savedSessions >= totalSessions ? 'Week Saved ✓' : 'Save Full Week'}</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="PlanView.saveWholeWeek()">${totalSessions && savedSessions >= totalSessions ? 'Week Saved ✓' : 'Save Full Week'}</button>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </div>
       </div>
