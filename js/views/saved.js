@@ -4,6 +4,7 @@
 
 const SavedView = (() => {
   let openSavedId = '';
+  let openSeriesId = '';
   let syncing = false;
 
   function escapeHtml(text = '') {
@@ -19,19 +20,89 @@ const SavedView = (() => {
     return escapeHtml(text).replace(/"/g, '&quot;');
   }
 
+  function sessionSortValue(session = '') {
+    return session === 'evening' ? 1 : 0;
+  }
+
+  function entryTheme(entry = {}) {
+    const theme = String(entry.theme || entry?.devotionData?.theme || '').trim();
+    return theme || 'Untitled Series';
+  }
+
+  function entryWeekKey(entry = {}) {
+    return DateUtils.weekStart(entry.dateKey || DateUtils.today());
+  }
+
+  function seriesIdForEntry(entry = {}) {
+    const weekKey = entryWeekKey(entry);
+    const theme = entryTheme(entry).toLowerCase();
+    return `${weekKey}::${theme}`;
+  }
+
+  function buildSeries(entries = []) {
+    const byId = {};
+
+    entries.forEach((entry) => {
+      const id = seriesIdForEntry(entry);
+      if (!byId[id]) {
+        byId[id] = {
+          id,
+          weekKey: entryWeekKey(entry),
+          theme: entryTheme(entry),
+          entries: [],
+          lastSavedAt: '',
+        };
+      }
+      byId[id].entries.push(entry);
+      const savedAt = String(entry.savedAt || '');
+      if (savedAt > byId[id].lastSavedAt) byId[id].lastSavedAt = savedAt;
+    });
+
+    const groups = Object.values(byId).map((group) => {
+      group.entries.sort((a, b) => {
+        const dateA = String(a.dateKey || '');
+        const dateB = String(b.dateKey || '');
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return sessionSortValue(a.session) - sessionSortValue(b.session);
+      });
+      return group;
+    });
+
+    groups.sort((a, b) => {
+      if (a.weekKey !== b.weekKey) return b.weekKey.localeCompare(a.weekKey);
+      if (a.lastSavedAt !== b.lastSavedAt) return String(b.lastSavedAt).localeCompare(String(a.lastSavedAt));
+      return a.theme.localeCompare(b.theme);
+    });
+
+    return groups;
+  }
+
+  function formatSeriesMeta(series) {
+    const days = new Set(series.entries.map((e) => e.dateKey).filter(Boolean)).size;
+    const sessions = series.entries.length;
+    return `${DateUtils.format(series.weekKey)} · ${days} day${days === 1 ? '' : 's'} · ${sessions} devotion${sessions === 1 ? '' : 's'}`;
+  }
+
   function render(container) {
     Router.setTitle('Saved Devotionals');
     Router.clearHeaderActions();
 
-    const saved = Store.getSavedDevotionLibrary();
+    const savedEntries = Store.getSavedDevotionLibrary();
+    const seriesList = buildSeries(savedEntries);
     const googleConnected = !!Store.get('googleProfile');
-    const openEntry = openSavedId ? Store.getSavedDevotionById(openSavedId) : null;
+
+    if (openSavedId && !Store.getSavedDevotionById(openSavedId)) {
+      openSavedId = '';
+    }
+    if (openSeriesId && !seriesList.find((s) => s.id === openSeriesId)) {
+      openSeriesId = '';
+    }
 
     const div = document.createElement('div');
     div.className = 'view-content view-enter';
     div.innerHTML = `
       <div class="section-header">
-        <span class="section-title">Saved Devotionals (${saved.length})</span>
+        <span class="section-title">Saved Series (${seriesList.length})</span>
         <div style="display:flex;gap:8px;align-items:center;">
           ${syncing ? `<span class="text-xs text-secondary">Syncing...</span>` : ''}
           ${googleConnected ? `<button class="btn btn-ghost btn-sm" onclick="SavedView.importSharedLinkPrompt()">Import Shared</button>` : ''}
@@ -41,23 +112,42 @@ const SavedView = (() => {
         </div>
       </div>
 
-      ${saved.length ? `
+      ${seriesList.length ? `
       <div class="devotion-library-list">
-        ${saved.map((item) => {
-          const isOpen = item.id === openSavedId;
-          const title = item.title || item.openingVerse?.reference || 'Saved devotion';
-          const when = `${DateUtils.format(item.dateKey || DateUtils.today(), 'short')} · ${item.session || ''}`;
+        ${seriesList.map((series) => {
+          const isOpen = series.id === openSeriesId;
           return `
-            <div class="devotion-library-item">
-              <div class="devotion-library-item__meta">${escapeHtml(when)}</div>
-              <div class="devotion-library-item__title">${escapeHtml(title)}</div>
-              ${item.theme ? `<div class="devotion-library-item__theme">${escapeHtml(item.theme)}</div>` : ''}
-              <div style="display:flex;gap:8px;margin-top:10px;">
-                <button class="btn btn-secondary btn-sm" onclick="SavedView.openSaved('${escapeAttr(item.id)}')">${isOpen ? 'Hide' : 'Open'}</button>
-                <button class="btn btn-secondary btn-sm" onclick="SavedView.goToDay('${escapeAttr(item.dateKey)}','${escapeAttr(item.session || 'morning')}')">Go to day</button>
-                <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSaved('${escapeAttr(item.id)}')">Share</button>
+            <div class="devotion-library-item devotion-series">
+              <div class="devotion-library-item__meta">${escapeHtml(formatSeriesMeta(series))}</div>
+              <div class="devotion-library-item__title">${escapeHtml(series.theme)}</div>
+              <div class="devotion-library-item__theme">Week of ${escapeHtml(DateUtils.format(series.weekKey))}</div>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="SavedView.useSeries('${escapeAttr(series.id)}')">Use This Week</button>
+                <button class="btn btn-secondary btn-sm" onclick="SavedView.toggleSeries('${escapeAttr(series.id)}')">${isOpen ? 'Hide Series' : 'Open Series'}</button>
               </div>
-              ${isOpen ? renderSavedDetail(openEntry || item) : ''}
+
+              ${isOpen ? `
+                <div class="devotion-series-entries">
+                  ${series.entries.map((item) => {
+                    const itemOpen = item.id === openSavedId;
+                    const title = item.title || item.openingVerse?.reference || 'Saved devotion';
+                    const when = `${DateUtils.format(item.dateKey || DateUtils.today(), 'short')} · ${item.session === 'evening' ? 'Evening' : 'Morning'}`;
+                    const openEntry = itemOpen ? (Store.getSavedDevotionById(item.id) || item) : item;
+                    return `
+                      <div class="devotion-library-item devotion-series-entry">
+                        <div class="devotion-library-item__meta">${escapeHtml(when)}</div>
+                        <div class="devotion-library-item__title">${escapeHtml(title)}</div>
+                        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+                          <button class="btn btn-secondary btn-sm" onclick="SavedView.openSaved('${escapeAttr(item.id)}')">${itemOpen ? 'Hide' : 'Open'}</button>
+                          <button class="btn btn-secondary btn-sm" onclick="SavedView.goToDay('${escapeAttr(item.dateKey)}','${escapeAttr(item.session || 'morning')}','${escapeAttr(series.id)}')">Go to day</button>
+                          <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSaved('${escapeAttr(item.id)}')">Share</button>
+                        </div>
+                        ${itemOpen ? renderSavedDetail(openEntry) : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              ` : ''}
             </div>
           `;
         }).join('')}
@@ -128,14 +218,56 @@ const SavedView = (() => {
     }).join('');
   }
 
+  function toggleSeries(id) {
+    if (!id) return;
+    if (openSeriesId === id) {
+      openSeriesId = '';
+      openSavedId = '';
+    } else {
+      openSeriesId = id;
+      openSavedId = '';
+    }
+    render(document.getElementById('view-container'));
+  }
+
   function openSaved(id) {
+    if (!id) return;
+    const entry = Store.getSavedDevotionById(id);
+    if (entry) {
+      openSeriesId = seriesIdForEntry(entry);
+    }
     openSavedId = openSavedId === id ? '' : id;
     render(document.getElementById('view-container'));
   }
 
-  function goToDay(dateKey, session) {
+  function goToDay(dateKey, session, seriesId = '') {
+    const currentHasDate = !!Store.getDevotionData(dateKey);
+    if (!currentHasDate) {
+      const allSeries = buildSeries(Store.getSavedDevotionLibrary());
+      const targetSeries = (seriesId
+        ? allSeries.find((series) => series.id === seriesId)
+        : null) || allSeries.find((series) => series.entries.some((entry) => entry.dateKey === dateKey && (entry.session || 'morning') === (session || 'morning')));
+      if (targetSeries) {
+        Store.useSavedSeries(targetSeries.entries, dateKey, session || 'morning');
+      }
+    }
     if (dateKey) Store.setSelectedDevotionDate(dateKey);
     Store.set('_sessionOverride', session || 'morning');
+    Router.navigate('/');
+  }
+
+  function useSeries(seriesId) {
+    const series = buildSeries(Store.getSavedDevotionLibrary()).find((s) => s.id === seriesId);
+    if (!series) {
+      alert('Could not find that saved devotional series.');
+      return;
+    }
+    const result = Store.useSavedSeries(series.entries, series.entries[0]?.dateKey || '', series.entries[0]?.session || 'morning');
+    if (!result.ok) {
+      alert('Could not apply that saved series as your current week.');
+      return;
+    }
+    alert(`Now using "${series.theme}" as this week's devotional.`);
     Router.navigate('/');
   }
 
@@ -234,7 +366,18 @@ const SavedView = (() => {
     }
   }
 
-  return { render, openSaved, goToDay, shareSaved, importSharedLinkPrompt, upload, download, connectGoogle };
+  return {
+    render,
+    toggleSeries,
+    useSeries,
+    openSaved,
+    goToDay,
+    shareSaved,
+    importSharedLinkPrompt,
+    upload,
+    download,
+    connectGoogle,
+  };
 })();
 
 window.SavedView = SavedView;

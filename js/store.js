@@ -420,6 +420,90 @@ const Store = (() => {
     };
   }
 
+  function cloneValue(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
+  function normalizeDayFromSavedEntries(entries = [], fallbackTheme = 'Saved Week') {
+    const dayMap = {};
+    let theme = String(fallbackTheme || '').trim() || 'Saved Week';
+
+    entries.forEach((entry) => {
+      const dateKey = String(entry?.dateKey || '').trim();
+      if (!dateKey) return;
+
+      const session = entry?.session === 'evening' ? 'evening' : 'morning';
+      const devotionData = entry?.devotionData && typeof entry.devotionData === 'object' ? entry.devotionData : {};
+      const fromDay = devotionData && typeof devotionData === 'object' ? devotionData : {};
+      const fromTheme = String(entry?.theme || fromDay.theme || '').trim();
+      if (fromTheme) theme = fromTheme;
+
+      if (!dayMap[dateKey]) {
+        dayMap[dateKey] = {
+          theme: fromTheme || theme,
+          morning: null,
+          evening: null,
+          faith_stretch: null,
+          sources: [],
+        };
+      }
+
+      const target = dayMap[dateKey];
+      if (fromDay.theme && !target.theme) target.theme = String(fromDay.theme);
+      if (fromDay.faith_stretch && !target.faith_stretch) target.faith_stretch = cloneValue(fromDay.faith_stretch);
+      if (Array.isArray(fromDay.sources) && fromDay.sources.length) target.sources = cloneValue(fromDay.sources);
+      if (fromDay.morning && !target.morning) target.morning = cloneValue(fromDay.morning);
+      if (fromDay.evening && !target.evening) target.evening = cloneValue(fromDay.evening);
+
+      if (!target[session]) {
+        target[session] = {
+          title: entry?.title || '',
+          opening_verse: cloneValue(entry?.openingVerse || null),
+          body: Array.isArray(entry?.body) ? cloneValue(entry.body) : [],
+          reflection_prompts: Array.isArray(entry?.reflectionPrompts) ? cloneValue(entry.reflectionPrompts) : [],
+          prayer: String(entry?.prayer || ''),
+          inspired_by: Array.isArray(entry?.inspiredBy) ? cloneValue(entry.inspiredBy) : [],
+        };
+      }
+
+      if (!target.theme) target.theme = fromTheme || theme;
+    });
+
+    Object.keys(dayMap).forEach((dateKey) => {
+      if (!dayMap[dateKey].theme) dayMap[dateKey].theme = theme;
+    });
+
+    return { days: dayMap, theme: theme || 'Saved Week' };
+  }
+
+  function useSavedSeries(entries = [], preferredDate = '', preferredSession = 'morning') {
+    const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
+    if (!list.length) return { ok: false, reason: 'empty' };
+
+    const { days, theme } = normalizeDayFromSavedEntries(list, list[0]?.theme || 'Saved Week');
+    const dayKeys = Object.keys(days).sort((a, b) => a.localeCompare(b));
+    if (!dayKeys.length) return { ok: false, reason: 'no-days' };
+
+    const week = DateUtils.weekStart(dayKeys[0]);
+    _state.currentWeekPlan = {
+      week,
+      theme,
+      aiGenerated: false,
+      fromSavedSeries: true,
+      createdAt: new Date().toISOString(),
+      days,
+    };
+
+    _state.selectedDevotionDate = dayKeys.includes(preferredDate) ? preferredDate : dayKeys[0];
+    _state._sessionOverride = preferredSession === 'evening' ? 'evening' : 'morning';
+    save();
+    return { ok: true, week, theme, dayCount: dayKeys.length };
+  }
+
   function exportSavedDevotionsSnapshot() {
     const list = Array.isArray(_state.savedDevotions) ? _state.savedDevotions : [];
     const lib = { ...(_state.savedDevotionLibrary || {}) };
@@ -794,6 +878,7 @@ const Store = (() => {
     getSavedDevotionById,
     exportSavedDevotionsSnapshot,
     importSavedDevotionsSnapshot,
+    useSavedSeries,
     exportDevotionsSnapshot,
     importDevotionsSnapshot,
     exportJournalSnapshot,
