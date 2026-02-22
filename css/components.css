@@ -1526,6 +1526,291 @@
   justify-content: center;
 }
 
+/* ── 1D: Verse Highlighting — color swatch popover ── */
+.passage-verse { cursor: default; user-select: text; }
+.passage-verse--highlighted { transition: background 200ms ease; }
+.verse-note-indicator {
+  font-size: 0.65em;
+  margin-left: 2px;
+  vertical-align: super;
+  cursor: pointer;
+}
+.verse-highlight-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 1200;
+  background: var(--glass-fill);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.verse-highlight-popover__colors {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.verse-highlight-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.verse-highlight-swatch:hover { transform: scale(1.15); }
+.verse-highlight-swatch--active { border-color: var(--color-text-primary); }
+.verse-highlight-swatch--clear {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.verse-highlight-note {
+  width: 100%;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
+  resize: none;
+  min-height: 52px;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* ── 1E: Memory Verse Sheet ── */
+.memory-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 960;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.memory-backdrop--visible { opacity: 1; }
+.memory-sheet {
+  width: 100%;
+  max-height: 85vh;
+  background: var(--glass-fill, rgba(255,255,255,0.97));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(40px);
+  transition: transform 240ms cubic-bezier(0.22,1,0.36,1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  overflow: hidden;
+}
+.memory-backdrop--visible .memory-sheet { transform: translateY(0); }
+.memory-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--divider); margin: 10px auto 0; flex-shrink: 0;
+}
+.memory-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.memory-reference {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.memory-subtitle {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+#memory-read-mode, #memory-practice-mode {
+  padding: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+}
+.memory-verse-text {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  line-height: 1.8;
+  color: var(--color-text-primary);
+}
+.memory-words {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  line-height: 2;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+}
+.memory-word--shown { color: var(--color-text-primary); }
+.memory-word--hidden {
+  display: inline-block;
+  border-radius: 3px;
+  background: var(--divider);
+  color: transparent;
+  user-select: none;
+  vertical-align: middle;
+  height: 1em;
+}
+.memory-word--short  { width: 2.2em; }
+.memory-word--med    { width: 3.8em; }
+.memory-word--long   { width: 5.5em; }
+.memory-controls { flex-shrink: 0; }
+.memory-progress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.memory-progress-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.memory-progress-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--divider);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.memory-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 200ms ease;
+}
+.memory-btn-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.memory-btn-row .btn:last-child { flex: 1; }
+
+/* ── 1F: Reading Progress Dashboard ── */
+.progress-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-4);
+}
+.progress-ring-wrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+}
+.progress-ring { display: block; }
+.progress-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.progress-ring-pct {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.progress-summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.progress-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.progress-stat__val {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.progress-stat__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.progress-book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  margin-bottom: var(--space-2);
+}
+.progress-book-card {
+  position: relative;
+  background: var(--color-surface-raised, var(--glass-fill));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 6px 6px 8px;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.progress-book-card:hover { transform: translateY(-1px); border-color: var(--color-primary); }
+.progress-book-card--started { border-color: var(--color-primary); opacity: 0.85; }
+.progress-book-card--complete {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--glass-fill));
+  border-color: var(--color-primary);
+}
+.progress-book-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.progress-book-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--divider);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-book-bar__fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+.progress-book-check {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 9px;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
 /* ── Word highlights — AI-selected words underlined in passage text ── */
 mark.wl-highlight {
   background: none;

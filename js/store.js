@@ -75,6 +75,8 @@ const Store = (() => {
     googleConnectedAt: null,
     planBuildStartMode: '',   // '' | 'today' | 'tomorrow'
     devotionLength: 'standard', // 'short' | 'standard' | 'long'
+    verseHighlights: {},      // { 'BookName C:V': { color: '#hex', note: '' } }
+    readingProgress: {},      // { 'BookName': [chapterNumbers...] }
     _defaultsVersion: 3,
   };
 
@@ -1107,6 +1109,52 @@ const Store = (() => {
     save();
   }
 
+  // --- Verse Highlights ---
+
+  function getVerseHighlights() {
+    if (!_state) load();
+    return _state.verseHighlights && typeof _state.verseHighlights === 'object'
+      ? _state.verseHighlights : {};
+  }
+
+  function setVerseHighlight(verseKey, color, note = '') {
+    if (!_state) load();
+    if (!_state.verseHighlights) _state.verseHighlights = {};
+    if (!color) {
+      delete _state.verseHighlights[verseKey];
+    } else {
+      _state.verseHighlights[verseKey] = { color, note: String(note || '') };
+    }
+    save();
+  }
+
+  function clearVerseHighlight(verseKey) {
+    if (!_state) load();
+    if (_state.verseHighlights) delete _state.verseHighlights[verseKey];
+    save();
+  }
+
+  // --- Reading Progress ---
+
+  function getReadingProgress() {
+    if (!_state) load();
+    return _state.readingProgress && typeof _state.readingProgress === 'object'
+      ? _state.readingProgress : {};
+  }
+
+  function markChapterRead(bookName, chapter) {
+    if (!_state) load();
+    if (!_state.readingProgress) _state.readingProgress = {};
+    const key = String(bookName).trim();
+    if (!Array.isArray(_state.readingProgress[key])) _state.readingProgress[key] = [];
+    const ch = parseInt(chapter);
+    if (!isNaN(ch) && !_state.readingProgress[key].includes(ch)) {
+      _state.readingProgress[key].push(ch);
+      _state.readingProgress[key].sort((a, b) => a - b);
+      save();
+    }
+  }
+
   // Initialize
   load();
 
@@ -1153,6 +1201,11 @@ const Store = (() => {
     importSettingsSnapshot,
     getTrustedPastors,
     setTrustedPastors,
+    getVerseHighlights,
+    setVerseHighlight,
+    clearVerseHighlight,
+    getReadingProgress,
+    markChapterRead,
     trackUsage,
     getUsageStats,
     getUsageLimits,

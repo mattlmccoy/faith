@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.22.15';
+  const APP_VERSION = '2026.02.22.16';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v60';
+  window.__ABIDE_SW_VERSION__ = 'abide-v61';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -119,6 +119,11 @@
     Router.register('/feedback', (container) => {
       Router.setTitle('Send Feedback');
       FeedbackView.render(container);
+    });
+
+    Router.register('/progress', (container) => {
+      Router.setTitle('Reading Progress');
+      ProgressView.render(container);
     });
   }
 

@@ -413,6 +413,13 @@ const ScriptureView = (() => {
     const attribution = TRANSLATION_ATTRIBUTION[translationId] || '';
     const isCopyrighted = ['esv', 'niv'].includes(translationId);
 
+    // Track reading progress
+    const chMatchProg = reference.match(/(.+?)\s+(\d+)/);
+    if (chMatchProg) Store.markChapterRead(chMatchProg[1].trim(), parseInt(chMatchProg[2]));
+
+    // Load existing highlights for this passage
+    const highlights = Store.getVerseHighlights();
+
     // Parse chapter for prev/next nav
     const chMatch = reference.match(/(.+?)\s+(\d+)/);
     const bookName = chMatch?.[1] || '';
@@ -443,12 +450,16 @@ const ScriptureView = (() => {
 
         <!-- Passage text -->
         <div class="passage-text" id="passage-text-body">
-          ${verses.length > 0 ? verses.map(v => `
-            <span class="passage-verse">
-              <sup class="verse-num">${v.verse}</sup>${v.text.trim()}
-            </span>
-            ${' '}
-          `).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
+          ${verses.length > 0 ? verses.map(v => {
+            const vKey = `${reference.replace(/\s+/g, ' ')} v${v.verse}`;
+            const hl = highlights[vKey];
+            const hlStyle = hl ? `background:${hl.color}22;border-radius:3px;padding:1px 2px;` : '';
+            const hlClass = hl ? ' passage-verse--highlighted' : '';
+            return `<span class="passage-verse${hlClass}" data-verse-key="${vKey.replace(/"/g,'&quot;')}" data-verse-num="${v.verse}" style="${hlStyle}">` +
+              `<sup class="verse-num">${v.verse}</sup>${v.text.trim()}` +
+              `${hl?.note ? `<span class="verse-note-indicator" title="${hl.note.replace(/"/g,'&quot;')}">✏️</span>` : ''}` +
+              `</span> `;
+          }).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
         </div>
 
         <!-- Action row: Dive Deeper + Parallel toggle -->
@@ -459,6 +470,12 @@ const ScriptureView = (() => {
               <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
             </svg>
             Dive Deeper
+          </button>
+          <button class="passage-dive-btn" id="passage-memory-btn" title="Memory verse practice">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2z"/><path d="M12 6v6l4 2"/>
+            </svg>
+            Memorize
           </button>
           <button class="passage-dive-btn passage-parallel-btn" id="passage-parallel-btn" title="Side-by-side translation">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -566,6 +583,18 @@ const ScriptureView = (() => {
         : (data.text || '');
       diveBtn.addEventListener('click', () => {
         WordLookup.openPassage({ reference, verseText }, diveBtn, passageBody);
+      });
+    }
+
+    // ── 1D: Verse Highlighting — long-press / right-click ────────────────
+    _wireVerseHighlights(container, reference);
+
+    // ── 1E: Memory Verse ─────────────────────────────────────────────────
+    const memBtn = container.querySelector('#passage-memory-btn');
+    if (memBtn) {
+      memBtn.addEventListener('click', () => {
+        const verseText = verses.length > 0 ? verses.map(v => v.text.trim()).join(' ') : (data.text || '');
+        MemoryVerseView.openSheet(reference, verseText);
       });
     }
 
@@ -719,6 +748,98 @@ const ScriptureView = (() => {
     if (quickLinks) quickLinks.style.display = '';
     const input = document.getElementById('scripture-search');
     if (input) { input.value = ''; input.focus(); }
+  }
+
+  // Helper: wire long-press / right-click verse highlighting
+  function _wireVerseHighlights(container, reference) {
+    const COLORS = [
+      { label: 'Yellow', value: '#F5C518' },
+      { label: 'Green',  value: '#4CAF50' },
+      { label: 'Blue',   value: '#2196F3' },
+      { label: 'Pink',   value: '#E91E8C' },
+      { label: 'Purple', value: '#9C27B0' },
+    ];
+
+    let _pressTimer = null;
+    let _activePopover = null;
+
+    function closePopover() {
+      if (_activePopover) { _activePopover.remove(); _activePopover = null; }
+    }
+
+    function openHighlightPopover(verseEl, verseKey) {
+      closePopover();
+      haptic([8]);
+
+      const existing = Store.getVerseHighlights()[verseKey];
+
+      const pop = document.createElement('div');
+      pop.className = 'verse-highlight-popover';
+      pop.innerHTML = `
+        <div class="verse-highlight-popover__colors">
+          ${COLORS.map(c => `
+            <button class="verse-highlight-swatch${existing?.color === c.value ? ' verse-highlight-swatch--active' : ''}"
+              data-color="${c.value}" title="${c.label}"
+              style="background:${c.value};"></button>`).join('')}
+          <button class="verse-highlight-swatch verse-highlight-swatch--clear" data-color="" title="Remove highlight">✕</button>
+        </div>
+        <textarea class="verse-highlight-note" placeholder="Add a note… (optional)"
+          maxlength="280">${existing?.note || ''}</textarea>
+      `;
+
+      // Position near the verse
+      verseEl.style.position = 'relative';
+      verseEl.appendChild(pop);
+      _activePopover = pop;
+
+      // Color swatches
+      pop.querySelectorAll('.verse-highlight-swatch').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const color = btn.dataset.color;
+          const note = pop.querySelector('.verse-highlight-note')?.value || '';
+          Store.setVerseHighlight(verseKey, color, note);
+          haptic([6]);
+          closePopover();
+          // Re-apply highlight style inline without full re-render
+          if (color) {
+            verseEl.style.background = `${color}22`;
+            verseEl.style.borderRadius = '3px';
+            verseEl.style.padding = '1px 2px';
+            verseEl.classList.add('passage-verse--highlighted');
+          } else {
+            verseEl.style.background = '';
+            verseEl.style.borderRadius = '';
+            verseEl.style.padding = '';
+            verseEl.classList.remove('passage-verse--highlighted');
+            verseEl.querySelector('.verse-note-indicator')?.remove();
+          }
+        });
+      });
+
+      // Close on outside click
+      setTimeout(() => {
+        document.addEventListener('click', closePopover, { once: true });
+      }, 0);
+    }
+
+    // Bind to all verse elements
+    container.querySelectorAll('.passage-verse[data-verse-key]').forEach(el => {
+      const verseKey = el.getAttribute('data-verse-key');
+
+      // Long-press (mobile)
+      el.addEventListener('touchstart', () => {
+        _pressTimer = setTimeout(() => openHighlightPopover(el, verseKey), 500);
+      }, { passive: true });
+      el.addEventListener('touchend', () => clearTimeout(_pressTimer));
+      el.addEventListener('touchmove', () => clearTimeout(_pressTimer), { passive: true });
+
+      // Right-click (desktop)
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openHighlightPopover(el, verseKey);
+      });
+    });
   }
 
   return { render, loadPassage, loadPassageFromPhrase, backToPhraseResults, clearPassage, searchPhrase };
