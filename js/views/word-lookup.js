@@ -121,7 +121,7 @@ const WordLookup = (() => {
 
         <div class="wl-header">
           <div class="wl-header__left">
-            <span class="wl-original" id="wl-original">${escHtml(_word)}</span>
+            <span class="wl-original" id="wl-original"></span>
             <span class="wl-translit" id="wl-translit"></span>
           </div>
           <div class="wl-header__right">
@@ -185,9 +185,11 @@ const WordLookup = (() => {
     if (!passageEl || !words.length) return;
 
     // Build a map: lowercase english → wordEntry
+    // Skip entries that don't have a real original-script word or are too short
     const wordMap = new Map();
     words.forEach(w => {
-      if (w.english) wordMap.set(w.english.toLowerCase().trim(), w);
+      const eng = (w.english || '').toLowerCase().trim();
+      if (eng.length >= 3 && w.original) wordMap.set(eng, w);
     });
 
     // Build a regex that matches any of the english words (whole word, case-insensitive)
@@ -306,6 +308,9 @@ const WordLookup = (() => {
     _history = [];
 
     buildPanel();
+
+    // Show the english word as a placeholder until the worker responds
+    populateHeader({ word: _word });
 
     const firstMsg = `In ${_context.reference || 'this passage'}: "${_context.verseText || ''}" — explain the word "${_word}".`;
     _history.push({ role: 'user', content: firstMsg });

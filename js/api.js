@@ -284,7 +284,7 @@ const API = (() => {
 
   // Mode A: passage analysis — AI picks 3–5 key words for the whole passage
   async function wordLookupPassage(context) {
-    const cacheKey = `wordpassage:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+    const cacheKey = `wordpassage:v2:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
     const cached = Cache.get(cacheKey);
     if (cached) return cached;
 

@@ -1216,7 +1216,7 @@ export async function handleWordLookup(request, url, env, origin, json) {
   // ── Cache key ──────────────────────────────────────────────────────────────
   const refSlug = (context.reference || '').toLowerCase().replace(/\s+/g, '');
   const cacheKey = isPassageMode
-    ? `word:passage:v1:${refSlug}`
+    ? `word:passage:v2:${refSlug}`
     : `word:lookup:v2:${word.toLowerCase().trim()}:${refSlug}`;
 
   if (isFirstTurn && env.ABIDE_KV) {
@@ -1228,10 +1228,13 @@ export async function handleWordLookup(request, url, env, origin, json) {
   const systemPrompt = isPassageMode
     ? `You are a Biblical Hebrew and Greek scholar. Given a Bible passage, identify the 3–5 most \
 theologically significant words where knowing the original language deepens understanding. \
-For each word return its original Hebrew/Greek, transliteration, Strong's number, and a \
+CRITICAL RULES for the "english" field: it MUST be the exact word (or a root form of the word) \
+as it appears in the English Bible text provided — NOT a label like "key", "concept", or "theme". \
+For example if the passage says "grace" use "grace", if it says "saved" use "saved". \
+For each word return its original Hebrew/Greek script, transliteration, Strong's number, and a \
 2–3 sentence explanation of its theological significance. \
 Respond ONLY with valid JSON matching exactly this schema: \
-{ "mode": "passage", "words": [ { "english": "...", "original": "...", \
+{ "mode": "passage", "words": [ { "english": "<exact word from the verse>", "original": "<Hebrew or Greek script>", \
 "transliteration": "...", "strongsNumber": "...", "language": "Hebrew|Greek", \
 "summary": "..." } ] }`
     : `You are a Biblical Hebrew and Greek lexicon expert and theologian. \
