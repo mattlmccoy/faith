@@ -274,6 +274,14 @@ const Store = (() => {
       .map(([date, entry]) => ({ date, ...entry }));
   }
 
+  function deleteJournalEntry(dateKey) {
+    const key = String(dateKey || '').trim();
+    if (!key || !_state.journalEntries || !_state.journalEntries[key]) return { removed: 0 };
+    delete _state.journalEntries[key];
+    save();
+    return { removed: 1 };
+  }
+
   // --- Plan ---
   function savePlan(plan) {
     pushCurrentPlanToHistory('save-plan');
@@ -433,6 +441,35 @@ const Store = (() => {
 
   function isSavedDevotion(dateKey, session) {
     return _state.savedDevotions.includes(`${dateKey}-${session}`);
+  }
+
+  function deleteSavedDevotionById(id) {
+    const key = String(id || '').trim();
+    if (!key) return { removed: 0 };
+    const before = Array.isArray(_state.savedDevotions) ? _state.savedDevotions.length : 0;
+    _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((x) => x !== key);
+    if (_state.savedDevotionLibrary && Object.prototype.hasOwnProperty.call(_state.savedDevotionLibrary, key)) {
+      delete _state.savedDevotionLibrary[key];
+    }
+    save();
+    return { removed: before - _state.savedDevotions.length };
+  }
+
+  function deleteSavedDevotionsByIds(ids = []) {
+    const unique = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id || '').trim()).filter(Boolean))];
+    if (!unique.length) return { removed: 0 };
+    const set = new Set(unique);
+    const before = Array.isArray(_state.savedDevotions) ? _state.savedDevotions.length : 0;
+    _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((id) => !set.has(id));
+    if (_state.savedDevotionLibrary && typeof _state.savedDevotionLibrary === 'object') {
+      unique.forEach((id) => {
+        if (Object.prototype.hasOwnProperty.call(_state.savedDevotionLibrary, id)) {
+          delete _state.savedDevotionLibrary[id];
+        }
+      });
+    }
+    save();
+    return { removed: before - _state.savedDevotions.length };
   }
 
   function getSavedDevotionLibrary() {
@@ -909,6 +946,7 @@ const Store = (() => {
     markCompleted,
     isCompleted,
     saveJournalEntry,
+    deleteJournalEntry,
     getJournalEntry,
     getRecentJournalEntries,
     getAllJournalEntries,
@@ -926,6 +964,8 @@ const Store = (() => {
     saveDevotion,
     saveEntirePlan,
     isSavedDevotion,
+    deleteSavedDevotionById,
+    deleteSavedDevotionsByIds,
     getSavedDevotionLibrary,
     getSavedDevotionById,
     exportSavedDevotionsSnapshot,

@@ -123,6 +123,7 @@ const SavedView = (() => {
               <div class="devotion-library-item__theme">Week of ${escapeHtml(DateUtils.format(series.weekKey))}</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.useSeries('${escapeAttr(series.id)}')">Use This Week</button>
+                <button class="btn btn-secondary btn-sm" onclick="SavedView.deleteSeries('${escapeAttr(series.id)}')">Delete Series</button>
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.toggleSeries('${escapeAttr(series.id)}')">${isOpen ? 'Hide Series' : 'Open Series'}</button>
               </div>
 
@@ -141,6 +142,7 @@ const SavedView = (() => {
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.openSaved('${escapeAttr(item.id)}')">${itemOpen ? 'Hide' : 'Open'}</button>
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.goToDay('${escapeAttr(item.dateKey)}','${escapeAttr(item.session || 'morning')}','${escapeAttr(series.id)}')">Go to day</button>
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSaved('${escapeAttr(item.id)}')">Share</button>
+                          <button class="btn btn-secondary btn-sm" onclick="SavedView.deleteSaved('${escapeAttr(item.id)}')">Delete</button>
                         </div>
                         ${itemOpen ? renderSavedDetail(openEntry) : ''}
                       </div>
@@ -366,6 +368,75 @@ const SavedView = (() => {
     }
   }
 
+  async function askDeleteScope(label = 'entry') {
+    const googleConnected = !!Store.get('googleProfile');
+    if (!googleConnected) {
+      const yes = window.confirm(`Delete this ${label} from this device?`);
+      return yes ? 'local' : '';
+    }
+    const choice = window.prompt(
+      `Delete ${label}:\n1) This device only\n2) Device + Google Drive\n\nType 1 or 2`
+    );
+    if (!choice) return '';
+    if (choice.trim() === '2') {
+      const confirmGlobal = window.confirm(`Also remove this ${label} from your synced Google Drive data?`);
+      return confirmGlobal ? 'global' : '';
+    }
+    if (choice.trim() === '1') return 'local';
+    return '';
+  }
+
+  async function applyDeleteScope(scope) {
+    if (scope !== 'global') return;
+    await Sync.pushSavedDevotions();
+  }
+
+  async function deleteSaved(id) {
+    const entry = Store.getSavedDevotionById(id);
+    if (!entry) {
+      alert('Could not find that saved devotion.');
+      return;
+    }
+    const scope = await askDeleteScope('devotion');
+    if (!scope) return;
+    const removed = Store.deleteSavedDevotionById(id);
+    if (!removed.removed) {
+      alert('Could not delete that devotion.');
+      return;
+    }
+    try {
+      await applyDeleteScope(scope);
+    } catch (err) {
+      alert(`Deleted locally, but Drive sync failed: ${err.message}`);
+    }
+    if (openSavedId === id) openSavedId = '';
+    render(document.getElementById('view-container'));
+  }
+
+  async function deleteSeries(seriesId) {
+    const series = buildSeries(Store.getSavedDevotionLibrary()).find((s) => s.id === seriesId);
+    if (!series) {
+      alert('Could not find that series.');
+      return;
+    }
+    const scope = await askDeleteScope('series');
+    if (!scope) return;
+    const ids = series.entries.map((e) => e.id).filter(Boolean);
+    const removed = Store.deleteSavedDevotionsByIds(ids);
+    if (!removed.removed) {
+      alert('Could not delete that series.');
+      return;
+    }
+    try {
+      await applyDeleteScope(scope);
+    } catch (err) {
+      alert(`Deleted locally, but Drive sync failed: ${err.message}`);
+    }
+    if (openSeriesId === seriesId) openSeriesId = '';
+    if (openSavedId && ids.includes(openSavedId)) openSavedId = '';
+    render(document.getElementById('view-container'));
+  }
+
   return {
     render,
     toggleSeries,
@@ -373,6 +444,8 @@ const SavedView = (() => {
     openSaved,
     goToDay,
     shareSaved,
+    deleteSaved,
+    deleteSeries,
     importSharedLinkPrompt,
     upload,
     download,

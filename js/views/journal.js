@@ -63,7 +63,10 @@ const JournalView = (() => {
         >${existingEntry?.text || ''}</textarea>
         <div class="journal-entry-card__footer">
           <span class="journal-entry-card__date">${existingEntry?.savedAt ? `Saved ${formatRelative(existingEntry.savedAt)}` : 'Not yet saved'}</span>
-          <button class="btn btn-primary btn-sm" id="journal-save-btn" onclick="JournalView.saveEntry()">Save</button>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="JournalView.deleteEntry('${escapeAttr(today)}')">Delete</button>
+            <button class="btn btn-primary btn-sm" id="journal-save-btn" onclick="JournalView.saveEntry()">Save</button>
+          </div>
         </div>
       </div>
 
@@ -111,6 +114,7 @@ const JournalView = (() => {
             <div class="journal-past-item__preview ${isOpen ? 'journal-past-item__preview--open' : ''}">${escapeHtml(e.text || '(no entry)')}</div>
             <div style="margin-top:10px;">
               <button class="btn btn-secondary btn-sm" onclick="JournalView.togglePast('${escapeAttr(e.date)}')">${isOpen ? 'Collapse' : 'Open'}</button>
+              <button class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="JournalView.deleteEntry('${escapeAttr(e.date)}')">Delete</button>
             </div>
           </div>
         `;
@@ -260,7 +264,46 @@ const JournalView = (() => {
     }
   }
 
-  return { render, saveEntry, usePrompt, togglePast, uploadHistory, downloadHistory };
+  async function askDeleteScope(label = 'entry') {
+    const googleConnected = !!Store.get('googleProfile');
+    if (!googleConnected) {
+      const yes = window.confirm(`Delete this journal ${label} from this device?`);
+      return yes ? 'local' : '';
+    }
+    const choice = window.prompt(
+      `Delete journal ${label}:\n1) This device only\n2) Device + Google Drive\n\nType 1 or 2`
+    );
+    if (!choice) return '';
+    if (choice.trim() === '2') {
+      const confirmGlobal = window.confirm(`Also remove this journal ${label} from your synced Google Drive data?`);
+      return confirmGlobal ? 'global' : '';
+    }
+    if (choice.trim() === '1') return 'local';
+    return '';
+  }
+
+  async function deleteEntry(dateKey) {
+    const key = String(dateKey || '').trim();
+    if (!key) return;
+    const scope = await askDeleteScope('entry');
+    if (!scope) return;
+    const result = Store.deleteJournalEntry(key);
+    if (!result.removed) {
+      alert('Could not delete that journal entry.');
+      return;
+    }
+    try {
+      if (scope === 'global') {
+        await Sync.pushSavedDevotions();
+      }
+    } catch (err) {
+      alert(`Deleted locally, but Drive sync failed: ${err.message}`);
+    }
+    if (openPastDate === key) openPastDate = '';
+    render(document.getElementById('view-container'));
+  }
+
+  return { render, saveEntry, usePrompt, togglePast, uploadHistory, downloadHistory, deleteEntry };
 })();
 
 window.JournalView = JournalView;

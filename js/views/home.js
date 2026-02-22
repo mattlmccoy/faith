@@ -601,6 +601,16 @@ const HomeView = (() => {
         body: 'Use Scripture to search verses by reference or topic and change translations in Settings.',
       },
       {
+        route: '/scripture', selector: '#passage-dive-btn', calloutPos: 'below', highlightPadding: 10,
+        title: 'Deep Dive (John 15:5)',
+        body: "Search and open John 15:5, then tap Dive Deeper to explore context and meaning. This verse is where Abide gets its name.",
+        setup: async () => {
+          if (window.ScriptureView?.loadPassage) {
+            await window.ScriptureView.loadPassage('John 15:5');
+          }
+        },
+      },
+      {
         route: '/prayer', selector: '[data-tab="prayer"]', calloutPos: 'above', highlightPadding: 8,
         title: 'Guided Prayer',
         body: "Use Prayer to walk through structured prayer frameworks and stay consistent when you don't know where to start.",
@@ -611,17 +621,17 @@ const HomeView = (() => {
         body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
       },
       {
-        route: '/settings', selector: '#settings-appearance-section', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-appearance-section .settings-group', calloutPos: 'below', highlightPadding: 10,
         title: 'Appearance & Translation',
         body: "Choose your color palette and app theme. You can also pick Bible translation: WEB is public-domain default; ESV is available for personal devotional use.",
       },
       {
-        route: '/settings', selector: '#settings-notifications-section', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-notifications-section .settings-group', calloutPos: 'below', highlightPadding: 10,
         title: 'Daily Reminders',
         body: "Enable notifications for morning/evening reminders and Sunday plan prompts. iOS will ask for permission when you save.",
       },
       {
-        route: '/settings', selector: '#settings-pastors-section', calloutPos: 'below', highlightPadding: 10,
+        route: '/settings', selector: '#settings-pastors-section .settings-group', calloutPos: 'below', highlightPadding: 10,
         title: 'Your Trusted Pastors',
         body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
       },
@@ -646,7 +656,7 @@ const HomeView = (() => {
     calloutEl.className = 'tour-callout';
     document.body.appendChild(calloutEl);
 
-    function goToStep(index) {
+    async function goToStep(index) {
       if (index >= STEPS.length) { dismissTour(); return; }
       stepIndex = index;
       const step = STEPS[index];
@@ -657,11 +667,18 @@ const HomeView = (() => {
       calloutEl.classList.remove('tour-callout--visible');
       highlightEl.classList.remove('tour-highlight--visible');
 
-      function showStep() {
-        const target = findTarget(step.selector);
+      async function showStep() {
+        try {
+          if (typeof step.setup === 'function') {
+            await step.setup();
+          }
+        } catch (err) {
+          console.warn('Tutorial step setup failed:', err);
+        }
+        const target = await waitForTarget(step.selector, 8, 120);
         if (!target) {
           // Skip missing targets (prevents blank/odd states on dynamic views)
-          goToStep(stepIndex + 1);
+          await goToStep(stepIndex + 1);
           return;
         }
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -674,6 +691,15 @@ const HomeView = (() => {
       } else {
         setTimeout(showStep, 80);
       }
+    }
+
+    async function waitForTarget(selector, tries = 8, delay = 120) {
+      for (let i = 0; i < tries; i += 1) {
+        const target = findTarget(selector);
+        if (target) return target;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+      return null;
     }
 
     function findTarget(selector) {
@@ -727,12 +753,13 @@ const HomeView = (() => {
         calloutEl.style.top = '12px';
 
         const tabBarHeight = document.getElementById('tab-bar')?.offsetHeight || 0;
-        const maxHeight = Math.max(220, window.innerHeight - tabBarHeight - 24);
+        const safeTop = 12;
+        const iOSInset = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 20 : 0;
+        const safeBottom = tabBarHeight + 16 + iOSInset;
+        const maxHeight = Math.max(220, window.innerHeight - safeTop - safeBottom);
         calloutEl.style.maxHeight = `${maxHeight}px`;
 
         const calloutHeight = calloutEl.offsetHeight || 320;
-        const safeTop = 12;
-        const safeBottom = tabBarHeight + 12;
         const preferAbove = step.calloutPos === 'above';
         const aboveTop = rect.top - calloutHeight - pad - 8;
         const belowTop = rect.bottom + pad + 8;
@@ -778,11 +805,11 @@ const HomeView = (() => {
 
       requestAnimationFrame(() => calloutEl.classList.add('tour-callout--visible'));
 
-      calloutEl.querySelector('.tour-callout__skip').addEventListener('click', dismissTour);
-      calloutEl.querySelector('.tour-callout__back')?.addEventListener('click', () => {
-        if (stepIndex > 0) goToStep(stepIndex - 1);
-      });
-      calloutEl.querySelector('.tour-callout__next').addEventListener('click', () => goToStep(stepIndex + 1));
+        calloutEl.querySelector('.tour-callout__skip').addEventListener('click', dismissTour);
+        calloutEl.querySelector('.tour-callout__back')?.addEventListener('click', () => {
+        if (stepIndex > 0) void goToStep(stepIndex - 1);
+        });
+      calloutEl.querySelector('.tour-callout__next').addEventListener('click', () => void goToStep(stepIndex + 1));
     }
 
     function dismissTour() {
@@ -803,7 +830,7 @@ const HomeView = (() => {
     }
 
     // Kick off from step 0
-    goToStep(0);
+    void goToStep(0);
   }
 
   return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel, shareCurrentDevotion };
