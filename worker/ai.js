@@ -1446,7 +1446,7 @@ export async function handleWordLookup(request, url, env, origin, json) {
   const refSlug = (context.reference || '').toLowerCase().replace(/\s+/g, '');
   const cacheKey = isPassageMode
     ? `word:passage:v3:${refSlug}`
-    : `word:lookup:v3:${word.toLowerCase().trim()}:${refSlug}`;
+    : `word:lookup:v4:${word.toLowerCase().trim()}:${refSlug}`;
 
   if (isFirstTurn && env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');

@@ -94,9 +94,14 @@ const WordLookup = (() => {
 
     try {
       const data = await API.wordLookup(_word, _context, _history);
-      _history.push({ role: 'assistant', content: data.reply || '' });
+      // Guard: if reply is a raw JSON string (parsing slipped through), extract it
+      let reply = data.reply || '';
+      if (reply.trim().startsWith('{')) {
+        try { const p = JSON.parse(reply); reply = p.reply || reply; } catch {}
+      }
+      _history.push({ role: 'assistant', content: reply });
       populateHeader(data);
-      appendBubble('ai', mdToHtml(data.reply || 'No content returned.'));
+      appendBubble('ai', mdToHtml(reply || 'No content returned.'));
     } catch (err) {
       appendBubble('ai', `<p style="color:var(--color-text-muted)">Sorry — ${err.message || 'lookup failed'}. Please try again.</p>`);
     } finally {

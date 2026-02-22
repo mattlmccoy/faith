@@ -695,8 +695,16 @@ const HomeView = (() => {
       const pad = step.highlightPadding || 8;
       const CALLOUT_WIDTH = Math.min(300, window.innerWidth - 24);
 
-      if (target) {
-        const rect = target.getBoundingClientRect();
+      // Treat target as absent if its rect falls outside the visible viewport —
+      // this prevents the box-shadow from covering the whole screen when the
+      // highlighted element (e.g. a tab icon) is below the Safari bottom bar.
+      const rect = target ? target.getBoundingClientRect() : null;
+      const isVisible = rect &&
+        rect.width > 0 && rect.height > 0 &&
+        rect.top  < window.innerHeight && rect.bottom > 0 &&
+        rect.left < window.innerWidth  && rect.right  > 0;
+
+      if (target && isVisible) {
         // Position spotlight
         highlightEl.style.left   = (rect.left - pad) + 'px';
         highlightEl.style.top    = (rect.top - pad) + 'px';
@@ -753,7 +761,7 @@ const HomeView = (() => {
         if (top < minTop) top = minTop;
         calloutEl.style.top = `${top}px`;
       } else {
-        // No target found — show centered callout with no spotlight
+        // No target found or target is off-screen — show centered callout, no spotlight
         highlightEl.classList.remove('tour-highlight--visible');
 
         const isLast = stepIndex === STEPS.length - 1;

@@ -309,7 +309,7 @@ const API = (() => {
   // Mode B: single word follow-up conversation
   async function wordLookup(word, context = {}, history = []) {
     const isFirstTurn = history.length === 0;
-    const cacheKey = `wordlookup:v3:${word.toLowerCase()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+    const cacheKey = `wordlookup:v4:${word.toLowerCase()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
 
     if (isFirstTurn) {
       const cached = Cache.get(cacheKey);
