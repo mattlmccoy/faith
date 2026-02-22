@@ -638,7 +638,7 @@ const Store = (() => {
     };
   }
 
-  function importSavedDevotionsSnapshot(snapshot = {}) {
+  function importSavedDevotionsSnapshot(snapshot = {}, options = {}) {
     if (Array.isArray(snapshot)) {
       snapshot = { savedDevotionLibrary: snapshot };
     }
@@ -664,18 +664,23 @@ const Store = (() => {
       normalizedSnapshot.savedDevotionLibrary = arrayLib;
     }
 
+    const replaceExisting = options && options.replace === true;
     const list = Array.isArray(normalizedSnapshot.savedDevotions) ? normalizedSnapshot.savedDevotions : [];
     const lib = normalizedSnapshot.savedDevotionLibrary && typeof normalizedSnapshot.savedDevotionLibrary === 'object'
       ? normalizedSnapshot.savedDevotionLibrary
       : {};
 
-    const mergedIds = new Set([
-      ...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []),
-      ...list,
-      ...Object.keys(lib),
-    ]);
+    const mergedIds = new Set(replaceExisting
+      ? [...list, ...Object.keys(lib)]
+      : [
+        ...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []),
+        ...list,
+        ...Object.keys(lib),
+      ]);
     _state.savedDevotions = [...mergedIds];
-    _state.savedDevotionLibrary = { ...(_state.savedDevotionLibrary || {}), ...lib };
+    _state.savedDevotionLibrary = replaceExisting
+      ? { ...lib }
+      : { ...(_state.savedDevotionLibrary || {}), ...lib };
     const incomingProfile = normalizedSnapshot.profile && typeof normalizedSnapshot.profile === 'object' ? normalizedSnapshot.profile : {};
     if (incomingProfile.userName && !_state.userName) {
       _state.userName = String(incomingProfile.userName).trim();
@@ -761,13 +766,15 @@ const Store = (() => {
     };
   }
 
-  function importDevotionsSnapshot(snapshot = {}) {
+  function importDevotionsSnapshot(snapshot = {}, options = {}) {
     if (snapshot && typeof snapshot === 'object' && snapshot.devotions && typeof snapshot.devotions === 'object') {
       snapshot = snapshot.devotions;
     }
     const base = importSavedDevotionsSnapshot({
       savedDevotions: snapshot.savedDevotions,
       savedDevotionLibrary: snapshot.savedDevotionLibrary,
+    }, {
+      replace: options && options.replaceSaved === true,
     });
 
     const mergedPlan = mergePlan(_state.currentWeekPlan, snapshot.currentWeekPlan);

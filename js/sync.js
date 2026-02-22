@@ -715,7 +715,7 @@ const Sync = (() => {
     let settingsResult = { importedSettings: false, importedPastors: 0 };
 
     if (devotionsFile.found && devotionsFile.data && typeof devotionsFile.data === 'object') {
-      devResult = Store.importDevotionsSnapshot(devotionsFile.data || {});
+      devResult = Store.importDevotionsSnapshot(devotionsFile.data || {}, { replaceSaved: true });
       imported = true;
     }
     if (journalsFile.found && journalsFile.data && typeof journalsFile.data === 'object') {
