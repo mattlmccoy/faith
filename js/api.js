@@ -280,6 +280,38 @@ const API = (() => {
     return res.json();
   }
 
+  // --- Hebrew / Greek Word Deep Dive ---
+  async function wordLookup(word, context = {}, history = []) {
+    // word: string, context: { reference, verseText }, history: [{role, content}]
+    const isFirstTurn = history.length === 0;
+    const cacheKey = `wordlookup:${word.toLowerCase()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+
+    if (isFirstTurn) {
+      const cached = Cache.get(cacheKey);
+      if (cached) return cached;
+    }
+
+    const res = await fetch(`${workerUrl()}/word/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ word, context, history }),
+    });
+
+    if (!res.ok) {
+      let msg = 'Word lookup failed';
+      try { const d = await res.json(); msg = d?.error || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    Store.trackUsage('wordLookupQueries', 1);
+
+    if (isFirstTurn) {
+      Cache.set(cacheKey, data, 30 * 24 * 60 * 60 * 1000); // 30 days
+    }
+    return data;
+  }
+
   return {
     getPassage,
     getVerses,
@@ -297,6 +329,7 @@ const API = (() => {
     workerUrl,
     bibleTranslation,
     translationLabel,
+    wordLookup,
   };
 })();
 

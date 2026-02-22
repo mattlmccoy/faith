@@ -198,6 +198,21 @@ const DevotionView = (() => {
     container.innerHTML = '';
     container.appendChild(div);
     hydrateScripture(div, sessionData, selectedDate);
+
+    // Wire "Dive Deeper" buttons on scripture blocks
+    if (window.WordLookup) {
+      div.querySelectorAll('.devotion-dive-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const block = btn.closest('[data-scripture-block]');
+          if (!block) return;
+          const textEl = block.querySelector('[data-scripture-text]');
+          const ref = block.getAttribute('data-ref') || '';
+          // Strip surrounding quotes that the template adds
+          const verseText = (textEl?.textContent || '').replace(/^[""]|[""]$/g, '').trim();
+          WordLookup.activateWordTapMode(textEl, { reference: ref, verseText });
+        });
+      });
+    }
   }
 
   function renderBody(body) {
@@ -210,6 +225,15 @@ const DevotionView = (() => {
           <div class="devotion-scripture-block" data-scripture-block data-ref="${block.reference || ''}">
             <div class="devotion-scripture-block__text" data-scripture-text>"${block.text || ''}"</div>
             ${block.reference ? `<div class="devotion-scripture-block__ref" data-scripture-ref>— ${block.reference}</div>` : ''}
+            <div class="passage-dive-row">
+              <button class="passage-dive-btn devotion-dive-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                </svg>
+                Dive Deeper
+              </button>
+            </div>
           </div>
         `;
       }

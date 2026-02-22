@@ -15,7 +15,7 @@
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
-import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe } from './ai.js';
+import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleWordLookup } from './ai.js';
 
 // CORS — allow GitHub Pages origin + local dev
 const ALLOWED_ORIGINS = [
@@ -78,6 +78,11 @@ export default {
       // AI-powered verse phrase search
       if (url.pathname === '/ai/phrase') {
         return handleAIPhrase(request, url, env, origin, json);
+      }
+
+      // Hebrew/Greek word deep dive
+      if (url.pathname === '/word/lookup') {
+        return handleWordLookup(request, url, env, origin, json);
       }
 
       // AI model diagnostics

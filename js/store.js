@@ -12,6 +12,7 @@ const Store = (() => {
     'aiPhraseQueries',
     'devotionalSearchQueries',
     'pushTestRequests',
+    'wordLookupQueries',
   ];
   const DEFAULT_TRUSTED_PASTORS = [
     { name: 'Tim Keller', enabled: true },

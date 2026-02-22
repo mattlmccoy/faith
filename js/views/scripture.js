@@ -442,13 +442,24 @@ const ScriptureView = (() => {
         </div>
 
         <!-- Passage text -->
-        <div class="passage-text">
+        <div class="passage-text" id="passage-text-body">
           ${verses.length > 0 ? verses.map(v => `
             <span class="passage-verse">
               <sup class="verse-num">${v.verse}</sup>${v.text.trim()}
             </span>
             ${' '}
           `).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
+        </div>
+
+        <!-- Dive Deeper -->
+        <div class="passage-dive-row">
+          <button class="passage-dive-btn" id="passage-dive-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+            </svg>
+            Dive Deeper
+          </button>
         </div>
 
         <!-- Copyright attribution -->
@@ -467,6 +478,18 @@ const ScriptureView = (() => {
         </div>
       </div>
     `;
+
+    // Wire "Dive Deeper" — collects plain verse text for context
+    const diveBtn = container.querySelector('#passage-dive-btn');
+    const passageBody = container.querySelector('#passage-text-body');
+    if (diveBtn && passageBody && window.WordLookup) {
+      const verseText = verses.length > 0
+        ? verses.map(v => v.text.trim()).join(' ')
+        : (data.text || '');
+      diveBtn.addEventListener('click', () => {
+        WordLookup.activateWordTapMode(passageBody, { reference, verseText });
+      });
+    }
   }
 
   function loadPassageFromPhrase(ref) {

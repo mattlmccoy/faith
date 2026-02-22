@@ -1199,3 +1199,89 @@ Use standard Bible references like "John 3:16", "Psalm 23:1", "Romans 8:28". Ran
     return json({ verses: [], fallback: true }, 200, origin);
   }
 }
+
+/* ── Word / Hebrew-Greek Deep Dive ── */
+export async function handleWordLookup(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  let body = {};
+  try { body = await request.json(); } catch {}
+
+  const { word, context = {}, history = [] } = body;
+  if (!word?.trim()) return json({ error: 'word required' }, 400, origin);
+
+  const isFirstTurn = history.length === 0;
+  const cacheKey = `word:lookup:v2:${word.toLowerCase().trim()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+
+  if (isFirstTurn && env.ABIDE_KV) {
+    const cached = await env.ABIDE_KV.get(cacheKey, 'json');
+    if (cached) return json(cached, 200, origin);
+  }
+
+  if (!env.GEMINI_API_KEY) {
+    return json({ error: 'GEMINI_API_KEY not configured', reply: 'Word lookup is not available right now.' }, 503, origin);
+  }
+
+  const systemPrompt = `You are a Biblical Hebrew and Greek lexicon expert and theologian. \
+When given an English word from a Bible passage, identify the most likely underlying \
+Hebrew (OT) or Greek (NT) word and explain it for a thoughtful Christian reader. \
+Keep initial responses concise but theologically rich. For follow-up questions, go deeper. \
+Always respond in JSON: { "reply": "<markdown>", "word": "<original script>", "transliteration": "<romanized>", "strongsNumber": "<H#### or G####>", "language": "<Hebrew|Greek|Unknown>" } \
+The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
+
+  // Build first-turn user message
+  const firstUserMsg = `In ${context.reference || 'this verse'}: "${context.verseText || ''}" — \
+explain the word "${word}". Give the original Hebrew or Greek word, its transliteration, \
+Strong's number, and core definition. Then explain its theological significance in this passage.`;
+
+  // Build Gemini contents array (handles multi-turn)
+  const contents = isFirstTurn
+    ? [{ role: 'user', parts: [{ text: firstUserMsg }] }]
+    : [
+        { role: 'user', parts: [{ text: firstUserMsg }] },
+        ...history.slice(1).map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        })),
+      ];
+
+  try {
+    const discoveredModels = await listGeminiGenerateModels(env);
+    const modelCandidates = buildModelCandidates(env, discoveredModels, '');
+
+    let response = null;
+    for (const model of modelCandidates) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+      const payload = {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { temperature: 0.3, maxOutputTokens: 900, responseMimeType: 'application/json' },
+      };
+      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) { const t = await res.text(); console.warn(`Gemini(${model}) word lookup ${res.status}: ${t.slice(0, 200)}`); continue; }
+      const data = await res.json();
+      const text = (data?.candidates || []).flatMap(c => c?.content?.parts || []).map(p => p?.text || '').join('\n').trim();
+      if (text) { response = { text, model }; break; }
+    }
+
+    if (!response) throw new Error('All Gemini models returned empty');
+
+    const parsed = parseJsonBlock(response.text);
+    const result = {
+      reply: parsed.reply || response.text,
+      word: parsed.word || word,
+      transliteration: parsed.transliteration || '',
+      strongsNumber: parsed.strongsNumber || '',
+      language: parsed.language || 'Unknown',
+      provider: 'gemini',
+    };
+
+    if (isFirstTurn && env.ABIDE_KV) {
+      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 30 * 24 * 60 * 60 });
+    }
+    return json(result, 200, origin);
+  } catch (err) {
+    console.error('Word lookup error:', err.message);
+    return json({ error: err.message, reply: 'Could not look up this word. Please try again.', word, transliteration: '', strongsNumber: '', language: 'Unknown' }, 500, origin);
+  }
+}
