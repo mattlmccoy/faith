@@ -209,7 +209,7 @@ const DevotionView = (() => {
           const ref = block.getAttribute('data-ref') || '';
           // Strip surrounding quotes that the template adds
           const verseText = (textEl?.textContent || '').replace(/^[""]|[""]$/g, '').trim();
-          WordLookup.openPassage({ reference: ref, verseText }, btn);
+          WordLookup.openPassage({ reference: ref, verseText }, btn, textEl);
         });
       });
     }

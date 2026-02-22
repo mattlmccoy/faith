@@ -1,16 +1,20 @@
 /* ============================================================
    ABIDE - Hebrew / Greek Word Deep Dive
-   WordLookup.openPassage(context, diveBtn) — AI picks key words, renders chips
-   WordLookup.open(word, context)           — open single-word sheet (tap chip)
-   WordLookup.openWithSummary(word, ctx, wordEntry) — sheet with pre-fetched summary
+   WordLookup.openPassage(context, diveBtn, passageEl)
+     — AI picks key words, highlights them in the passage, renders chips
+   WordLookup.open(word, context)
+     — open single-word sheet (fetches from worker)
+   WordLookup.openWithSummary(word, ctx, wordEntry)
+     — sheet with pre-fetched summary (no extra network call)
    context = { reference: "Eph 2:8", verseText: "For by grace…" }
    ============================================================ */
 
 const WordLookup = (() => {
   // ── state ─────────────────────────────────────────────────────────
-  let _word = '';
+  let _word    = '';
   let _context = {};
   let _history = []; // [{ role: 'user'|'assistant', content: string }]
+  let _tapCleanup = null; // active tap-any-word cleanup fn
 
   // ── minimal markdown → safe HTML ──────────────────────────────────
   function mdToHtml(text) {
@@ -19,29 +23,36 @@ const WordLookup = (() => {
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      // Bold **text** or __text__
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/__(.+?)__/g, '<strong>$1</strong>')
-      // Italic *text* or _text_
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/_(.+?)_/g, '<em>$1</em>')
-      // Line breaks → paragraphs (double newline)
       .split(/\n\n+/)
       .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
       .join('');
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   // ── panel teardown ────────────────────────────────────────────────
   function teardown() {
     document.getElementById('wl-backdrop')?.remove();
     document.removeEventListener('keydown', _onEscape);
+    if (_tapCleanup) { _tapCleanup(); _tapCleanup = null; }
   }
 
   function _onEscape(e) {
     if (e.key === 'Escape') teardown();
   }
 
-  // ── append a message bubble to the conversation ───────────────────
+  // ── append a message bubble ───────────────────────────────────────
   function appendBubble(role, htmlContent) {
     const conv = document.getElementById('wl-conversation');
     if (!conv) return;
@@ -55,13 +66,13 @@ const WordLookup = (() => {
     conv.scrollTop = conv.scrollHeight;
   }
 
-  // ── populate header after first response ─────────────────────────
+  // ── populate header ───────────────────────────────────────────────
   function populateHeader(data) {
     const orig  = document.getElementById('wl-original');
     const tr    = document.getElementById('wl-translit');
     const badge = document.getElementById('wl-badge');
-    if (orig)  orig.textContent  = data.word || _word;
-    if (tr)    tr.textContent    = data.transliteration || '';
+    if (orig)  orig.textContent = data.word || _word;
+    if (tr)    tr.textContent   = data.transliteration || '';
     if (badge) {
       const lang    = data.language || '';
       const strongs = data.strongsNumber || '';
@@ -70,7 +81,7 @@ const WordLookup = (() => {
     }
   }
 
-  // ── send a follow-up turn to the API ─────────────────────────────
+  // ── send a follow-up turn ─────────────────────────────────────────
   async function sendTurn(userText) {
     const loading  = document.getElementById('wl-loading');
     const inputRow = document.getElementById('wl-input-row');
@@ -84,7 +95,6 @@ const WordLookup = (() => {
     try {
       const data = await API.wordLookup(_word, _context, _history);
       _history.push({ role: 'assistant', content: data.reply || '' });
-
       populateHeader(data);
       appendBubble('ai', mdToHtml(data.reply || 'No content returned.'));
     } catch (err) {
@@ -97,7 +107,7 @@ const WordLookup = (() => {
     }
   }
 
-  // ── build and inject the panel HTML ──────────────────────────────
+  // ── build the bottom-sheet panel ─────────────────────────────────
   function buildPanel() {
     teardown();
 
@@ -111,7 +121,7 @@ const WordLookup = (() => {
 
         <div class="wl-header">
           <div class="wl-header__left">
-            <span class="wl-original" id="wl-original">${_word}</span>
+            <span class="wl-original" id="wl-original">${escHtml(_word)}</span>
             <span class="wl-translit" id="wl-translit"></span>
           </div>
           <div class="wl-header__right">
@@ -145,16 +155,12 @@ const WordLookup = (() => {
     `;
 
     document.body.appendChild(backdrop);
-
-    // Animate in
     requestAnimationFrame(() => backdrop.classList.add('wl-backdrop--visible'));
 
-    // Wire close controls
     document.getElementById('wl-close').addEventListener('click', teardown);
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) teardown(); });
     document.addEventListener('keydown', _onEscape);
 
-    // Wire send button + Enter key
     const input = document.getElementById('wl-input');
     const send  = document.getElementById('wl-send');
 
@@ -162,7 +168,7 @@ const WordLookup = (() => {
       const text = input.value.trim();
       if (!text) return;
       _history.push({ role: 'user', content: text });
-      appendBubble('user', text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+      appendBubble('user', escHtml(text));
       sendTurn(text);
     }
 
@@ -172,7 +178,128 @@ const WordLookup = (() => {
     });
   }
 
-  // ── public: open(word, context) ── single-word, fetches from worker ──
+  // ── highlight AI-selected words in the passage element ────────────
+  // Finds each word's English form in the passage text nodes and wraps
+  // it with a <mark class="wl-highlight"> that taps to openWithSummary.
+  function highlightWordsInPassage(passageEl, words, context) {
+    if (!passageEl || !words.length) return;
+
+    // Build a map: lowercase english → wordEntry
+    const wordMap = new Map();
+    words.forEach(w => {
+      if (w.english) wordMap.set(w.english.toLowerCase().trim(), w);
+    });
+
+    // Build a regex that matches any of the english words (whole word, case-insensitive)
+    const escaped = [...wordMap.keys()].map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!escaped.length) return;
+    const re = new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi');
+
+    // Walk all text nodes inside the passage element
+    function walkTextNodes(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent;
+        if (!re.test(text)) { re.lastIndex = 0; return; }
+        re.lastIndex = 0;
+
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        let m;
+        re.lastIndex = 0;
+        while ((m = re.exec(text)) !== null) {
+          // Text before match
+          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+
+          const entry = wordMap.get(m[0].toLowerCase());
+          const mark = document.createElement('mark');
+          mark.className = 'wl-highlight';
+          mark.textContent = m[0];
+          mark.setAttribute('title', entry?.original || '');
+          mark.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (entry) openWithSummary(entry.english || m[0], context, entry);
+          });
+          frag.appendChild(mark);
+          last = re.lastIndex;
+        }
+        // Remaining text
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+
+        node.parentNode.replaceChild(frag, node);
+      } else if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        node.nodeName !== 'MARK' &&
+        node.nodeName !== 'SCRIPT' &&
+        node.nodeName !== 'STYLE'
+      ) {
+        // Clone child list since we're mutating the DOM
+        [...node.childNodes].forEach(walkTextNodes);
+      }
+    }
+
+    walkTextNodes(passageEl);
+  }
+
+  // ── clear highlights (restore plain text) ─────────────────────────
+  function clearHighlights(passageEl) {
+    if (!passageEl) return;
+    passageEl.querySelectorAll('mark.wl-highlight').forEach(mark => {
+      mark.replaceWith(document.createTextNode(mark.textContent));
+    });
+    // Normalize adjacent text nodes
+    passageEl.normalize();
+  }
+
+  // ── tap-any-word mode (private) ───────────────────────────────────
+  function getWordAtPoint(e) {
+    let word = '';
+    if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) { range.expand('word'); word = range.toString(); }
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos && pos.offsetNode?.nodeType === Node.TEXT_NODE) {
+        const text = pos.offsetNode.textContent;
+        let s = pos.offset, en = pos.offset;
+        while (s > 0 && /\w/.test(text[s - 1])) s--;
+        while (en < text.length && /\w/.test(text[en])) en++;
+        word = text.slice(s, en);
+      }
+    }
+    return word.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '').trim();
+  }
+
+  // Activates tap-any-word on a passage element. Cleans up automatically
+  // after one tap. doneCallback is called after each successful word open.
+  function activateTapMode(passageEl, context, exploreBtn) {
+    if (!passageEl) return;
+    if (_tapCleanup) { _tapCleanup(); _tapCleanup = null; }
+
+    passageEl.classList.add('wl-tap-active');
+    if (exploreBtn) exploreBtn.classList.add('wl-explore-btn--active');
+
+    function onClick(e) {
+      // Ignore clicks on existing highlights (those open directly)
+      if (e.target.classList.contains('wl-highlight')) return;
+      const word = getWordAtPoint(e);
+      if (!word) return;
+      cleanup();
+      open(word, context);
+    }
+
+    function cleanup() {
+      passageEl.classList.remove('wl-tap-active');
+      if (exploreBtn) exploreBtn.classList.remove('wl-explore-btn--active');
+      passageEl.removeEventListener('click', onClick);
+      _tapCleanup = null;
+    }
+
+    passageEl.addEventListener('click', onClick);
+    _tapCleanup = cleanup;
+    return cleanup;
+  }
+
+  // ── public: open(word, context) ───────────────────────────────────
   function open(word, context) {
     _word    = word.replace(/[^\w\u0370-\u03FF\u0400-\u04FF\u05D0-\u05EA\u0600-\u06FF'\-]/g, '').trim() || word.trim();
     _context = context || {};
@@ -180,11 +307,9 @@ const WordLookup = (() => {
 
     buildPanel();
 
-    // First turn — inject the user prompt silently (not shown as a bubble)
     const firstMsg = `In ${_context.reference || 'this passage'}: "${_context.verseText || ''}" — explain the word "${_word}".`;
     _history.push({ role: 'user', content: firstMsg });
 
-    // Show loading immediately
     const loading = document.getElementById('wl-loading');
     if (loading) loading.hidden = false;
 
@@ -192,8 +317,6 @@ const WordLookup = (() => {
   }
 
   // ── public: openWithSummary(word, context, wordEntry) ─────────────
-  // Opens the sheet using the pre-fetched summary from passage analysis.
-  // No extra network call for the initial display; follow-ups still work.
   function openWithSummary(word, context, wordEntry) {
     _word    = wordEntry.english || word;
     _context = context || {};
@@ -201,7 +324,6 @@ const WordLookup = (() => {
 
     buildPanel();
 
-    // Populate header immediately from word entry data
     populateHeader({
       word:            wordEntry.original || word,
       transliteration: wordEntry.transliteration || '',
@@ -209,27 +331,28 @@ const WordLookup = (() => {
       language:        wordEntry.language || '',
     });
 
-    // Hide loading — we already have the summary
     const loading = document.getElementById('wl-loading');
     if (loading) loading.hidden = true;
 
-    // Show the pre-fetched summary as the first AI bubble
     appendBubble('ai', mdToHtml(wordEntry.summary || ''));
 
-    // Seed history so follow-up questions have context
     const seedMsg = `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${_word}".`;
     _history.push({ role: 'user', content: seedMsg });
     _history.push({ role: 'assistant', content: wordEntry.summary || '' });
   }
 
-  // ── public: openPassage(context, diveBtn) ─────────────────────────
-  // Replaces the Dive Deeper button with loading dots → word chips.
-  // Each chip tap calls openWithSummary() — no second network call.
-  async function openPassage(context, diveBtn) {
+  // ── public: openPassage(context, diveBtn, passageEl) ──────────────
+  // passageEl is optional — the element whose text gets highlighted.
+  // In scripture.js pass #passage-text-body; in devotion.js pass the
+  // scripture block text element.
+  async function openPassage(context, diveBtn, passageEl) {
     if (!diveBtn) return;
 
     const row = diveBtn.closest('.passage-dive-row') || diveBtn.parentElement;
     if (!row) return;
+
+    // Clear any existing highlights before re-analysing
+    if (passageEl) clearHighlights(passageEl);
 
     // Replace button with loading indicator
     row.innerHTML = `
@@ -240,6 +363,11 @@ const WordLookup = (() => {
         <span class="wl-chips-loading__label">Analysing passage…</span>
       </div>`;
 
+    const diveIconSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>`;
+
     try {
       const data = await API.wordLookupPassage(context);
       const words = data.words || [];
@@ -247,20 +375,16 @@ const WordLookup = (() => {
       if (!words.length) {
         row.innerHTML = `<p class="wl-chips-empty">No key words found. <button class="btn btn-ghost btn-sm wl-chips-retry">Retry</button></p>`;
         row.querySelector('.wl-chips-retry')?.addEventListener('click', () => {
-          // Restore button and retry
-          row.innerHTML = `<button class="passage-dive-btn">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-            </svg>
-            Dive Deeper
-          </button>`;
-          openPassage(context, row.querySelector('.passage-dive-btn'));
+          row.innerHTML = `<button class="passage-dive-btn">${diveIconSvg} Dive Deeper</button>`;
+          openPassage(context, row.querySelector('.passage-dive-btn'), passageEl);
         });
         return;
       }
 
-      // Render word chips
+      // ── Highlight the words in the passage text ──────────────────
+      if (passageEl) highlightWordsInPassage(passageEl, words, context);
+
+      // ── Render chips + "Explore any word" button ─────────────────
       row.innerHTML = `
         <div class="wl-word-chips">
           <p class="wl-chips-label">Key words in this passage</p>
@@ -273,8 +397,16 @@ const WordLookup = (() => {
               </button>
             `).join('')}
           </div>
+          <button class="wl-explore-btn" title="Tap any word in the passage to look it up">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Explore any word
+          </button>
         </div>`;
 
+      // Wire chip taps
       row.querySelectorAll('.wl-word-chip').forEach(chip => {
         chip.addEventListener('click', () => {
           const idx = parseInt(chip.getAttribute('data-word-index'), 10);
@@ -282,28 +414,26 @@ const WordLookup = (() => {
           if (w) openWithSummary(w.english || '', context, w);
         });
       });
+
+      // Wire "Explore any word" — toggle tap mode on passage element
+      const exploreBtn = row.querySelector('.wl-explore-btn');
+      if (exploreBtn && passageEl) {
+        exploreBtn.addEventListener('click', () => {
+          if (_tapCleanup) {
+            // Already active — cancel
+            _tapCleanup();
+          } else {
+            activateTapMode(passageEl, context, exploreBtn);
+          }
+        });
+      }
     } catch (err) {
       row.innerHTML = `<p class="wl-chips-empty">Could not analyse passage. <button class="btn btn-ghost btn-sm wl-chips-retry">Retry</button></p>`;
       row.querySelector('.wl-chips-retry')?.addEventListener('click', () => {
-        row.innerHTML = `<button class="passage-dive-btn">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-          </svg>
-          Dive Deeper
-        </button>`;
-        openPassage(context, row.querySelector('.passage-dive-btn'));
+        row.innerHTML = `<button class="passage-dive-btn">${diveIconSvg} Dive Deeper</button>`;
+        openPassage(context, row.querySelector('.passage-dive-btn'), passageEl);
       });
     }
-  }
-
-  // ── helpers ───────────────────────────────────────────────────────
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
   }
 
   return { open, openWithSummary, openPassage };

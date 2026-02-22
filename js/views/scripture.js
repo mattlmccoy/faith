@@ -487,7 +487,7 @@ const ScriptureView = (() => {
         ? verses.map(v => v.text.trim()).join(' ')
         : (data.text || '');
       diveBtn.addEventListener('click', () => {
-        WordLookup.openPassage({ reference, verseText }, diveBtn);
+        WordLookup.openPassage({ reference, verseText }, diveBtn, passageBody);
       });
     }
   }
