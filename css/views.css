@@ -953,9 +953,11 @@
   position: fixed;
   z-index: 910;
   border-radius: var(--radius-md, 12px);
-  /* box-shadow trick: dims everything OUTSIDE the highlighted rect */
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
-  outline: 2px solid rgba(255, 255, 255, 0.30);
+  /* Subtle ring — highlights the target without dimming the whole screen */
+  box-shadow:
+    0 0 0 3px var(--color-primary, #2D5016),
+    0 0 0 6px color-mix(in srgb, var(--color-primary, #2D5016) 25%, transparent),
+    0 4px 20px rgba(0, 0, 0, 0.15);
   pointer-events: none;
   opacity: 0;
   transition:
@@ -970,7 +972,7 @@
 .tour-blocker {
   position: fixed;
   inset: 0;
-  z-index: 915;
+  z-index: 905;
   background: transparent;
 }
 
