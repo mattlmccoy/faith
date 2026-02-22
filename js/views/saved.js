@@ -370,20 +370,37 @@ const SavedView = (() => {
 
   async function askDeleteScope(label = 'entry') {
     const googleConnected = !!Store.get('googleProfile');
-    if (!googleConnected) {
-      const yes = window.confirm(`Delete this ${label} from this device?`);
-      return yes ? 'local' : '';
-    }
-    const choice = window.prompt(
-      `Delete ${label}:\n1) This device only\n2) Device + Google Drive\n\nType 1 or 2`
-    );
-    if (!choice) return '';
-    if (choice.trim() === '2') {
-      const confirmGlobal = window.confirm(`Also remove this ${label} from your synced Google Drive data?`);
-      return confirmGlobal ? 'global' : '';
-    }
-    if (choice.trim() === '1') return 'local';
-    return '';
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'abide-delete-dialog-backdrop';
+      backdrop.innerHTML = `
+        <div class="abide-delete-dialog" role="dialog" aria-modal="true" aria-label="Delete ${escapeAttr(label)}">
+          <div class="abide-delete-dialog__title">Delete ${escapeHtml(label)}?</div>
+          <div class="abide-delete-dialog__body">
+            Choose where to remove this ${escapeHtml(label)}.
+          </div>
+          <div class="abide-delete-dialog__actions">
+            <button class="btn btn-secondary btn-sm" data-delete-action="cancel">Cancel</button>
+            <button class="btn btn-secondary btn-sm" data-delete-action="local">Delete locally</button>
+            ${googleConnected ? `<button class="btn btn-primary btn-sm" data-delete-action="global">Delete locally &amp; from Drive</button>` : ''}
+          </div>
+        </div>
+      `;
+
+      function close(result = '') {
+        backdrop.remove();
+        resolve(result);
+      }
+
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) close('');
+      });
+      backdrop.querySelector('[data-delete-action="cancel"]')?.addEventListener('click', () => close(''));
+      backdrop.querySelector('[data-delete-action="local"]')?.addEventListener('click', () => close('local'));
+      backdrop.querySelector('[data-delete-action="global"]')?.addEventListener('click', () => close('global'));
+
+      document.body.appendChild(backdrop);
+    });
   }
 
   async function applyDeleteScope(scope) {

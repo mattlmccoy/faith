@@ -1081,6 +1081,49 @@
   letter-spacing: 0.02em;
 }
 
+/* ── Delete Scope Dialog ── */
+.abide-delete-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+}
+
+.abide-delete-dialog {
+  width: min(540px, 100%);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+}
+
+.abide-delete-dialog__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+}
+
+.abide-delete-dialog__body {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--space-3);
+}
+
+.abide-delete-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 /* ── Plan Builder – Dictation Row ── */
 .plan-dictation-row {
   display: flex;

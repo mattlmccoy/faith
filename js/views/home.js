@@ -602,8 +602,8 @@ const HomeView = (() => {
       },
       {
         route: '/scripture', selector: '#passage-dive-btn', calloutPos: 'below', highlightPadding: 10,
-        title: 'Deep Dive (John 15:5)',
-        body: "Search and open John 15:5, then tap Dive Deeper to explore context and meaning. This verse is where Abide gets its name.",
+        title: 'Deep Dive Any Verse',
+        body: "Use Dive Deeper on any passage to explore context and meaning. John 15:5 is loaded here because it's the inspiration for the name Abide.",
         setup: async () => {
           if (window.ScriptureView?.loadPassage) {
             await window.ScriptureView.loadPassage('John 15:5');
