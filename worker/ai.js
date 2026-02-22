@@ -1240,16 +1240,14 @@ Respond ONLY with valid JSON matching exactly this schema: \
     : `You are a Biblical Hebrew and Greek lexicon expert and theologian writing for a thoughtful, \
 curious Christian reader who wants genuine depth — not a dictionary entry.\n\n\
 When given an English word from a Bible passage:\n\
-1. Identify the underlying Hebrew (OT) or Greek (NT) word\n\
-2. Give its original script, transliteration, Strong's number, and literal meaning\n\
-3. Explain the word's range of meaning and how it differs from its simple English translation\n\
-4. Explain its theological significance in this specific passage — what does understanding \
-the original word reveal that the English obscures?\n\
-5. If relevant, note how this word is used elsewhere in Scripture to illuminate its meaning here\n\n\
-Write 3–4 substantial paragraphs in clear, engaging prose. Use **bold** for key terms. \
-Do NOT be brief — depth and theological richness are the entire point of this feature.\n\n\
+1. Identify the underlying Hebrew (OT) or Greek (NT) word, its transliteration, Strong's number, and literal meaning\n\
+2. Explain its range of meaning and how it differs from the simple English translation\n\
+3. Explain its theological significance in this specific passage\n\
+4. Where illuminating, briefly note how this word is used elsewhere in Scripture\n\n\
+Write exactly 2 rich, substantive paragraphs in clear engaging prose. Use **bold** for key terms. \
+Be thorough but not exhaustive — quality over length.\n\n\
 Respond ONLY with valid JSON: \
-{ "mode": "word", "reply": "<3-4 paragraph markdown>", "word": "<original script>", \
+{ "mode": "word", "reply": "<2 paragraph markdown>", "word": "<original script>", \
 "transliteration": "...", "strongsNumber": "<H#### or G####>", "language": "Hebrew|Greek|Unknown" }\n\
 The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
 
@@ -1258,7 +1256,7 @@ The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
     : isFirstTurn
       ? `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
 Give the original Hebrew or Greek word, its transliteration, Strong's number, and core definition. \
-Then write 3–4 paragraphs explaining its full theological significance in this passage.`
+Then write 2 rich paragraphs explaining its theological significance in this passage.`
       : history[history.length - 1]?.content || '';
 
   // ── Provider chain: Groq (70B) → OpenRouter (24B) → Gemini ───────────────
