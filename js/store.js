@@ -17,7 +17,7 @@ const Store = (() => {
   const DEFAULT_TRUSTED_PASTORS = [
     { name: 'Tim Keller', enabled: true },
     { name: 'John Mark Comer', enabled: true },
-    { name: 'Jon Pokluda', enabled: true },
+    { name: 'Jonathan "JP" Pokluda', enabled: true },
     { name: 'Louie Giglio', enabled: true },
     { name: 'John Piper', enabled: true },
     { name: 'Ben Stuart', enabled: true },
@@ -127,6 +127,13 @@ const Store = (() => {
   }
 
   function normalizeTrustedPastors(input) {
+    const canonicalPastorName = (name = '') => {
+      const clean = String(name || '').trim();
+      if (!clean) return '';
+      if (clean.toLowerCase() === 'jon pokluda') return 'Jonathan "JP" Pokluda';
+      return clean;
+    };
+
     const source = Array.isArray(input) ? input : DEFAULT_TRUSTED_PASTORS;
     const names = new Set();
     const normalized = [];
@@ -134,7 +141,7 @@ const Store = (() => {
     source.forEach((entry) => {
       const name = typeof entry === 'string' ? entry : entry?.name;
       if (!name) return;
-      const clean = String(name).trim();
+      const clean = canonicalPastorName(name);
       if (!clean) return;
       const key = clean.toLowerCase();
       if (names.has(key)) return;

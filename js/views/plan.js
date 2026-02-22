@@ -237,6 +237,8 @@ const PlanView = (() => {
         let recognition = null;
         let isRecording = false;
         let fullTranscript = '';
+        let interimTranscript = '';
+        let latestComposed = '';
         let stopTimer = null;
 
         const clearStopTimer = () => {
@@ -256,7 +258,7 @@ const PlanView = (() => {
         micBtn.addEventListener('click', () => {
           if (isRecording) {
             try { recognition?.stop(); } catch {}
-            resetMicUi();
+            micBtn.setAttribute('aria-label', 'Stopping recording');
             return;
           }
 
@@ -280,23 +282,28 @@ const PlanView = (() => {
           micBtn.setAttribute('aria-label', 'Stop recording');
 
           recognition.onresult = (e) => {
-            let interim = '';
+            interimTranscript = '';
             let finalChunk = '';
             for (let i = e.resultIndex; i < e.results.length; i++) {
               if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript;
-              else interim += e.results[i][0].transcript;
+              else interimTranscript += e.results[i][0].transcript;
             }
             if (finalChunk) fullTranscript = (fullTranscript ? fullTranscript + ' ' : '') + finalChunk.trim();
-            if (customInput) customInput.value = (fullTranscript + (interim ? ' ' + interim : '')).trim();
+            latestComposed = (fullTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
+            if (customInput) customInput.value = latestComposed;
             // Keep selectedTopic in sync
-            selectedTopic = customInput ? customInput.value.trim() : fullTranscript;
+            selectedTopic = customInput ? customInput.value.trim() : latestComposed;
             root.querySelectorAll('.topic-chip[data-topic]').forEach(c => c.classList.remove('selected'));
           };
 
           recognition.onend = () => {
+            const committed = (latestComposed || fullTranscript || (customInput ? customInput.value : '') || '').trim();
+            fullTranscript = committed;
             resetMicUi();
-            if (customInput) customInput.value = fullTranscript;
-            selectedTopic = (customInput ? customInput.value.trim() : fullTranscript).trim();
+            if (customInput) customInput.value = committed;
+            selectedTopic = (customInput ? customInput.value.trim() : committed).trim();
+            latestComposed = '';
+            interimTranscript = '';
           };
 
           recognition.onerror = (e) => {
