@@ -479,6 +479,15 @@ const ScriptureView = (() => {
       </div>
     `;
 
+    // Staggered verse entrance animation
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.passage-verse').forEach((el, i) => {
+        el.style.opacity = '0';
+        el.style.animationDelay = `${Math.min(i, 9) * 40}ms`;
+        el.classList.add('verse-enter');
+      });
+    });
+
     // Wire "Dive Deeper" — collects plain verse text for context
     const diveBtn = container.querySelector('#passage-dive-btn');
     const passageBody = container.querySelector('#passage-text-body');

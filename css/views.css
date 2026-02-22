@@ -707,6 +707,24 @@
   to { transform: rotate(360deg); }
 }
 
+/* --- Pull-to-Refresh Pill --- */
+.pull-refresh-pill {
+  display: block;
+  width: fit-content;
+  margin: 0 auto var(--space-2);
+  padding: 6px 16px;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+}
+
 /* --- SETTINGS VIEW --- */
 .settings-section {
   margin-bottom: var(--space-6);

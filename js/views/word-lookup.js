@@ -521,6 +521,7 @@ const WordLookup = (() => {
       // Wire chip taps
       row.querySelectorAll('.wl-word-chip').forEach(chip => {
         chip.addEventListener('click', () => {
+          haptic([6]);
           const idx = parseInt(chip.getAttribute('data-word-index'), 10);
           const w   = words[idx];
           if (w) openWithSummary(w.english || '', context, w);

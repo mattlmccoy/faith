@@ -105,6 +105,11 @@
   }
 }
 
+/* --- Verse Entrance (staggered cascade in scripture view) --- */
+.verse-enter {
+  animation: fadeUp 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* --- Scale In (for modals, sheets) --- */
 @keyframes scaleIn {
   from {

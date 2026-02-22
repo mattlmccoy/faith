@@ -37,6 +37,55 @@ const HomeView = (() => {
     // Update streak
     Store.updateStreak();
 
+    // Pull-to-refresh (bind once per navigation)
+    if (!container._pullBound) {
+      container._pullBound = true;
+      let _pullStartY = 0;
+      let _pulling = false;
+      let _refreshPill = null;
+
+      container.addEventListener('touchstart', (e) => {
+        if (container.scrollTop === 0) {
+          _pullStartY = e.touches[0].clientY;
+          _pulling = true;
+        }
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (!_pulling) return;
+        const delta = e.touches[0].clientY - _pullStartY;
+        if (delta > 8 && !_refreshPill) {
+          _refreshPill = document.createElement('div');
+          _refreshPill.className = 'pull-refresh-pill';
+          _refreshPill.textContent = 'Pull to refresh…';
+          container.prepend(_refreshPill);
+        }
+        if (_refreshPill) {
+          _refreshPill.style.opacity = String(Math.min(delta / 70, 1));
+        }
+      }, { passive: true });
+
+      container.addEventListener('touchend', async (e) => {
+        if (!_pulling) return;
+        _pulling = false;
+        const delta = e.changedTouches[0].clientY - _pullStartY;
+        if (delta > 60 && _refreshPill) {
+          _refreshPill.textContent = 'Syncing…';
+          try {
+            const googleProfile = Store.get('googleProfile');
+            if (googleProfile && window.Sync?.pullSavedDevotions) {
+              await Sync.pullSavedDevotions();
+            }
+          } catch (_) {}
+          if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
+          const vc = document.getElementById('view-container');
+          if (vc) HomeView.render(vc);
+          return;
+        }
+        if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
+      }, { passive: true });
+    }
+
     // Auto tutorial only after today's content is actually present.
     const hasTodayContent = !!(devotionData && (devotionData.morning || devotionData.evening));
     if (!Store.get('tutorialSeen') && !_tourActive && hasTodayContent) {
@@ -470,6 +519,7 @@ const HomeView = (() => {
     const isNow = Store.isCompleted(selectedDate, session);
     if (!isNow) {
       Store.markCompleted(selectedDate, session);
+      haptic([12]);
       const btn = document.getElementById('complete-btn');
       if (btn) {
         btn.classList.add('completed');
@@ -533,6 +583,7 @@ const HomeView = (() => {
       }
     }
 
+    haptic([8]);
     const btn = document.getElementById('save-devotion-btn');
     if (btn) {
       btn.className = `btn ${saved ? 'btn-primary' : 'btn-secondary'}`;
@@ -876,7 +927,10 @@ const HomeView = (() => {
         calloutEl.querySelector('.tour-callout__back')?.addEventListener('click', () => {
         if (stepIndex > 0) void goToStep(stepIndex - 1);
         });
-      calloutEl.querySelector('.tour-callout__next').addEventListener('click', () => void goToStep(stepIndex + 1));
+      calloutEl.querySelector('.tour-callout__next').addEventListener('click', () => {
+        if (stepIndex === STEPS.length - 1) haptic([15, 8, 15]); // celebratory on Done
+        void goToStep(stepIndex + 1);
+      });
     }
 
     function dismissTour() {

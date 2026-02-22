@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.22.8';
+  const APP_VERSION = '2026.02.22.9';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v53';
+  window.__ABIDE_SW_VERSION__ = 'abide-v54';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -15,6 +15,11 @@
     }
     return path.endsWith('/') ? path : `${path}/`;
   }
+
+  // --- Haptic feedback (Android vibration; silently ignored on iOS) ---
+  window.haptic = function haptic(pattern = [8]) {
+    try { navigator.vibrate?.(pattern); } catch (_) {}
+  };
 
   // --- Theme init (before render, to prevent flash) ---
   function initTheme() {

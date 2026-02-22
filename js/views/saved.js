@@ -162,7 +162,17 @@ const SavedView = (() => {
           `;
         }).join('')}
       </div>
-      ` : `<div class="text-sm text-secondary">No saved devotionals yet. Save one from Today, then upload to Drive.</div>`}
+      ` : `
+        <div class="empty-state">
+          <div class="empty-state__icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <p class="empty-state__title">No saved devotionals</p>
+          <p class="empty-state__description">Save a devotion from Today to start building your library.</p>
+          <button class="btn btn-primary" onclick="Router.navigate('/')">Go to Today</button>
+        </div>`}
     `;
 
     container.innerHTML = '';

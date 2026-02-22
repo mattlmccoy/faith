@@ -118,7 +118,16 @@ const JournalView = (() => {
             </div>
           </div>
         `;
-        }).join('') : `<div class="text-sm text-secondary">No past journal entries found yet. Use Download to pull your Drive history.</div>`}
+        }).join('') : `
+          <div class="empty-state" style="padding: var(--space-8) var(--space-5);">
+            <div class="empty-state__icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </div>
+            <p class="empty-state__title">No past entries yet</p>
+            <p class="empty-state__description">Your reflections will appear here as you write each day.</p>
+          </div>`}
       </div>
     `;
 
@@ -143,6 +152,7 @@ const JournalView = (() => {
     const textarea = document.getElementById('journal-textarea');
     const text = textarea?.value || '';
     Store.saveJournalEntry(today, prompt, text);
+    haptic([8]);
 
     const btn = document.getElementById('journal-save-btn');
     if (btn) {
