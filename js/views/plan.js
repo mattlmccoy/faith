@@ -30,6 +30,17 @@ const PlanView = (() => {
 
   let selectedTopic = '';
 
+  function inferThemeFromDays(plan) {
+    const days = plan?.days || {};
+    const values = Object.values(days)
+      .map((d) => String(d?.theme || '').trim())
+      .filter(Boolean);
+    if (!values.length) return '';
+    const counts = new Map();
+    values.forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  }
+
   function textWordCount(text = '') {
     return String(text).trim().split(/\s+/).filter(Boolean).length;
   }
@@ -92,9 +103,9 @@ const PlanView = (() => {
 
     const currentPlan = Store.getPlan();
     const defaultWeekStart = DateUtils.weekStart(DateUtils.today());
-    const currentWeekTheme = String(currentPlan?.theme || '').trim() || DEFAULT_WEEK_THEME;
+    const currentWeekTheme = String(currentPlan?.theme || '').trim() || inferThemeFromDays(currentPlan) || DEFAULT_WEEK_THEME;
     const currentWeekStart = currentPlan?.week || defaultWeekStart;
-    const isDefaultWeek = !currentPlan || !String(currentPlan?.theme || '').trim();
+    const isDefaultWeek = !currentPlan || !!currentPlan?.seedDefault;
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
     const hasPreviousPlan = Store.hasPlanHistory();
     const dayKeys = Object.keys(currentPlan?.days || {}).sort((a, b) => a.localeCompare(b));
@@ -454,6 +465,7 @@ const PlanView = (() => {
       week: weekStart,
       theme: displayTopic || topic,
       aiGenerated: true,
+      seedDefault: false,
       aiMeta: aiPlan?.ai_meta || null,
       days,
       createdAt: new Date().toISOString(),
@@ -464,6 +476,7 @@ const PlanView = (() => {
     fetch('content/seed/week-1.json')
       .then(r => r.json())
       .then(data => {
+        data.seedDefault = true;
         Store.savePlan(data);
         Router.navigate('/');
       })
@@ -506,7 +519,7 @@ const PlanView = (() => {
         },
       };
     });
-    return { week: weekStart, theme: topic, days, createdAt: new Date().toISOString() };
+    return { week: weekStart, theme: topic, seedDefault: true, days, createdAt: new Date().toISOString() };
   }
 
   // Keep for backward compatibility

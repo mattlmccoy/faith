@@ -25,12 +25,18 @@ const SavedView = (() => {
   }
 
   function entryTheme(entry = {}) {
-    const theme = String(entry.theme || entry?.devotionData?.theme || '').trim();
+    const theme = String(
+      entry.seriesTheme
+      || entry?.devotionData?.seriesTheme
+      || entry.theme
+      || entry?.devotionData?.theme
+      || ''
+    ).trim();
     return theme || 'Untitled Series';
   }
 
   function entryWeekKey(entry = {}) {
-    return DateUtils.weekStart(entry.dateKey || DateUtils.today());
+    return String(entry.weekKey || DateUtils.weekStart(entry.dateKey || DateUtils.today()));
   }
 
   function seriesIdForEntry(entry = {}) {

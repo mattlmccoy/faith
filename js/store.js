@@ -286,7 +286,11 @@ const Store = (() => {
   // --- Plan ---
   function savePlan(plan) {
     pushCurrentPlanToHistory('save-plan');
-    set('currentWeekPlan', plan);
+    const nextPlan = plan && typeof plan === 'object' ? { ...plan } : plan;
+    if (nextPlan && typeof nextPlan === 'object' && nextPlan.seedDefault !== true) {
+      nextPlan.seedDefault = false;
+    }
+    set('currentWeekPlan', nextPlan);
     const keys = getPlanDayKeys();
     if (!keys.length) return;
     const today = DateUtils.today();
@@ -409,13 +413,15 @@ const Store = (() => {
     const id = `${dateKey}-${session}`;
     const day = getDevotionData(dateKey) || {};
     const sessionData = day?.[session] || null;
+    const plan = getPlan() || {};
+    const seriesTheme = String(plan?.theme || '').trim() || String(day?.theme || '').trim();
     if (!sessionData) return false;
 
     if (!_state.savedDevotions.includes(id)) {
       _state.savedDevotions = [..._state.savedDevotions, id];
     }
     const existingSavedAt = _state.savedDevotionLibrary?.[id]?.savedAt || '';
-    _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt);
+    _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt, seriesTheme);
     if (persist) save();
     return true;
   }
@@ -484,13 +490,18 @@ const Store = (() => {
     return (_state.savedDevotionLibrary || {})[id] || null;
   }
 
-  function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '') {
+  function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '', seriesTheme = '') {
+    const normalizedSeriesTheme = String(seriesTheme || day.theme || '').trim();
+    const dayTheme = String(day.theme || '').trim();
     return {
       id,
       dateKey,
       session,
       savedAt: existingSavedAt || new Date().toISOString(),
-      theme: day.theme || '',
+      weekKey: DateUtils.weekStart(dateKey),
+      seriesTheme: normalizedSeriesTheme,
+      dayTheme,
+      theme: normalizedSeriesTheme || dayTheme || '',
       title: sessionData.title || '',
       openingVerse: sessionData.opening_verse || null,
       body: Array.isArray(sessionData.body) ? sessionData.body : [],
@@ -498,7 +509,9 @@ const Store = (() => {
       prayer: sessionData.prayer || '',
       inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
       devotionData: JSON.parse(JSON.stringify({
-        theme: day.theme || '',
+        theme: normalizedSeriesTheme || dayTheme || '',
+        seriesTheme: normalizedSeriesTheme,
+        dayTheme,
         sources: Array.isArray(day.sources) ? day.sources : [],
         faith_stretch: day.faith_stretch || null,
         morning: day.morning || null,
@@ -581,6 +594,7 @@ const Store = (() => {
       week,
       theme,
       aiGenerated: false,
+      seedDefault: false,
       fromSavedSeries: true,
       createdAt: new Date().toISOString(),
       days,

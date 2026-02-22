@@ -470,12 +470,24 @@ const Sync = (() => {
     const session = entry.session === 'evening' ? 'evening' : 'morning';
     const sessionData = devotionData?.[session] || {};
     const id = String(entry.id || `${entry.dateKey || DateUtils.today()}-${session}`);
+    const weekKey = String(entry.weekKey || DateUtils.weekStart(entry.dateKey || DateUtils.today()));
+    const seriesTheme = String(
+      entry.seriesTheme
+      || devotionData.seriesTheme
+      || entry.theme
+      || devotionData.theme
+      || ''
+    ).trim();
+    const dayTheme = String(entry.dayTheme || devotionData.dayTheme || '').trim();
     return {
       id,
       dateKey: String(entry.dateKey || DateUtils.today()),
       session,
       savedAt: String(entry.savedAt || new Date().toISOString()),
-      theme: String(entry.theme || devotionData.theme || ''),
+      weekKey,
+      seriesTheme,
+      dayTheme,
+      theme: seriesTheme || dayTheme || '',
       title: String(entry.title || sessionData.title || ''),
       openingVerse: sessionData.opening_verse || entry.openingVerse || null,
       body: Array.isArray(sessionData.body) && sessionData.body.length ? sessionData.body : (Array.isArray(entry.body) ? entry.body : []),
@@ -487,7 +499,9 @@ const Sync = (() => {
         ? sessionData.inspired_by
         : (Array.isArray(entry.inspiredBy) ? entry.inspiredBy : []),
       devotionData: {
-        theme: String(devotionData.theme || entry.theme || ''),
+        theme: seriesTheme || dayTheme || '',
+        seriesTheme,
+        dayTheme,
         sources: Array.isArray(devotionData.sources) ? devotionData.sources : [],
         faith_stretch: devotionData.faith_stretch || null,
         morning: devotionData.morning || null,
@@ -516,8 +530,11 @@ const Sync = (() => {
         entries.push(entryToSavedShape({
           id: `${dateKey}-${session}`,
           dateKey,
+          weekKey: DateUtils.weekStart(dateKey),
+          seriesTheme: plan?.theme || day.theme || '',
+          dayTheme: day.theme || '',
           session,
-          theme: day.theme || plan?.theme || '',
+          theme: plan?.theme || day.theme || '',
           title: sessionData.title || '',
           openingVerse: sessionData.opening_verse || null,
           body: Array.isArray(sessionData.body) ? sessionData.body : [],
