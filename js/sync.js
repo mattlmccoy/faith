@@ -13,6 +13,7 @@ const Sync = (() => {
   const DEVOTIONS_FILE_CANDIDATES = [DEVOTIONS_FILE_NAME, 'abide-devotions', LEGACY_FILE_NAME, 'abide-saved-devotions'];
   const JOURNALS_FILE_CANDIDATES = [JOURNALS_FILE_NAME, 'abide-journals'];
   const SETTINGS_FILE_CANDIDATES = [SETTINGS_FILE_NAME, 'abide-settings'];
+  const LEGACY_SNAPSHOT_FILE_CANDIDATES = [LEGACY_FILE_NAME, 'abide-saved-devotions', 'abide-devotions.json', 'abide-devotions'];
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const PROFILE_SCOPE = 'openid email profile';
   const DEFAULT_GOOGLE_CLIENT_ID = '1098652353842-ve34jqhnsqda5v9n1d7455n2kka9k0ek.apps.googleusercontent.com';
@@ -285,6 +286,15 @@ const Sync = (() => {
     }
     if (folderId) Store.update({ googleDriveFolderId: folderId });
     return folderId;
+  }
+
+  async function findLegacyFolderIds() {
+    const found = [];
+    for (const name of LEGACY_FOLDER_NAMES) {
+      const folderId = await findFolderIdByName(name);
+      if (folderId && !found.includes(folderId)) found.push(folderId);
+    }
+    return found;
   }
 
   async function findFileIdByName(folderId, fileName) {
@@ -722,11 +732,31 @@ const Sync = (() => {
       readJsonFileById(knownFiles.settings || ''),
     ]);
 
-    const [devotionsFile, journalsFile, settingsFile] = await Promise.all([
+    let [devotionsFile, journalsFile, settingsFile] = await Promise.all([
       knownDevotions.found ? knownDevotions : readJsonFileByCandidates(folderId, DEVOTIONS_FILE_CANDIDATES),
       knownJournals.found ? knownJournals : readJsonFileByCandidates(folderId, JOURNALS_FILE_CANDIDATES),
       knownSettings.found ? knownSettings : readJsonFileByCandidates(folderId, SETTINGS_FILE_CANDIDATES),
     ]);
+
+    // Backward compatibility: older installs may store data in legacy folder names.
+    if (!devotionsFile.found || !journalsFile.found || !settingsFile.found) {
+      const legacyFolderIds = await findLegacyFolderIds();
+      for (const legacyFolderId of legacyFolderIds) {
+        if (!devotionsFile.found) {
+          const candidate = await readJsonFileByCandidates(legacyFolderId, DEVOTIONS_FILE_CANDIDATES);
+          if (candidate.found) devotionsFile = candidate;
+        }
+        if (!journalsFile.found) {
+          const candidate = await readJsonFileByCandidates(legacyFolderId, JOURNALS_FILE_CANDIDATES);
+          if (candidate.found) journalsFile = candidate;
+        }
+        if (!settingsFile.found) {
+          const candidate = await readJsonFileByCandidates(legacyFolderId, SETTINGS_FILE_CANDIDATES);
+          if (candidate.found) settingsFile = candidate;
+        }
+        if (devotionsFile.found && journalsFile.found && settingsFile.found) break;
+      }
+    }
 
     let imported = false;
     let devResult = { count: 0, importedIds: 0, importedLibrary: 0, importedPlanDays: 0 };
@@ -747,10 +777,31 @@ const Sync = (() => {
     }
 
     // Backward compatibility with old single-file sync.
-    if (!imported) {
-      const legacy = await readJsonFile(folderId, LEGACY_FILE_NAME);
+    // Import it when modern devotions were not found OR when nothing imported.
+    if (!devotionsFile.found || !imported) {
+      let legacy = await readJsonFileByCandidates(folderId, LEGACY_SNAPSHOT_FILE_CANDIDATES);
+      if (!legacy.found) {
+        const legacyFolderIds = await findLegacyFolderIds();
+        for (const legacyFolderId of legacyFolderIds) {
+          legacy = await readJsonFileByCandidates(legacyFolderId, LEGACY_SNAPSHOT_FILE_CANDIDATES);
+          if (legacy.found) break;
+        }
+      }
       if (legacy.found && legacy.data && typeof legacy.data === 'object') {
-        devResult = Store.importSavedDevotionsSnapshot(legacy.data || {});
+        const legacyResult = Store.importSavedDevotionsSnapshot(legacy.data || {}, {
+          replace: !devotionsFile.found,
+        });
+        devResult = {
+          ...devResult,
+          count: Math.max(Number(devResult.count || 0), Number(legacyResult.count || 0)),
+          importedIds: Number(devResult.importedIds || 0) + Number(legacyResult.importedIds || 0),
+          importedLibrary: Number(devResult.importedLibrary || 0) + Number(legacyResult.importedLibrary || 0),
+          importedJournal: Number(devResult.importedJournal || 0) + Number(legacyResult.importedJournal || 0),
+        };
+        journalResult = {
+          ...journalResult,
+          importedJournal: Number(journalResult.importedJournal || 0) + Number(legacyResult.importedJournal || 0),
+        };
         imported = true;
       }
     }
