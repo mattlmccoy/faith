@@ -937,6 +937,16 @@
   font-style: italic;
   letter-spacing: 0.03em;
 }
+.wl-provenance {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.03em;
+  margin-top: 1px;
+}
+.wl-provenance--warn {
+  color: var(--color-error, #C0392B);
+  font-weight: 600;
+}
 .wl-header__right {
   display: flex;
   align-items: center;

@@ -101,6 +101,7 @@ const WordLookup = (() => {
     const orig  = document.getElementById('wl-original');
     const tr    = document.getElementById('wl-translit');
     const badge = document.getElementById('wl-badge');
+    const provenance = document.getElementById('wl-provenance');
     if (orig)  orig.textContent = data.word || _word;
     if (tr)    tr.textContent   = data.transliteration || '';
     if (badge) {
@@ -108,6 +109,23 @@ const WordLookup = (() => {
       const strongs = data.strongsNumber || '';
       badge.textContent = [lang, strongs].filter(Boolean).join(' · ');
       badge.hidden = !badge.textContent;
+    }
+    if (provenance) {
+      const source = String(data.lexicalSource || _context.lexicalSource || '').trim();
+      provenance.className = 'wl-provenance';
+      if (source === 'verse-verified') {
+        provenance.textContent = 'Lexical source: Verse-verified';
+        provenance.hidden = false;
+      } else if (source === 'strongs-verified') {
+        provenance.textContent = 'Lexical source: Strong’s-verified';
+        provenance.hidden = false;
+      } else if (source === 'model-inferred') {
+        provenance.textContent = 'Lexical source: Model-inferred. Verify against a lexicon.';
+        provenance.classList.add('wl-provenance--warn');
+        provenance.hidden = false;
+      } else {
+        provenance.hidden = true;
+      }
     }
   }
 
@@ -125,6 +143,14 @@ const WordLookup = (() => {
     try {
       const data = await API.wordLookup(_word, _context, _history);
       const reply = sanitizeReply(data.reply || '');
+      _context = {
+        ..._context,
+        strongsNumber: data.strongsNumber || _context.strongsNumber || '',
+        originalWord: data.word || _context.originalWord || '',
+        transliteration: data.transliteration || _context.transliteration || '',
+        language: data.language || _context.language || '',
+        lexicalSource: data.lexicalSource || _context.lexicalSource || '',
+      };
       _history.push({ role: 'assistant', content: reply });
       populateHeader(data);
       appendBubble('ai', mdToHtml(reply || 'No content returned.'));
@@ -154,6 +180,7 @@ const WordLookup = (() => {
           <div class="wl-header__left">
             <span class="wl-original" id="wl-original"></span>
             <span class="wl-translit" id="wl-translit"></span>
+            <span class="wl-provenance" id="wl-provenance" hidden></span>
           </div>
           <div class="wl-header__right">
             <span class="wl-badge" id="wl-badge" hidden></span>
@@ -370,6 +397,7 @@ const WordLookup = (() => {
       originalWord: match.original || '',
       transliteration: match.transliteration || '',
       language: match.language || '',
+      lexicalSource: 'verse-verified',
     };
   }
 
@@ -402,6 +430,7 @@ const WordLookup = (() => {
       originalWord: wordEntry.original || '',
       transliteration: wordEntry.transliteration || '',
       language: wordEntry.language || '',
+      lexicalSource: 'verse-verified',
     };
     _history = [];
 

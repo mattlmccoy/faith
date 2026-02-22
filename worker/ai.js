@@ -1733,6 +1733,7 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
           transliteration: parsed.transliteration || verifiedEntry?.translit || '',
           strongsNumber: parsed.strongsNumber || '',
           language: parsed.language || verifiedEntry?.language || 'Unknown',
+          lexicalSource: 'model-inferred',
           provider: response.provider || provider.name,
         };
         if (!verifiedEntry && verseStrongs && Object.keys(verseStrongs).length) {
@@ -1741,6 +1742,8 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
           if (claimed && !allowed.has(claimed)) {
             result.strongsNumber = '';
             result.language = 'Unknown';
+          } else if (claimed && allowed.has(claimed)) {
+            result.lexicalSource = 'verse-verified';
           }
         }
       } else {
@@ -1753,6 +1756,7 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
           transliteration: verifiedEntry ? verifiedEntry.translit : (context.transliteration || ''),
           strongsNumber: context.strongsNumber || '',
           language: verifiedEntry ? verifiedEntry.language : (context.language || 'Unknown'),
+          lexicalSource: context.lexicalSource || (verifiedEntry ? 'strongs-verified' : 'model-inferred'),
           provider: response.provider || provider.name,
         };
         if (!result.reply?.trim()) throw new Error('Empty follow-up reply from ' + provider.name);
@@ -1798,6 +1802,7 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
     result.transliteration = verifiedEntry.translit;
     result.strongsNumber   = verifiedEntry.strongsNumber;
     result.language        = verifiedEntry.language;
+    result.lexicalSource   = 'strongs-verified';
   }
 
   // Cache: passage 24h, first-turn word lookup 30 days
