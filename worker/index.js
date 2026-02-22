@@ -15,7 +15,8 @@
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
-import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleWordLookup } from './ai.js';
+import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleAISummarize, handleWordLookup } from './ai.js';
+import { handleFeedback } from './feedback.js';
 
 // CORS — allow GitHub Pages origin + local dev
 const ALLOWED_ORIGINS = [
@@ -80,6 +81,10 @@ export default {
         return handleAIPhrase(request, url, env, origin, json);
       }
 
+      if (url.pathname === '/ai/summarize') {
+        return handleAISummarize(request, url, env, origin, json);
+      }
+
       // Hebrew/Greek word deep dive
       if (url.pathname === '/word/lookup') {
         return handleWordLookup(request, url, env, origin, json);
@@ -107,6 +112,10 @@ export default {
 
       if (url.pathname.startsWith('/push')) {
         return handlePush(request, url, env, origin, json, ctx);
+      }
+
+      if (url.pathname === '/feedback') {
+        return handleFeedback(request, url, env, origin, json);
       }
 
       return json({ error: 'Not found' }, 404, origin);

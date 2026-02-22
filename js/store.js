@@ -409,19 +409,32 @@ const Store = (() => {
     return !has;
   }
 
-  function saveDevotion(dateKey, session, persist = true) {
-    const id = `${dateKey}-${session}`;
+  function slugify(value = '') {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 60);
+  }
+
+  function saveDevotion(dateKey, session, options = {}) {
+    const opts = (typeof options === 'boolean') ? { persist: options } : (options || {});
+    const persist = opts.persist !== false;
+    const markerId = `${dateKey}-${session}`;
+    const id = opts.uniqueId && opts.seriesId
+      ? `${opts.seriesId}::${markerId}`
+      : markerId;
     const day = getDevotionData(dateKey) || {};
     const sessionData = day?.[session] || null;
     const plan = getPlan() || {};
     const seriesTheme = String(plan?.theme || '').trim() || String(day?.theme || '').trim();
     if (!sessionData) return false;
 
-    if (!_state.savedDevotions.includes(id)) {
-      _state.savedDevotions = [..._state.savedDevotions, id];
+    if (opts.includeSavedMarker !== false && !_state.savedDevotions.includes(markerId)) {
+      _state.savedDevotions = [..._state.savedDevotions, markerId];
     }
     const existingSavedAt = _state.savedDevotionLibrary?.[id]?.savedAt || '';
-    _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt, seriesTheme);
+    _state.savedDevotionLibrary[id] = buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt, seriesTheme, opts.seriesId || '');
     if (persist) save();
     return true;
   }
@@ -433,17 +446,26 @@ const Store = (() => {
 
     let added = 0;
     const total = keys.length * 2;
+    const nowIso = new Date().toISOString();
+    const weekKey = String(plan.week || DateUtils.weekStart(keys[0] || DateUtils.today()));
+    const theme = String(plan.theme || '').trim() || 'Saved Week';
+    const seriesId = `${weekKey}::${slugify(theme)}::${nowIso.replace(/[-:.TZ]/g, '')}`;
 
     keys.forEach((dateKey) => {
       ['morning', 'evening'].forEach((session) => {
-        const id = `${dateKey}-${session}`;
-        const alreadySaved = _state.savedDevotions.includes(id);
-        const ok = saveDevotion(dateKey, session, false);
+        const markerId = `${dateKey}-${session}`;
+        const alreadySaved = _state.savedDevotions.includes(markerId);
+        const ok = saveDevotion(dateKey, session, {
+          persist: false,
+          uniqueId: true,
+          seriesId,
+          includeSavedMarker: true,
+        });
         if (ok && !alreadySaved) added += 1;
       });
     });
     save();
-    return { added, total, saved: (_state.savedDevotions || []).length };
+    return { added, total, saved: (_state.savedDevotions || []).length, seriesId };
   }
 
   function isSavedDevotion(dateKey, session) {
@@ -453,30 +475,54 @@ const Store = (() => {
   function deleteSavedDevotionById(id) {
     const key = String(id || '').trim();
     if (!key) return { removed: 0 };
-    const before = Array.isArray(_state.savedDevotions) ? _state.savedDevotions.length : 0;
+    const marker = key.includes('::') ? key.split('::').pop() : key;
+    let removedLibrary = 0;
     _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((x) => x !== key);
     if (_state.savedDevotionLibrary && Object.prototype.hasOwnProperty.call(_state.savedDevotionLibrary, key)) {
       delete _state.savedDevotionLibrary[key];
+      removedLibrary = 1;
+    }
+    if (marker && marker !== key) {
+      const stillHasMarker = Object.values(_state.savedDevotionLibrary || {}).some((entry) => {
+        if (!entry?.id) return false;
+        const entryMarker = String(entry.id).includes('::') ? String(entry.id).split('::').pop() : String(entry.id);
+        return entryMarker === marker;
+      });
+      if (!stillHasMarker) {
+        _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((x) => x !== marker);
+      }
     }
     save();
-    return { removed: before - _state.savedDevotions.length };
+    return { removed: removedLibrary };
   }
 
   function deleteSavedDevotionsByIds(ids = []) {
     const unique = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id || '').trim()).filter(Boolean))];
     if (!unique.length) return { removed: 0 };
     const set = new Set(unique);
-    const before = Array.isArray(_state.savedDevotions) ? _state.savedDevotions.length : 0;
+    const markers = unique.map((id) => (id.includes('::') ? id.split('::').pop() : id)).filter(Boolean);
+    let removedLibrary = 0;
     _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((id) => !set.has(id));
     if (_state.savedDevotionLibrary && typeof _state.savedDevotionLibrary === 'object') {
       unique.forEach((id) => {
         if (Object.prototype.hasOwnProperty.call(_state.savedDevotionLibrary, id)) {
           delete _state.savedDevotionLibrary[id];
+          removedLibrary += 1;
         }
       });
     }
+    const activeMarkers = new Set(
+      Object.values(_state.savedDevotionLibrary || {}).map((entry) => {
+        const id = String(entry?.id || '');
+        return id.includes('::') ? id.split('::').pop() : id;
+      }).filter(Boolean)
+    );
+    _state.savedDevotions = (Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []).filter((id) => {
+      if (!markers.includes(id)) return true;
+      return activeMarkers.has(id);
+    });
     save();
-    return { removed: before - _state.savedDevotions.length };
+    return { removed: removedLibrary };
   }
 
   function getSavedDevotionLibrary() {
@@ -490,7 +536,7 @@ const Store = (() => {
     return (_state.savedDevotionLibrary || {})[id] || null;
   }
 
-  function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '', seriesTheme = '') {
+  function buildSavedEntry(id, dateKey, session, day, sessionData, existingSavedAt = '', seriesTheme = '', seriesId = '') {
     const normalizedSeriesTheme = String(seriesTheme || day.theme || '').trim();
     const dayTheme = String(day.theme || '').trim();
     return {
@@ -499,6 +545,7 @@ const Store = (() => {
       session,
       savedAt: existingSavedAt || new Date().toISOString(),
       weekKey: DateUtils.weekStart(dateKey),
+      seriesId: String(seriesId || ''),
       seriesTheme: normalizedSeriesTheme,
       dayTheme,
       theme: normalizedSeriesTheme || dayTheme || '',
@@ -510,6 +557,7 @@ const Store = (() => {
       inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
       devotionData: JSON.parse(JSON.stringify({
         theme: normalizedSeriesTheme || dayTheme || '',
+        seriesId: String(seriesId || ''),
         seriesTheme: normalizedSeriesTheme,
         dayTheme,
         sources: Array.isArray(day.sources) ? day.sources : [],

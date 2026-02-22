@@ -220,6 +220,7 @@ const SettingsView = (() => {
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/saved')" type="button">Open Saved Devotionals</button>
               <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/settings-advanced')" type="button">Open Sync & Backup</button>
+              <button class="btn btn-secondary btn-sm" onclick="Router.navigate('/feedback')" type="button">Send Feedback</button>
               <button class="btn btn-secondary btn-sm" id="btn-view-tutorial" type="button">View Tutorial</button>
               <button class="btn btn-secondary btn-sm" id="clear-site-data-btn" type="button">Clear Local Site Data</button>
             </div>

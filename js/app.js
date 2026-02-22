@@ -105,6 +105,11 @@
       Router.setTitle('Debug');
       DebugView.render(container);
     });
+
+    Router.register('/feedback', (container) => {
+      Router.setTitle('Send Feedback');
+      FeedbackView.render(container);
+    });
   }
 
   // --- Auto theme based on time ---

@@ -203,6 +203,19 @@ const API = (() => {
     return data;
   }
 
+  async function summarizeTopic(topic) {
+    const res = await fetch(`${workerUrl()}/ai/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic }),
+    });
+    if (!res.ok) {
+      const detail = await readErrorMessage(res, 'Topic summary error');
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
   async function getAIProviders() {
     const res = await fetch(`${workerUrl()}/ai/providers`);
     if (!res.ok) {
@@ -229,6 +242,19 @@ const API = (() => {
     });
     if (!res.ok) {
       const detail = await readErrorMessage(res, 'AI probe error');
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
+  async function submitFeedback(payload = {}) {
+    const res = await fetch(`${workerUrl()}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const detail = await readErrorMessage(res, 'Feedback submit error');
       throw new Error(detail);
     }
     return res.json();
@@ -344,9 +370,11 @@ const API = (() => {
     BIBLE_BOOKS,
     searchPhrase,
     buildAIPlan,
+    summarizeTopic,
     getAIProviders,
     getAIRouting,
     probeAIProviders,
+    submitFeedback,
     searchDevotional,
     subscribePush,
     sendTestPush,

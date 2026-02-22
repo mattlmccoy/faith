@@ -41,6 +41,36 @@ const WordLookup = (() => {
       .replace(/"/g, '&quot;');
   }
 
+  function sanitizeReply(raw) {
+    const input = String(raw || '').trim();
+    if (!input) return '';
+
+    const tryParse = (text) => {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object' && typeof parsed.reply === 'string') {
+          return parsed.reply.trim();
+        }
+      } catch {}
+      return '';
+    };
+
+    const fenced = input.match(/```json\s*([\s\S]*?)```/i);
+    if (fenced?.[1]) {
+      const fromFence = tryParse(fenced[1].trim());
+      if (fromFence) return fromFence;
+    }
+
+    if (input.startsWith('{') && input.endsWith('}')) {
+      const fromWhole = tryParse(input);
+      if (fromWhole) return fromWhole;
+    }
+
+    const leakPattern = /\s*,?\s*"word"\s*:\s*"[^"]*"\s*,\s*"transliteration"\s*:\s*"[^"]*"\s*,\s*"strongsNumber"\s*:\s*"[^"]*"\s*,\s*"language"\s*:\s*"[^"]*"\s*\}?\s*$/i;
+    const cleaned = input.replace(leakPattern, '').trim();
+    return cleaned || input;
+  }
+
   // ── panel teardown ────────────────────────────────────────────────
   function teardown() {
     document.getElementById('wl-backdrop')?.remove();
@@ -94,11 +124,7 @@ const WordLookup = (() => {
 
     try {
       const data = await API.wordLookup(_word, _context, _history);
-      // Guard: if reply is a raw JSON string (parsing slipped through), extract it
-      let reply = data.reply || '';
-      if (reply.trim().startsWith('{')) {
-        try { const p = JSON.parse(reply); reply = p.reply || reply; } catch {}
-      }
+      const reply = sanitizeReply(data.reply || '');
       _history.push({ role: 'assistant', content: reply });
       populateHeader(data);
       appendBubble('ai', mdToHtml(reply || 'No content returned.'));
@@ -318,7 +344,6 @@ const WordLookup = (() => {
     populateHeader({ word: _word });
 
     const firstMsg = `In ${_context.reference || 'this passage'}: "${_context.verseText || ''}" — explain the word "${_word}".`;
-    _history.push({ role: 'user', content: firstMsg });
 
     const loading = document.getElementById('wl-loading');
     if (loading) loading.hidden = false;
@@ -331,7 +356,13 @@ const WordLookup = (() => {
     _word    = wordEntry.english || word;
     // Forward the verified strongsNumber into context so the worker can
     // look up the real Strong's entry and anchor the Mode B response.
-    _context = { ...(context || {}), strongsNumber: wordEntry.strongsNumber || '' };
+    _context = {
+      ...(context || {}),
+      strongsNumber: wordEntry.strongsNumber || '',
+      originalWord: wordEntry.original || '',
+      transliteration: wordEntry.transliteration || '',
+      language: wordEntry.language || '',
+    };
     _history = [];
 
     buildPanel();
@@ -346,7 +377,7 @@ const WordLookup = (() => {
     const loading = document.getElementById('wl-loading');
     if (loading) loading.hidden = true;
 
-    appendBubble('ai', mdToHtml(wordEntry.summary || ''));
+    appendBubble('ai', mdToHtml(sanitizeReply(wordEntry.summary || '')));
 
     const seedMsg = `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${_word}".`;
     _history.push({ role: 'user', content: seedMsg });

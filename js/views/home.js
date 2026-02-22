@@ -460,9 +460,58 @@ const HomeView = (() => {
     }
   }
 
-  function toggleSave() {
+  async function askSaveScope() {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'abide-delete-dialog-backdrop';
+      backdrop.innerHTML = `
+        <div class="abide-delete-dialog" role="dialog" aria-modal="true" aria-label="Save devotion">
+          <div class="abide-delete-dialog__title">Save Devotion</div>
+          <div class="abide-delete-dialog__body">
+            Choose what to save from this week.
+          </div>
+          <div class="abide-delete-dialog__actions">
+            <button class="btn btn-secondary btn-sm" data-save-action="cancel">Cancel</button>
+            <button class="btn btn-secondary btn-sm" data-save-action="single">Save this devotion</button>
+            <button class="btn btn-primary btn-sm" data-save-action="week">Save full week series</button>
+          </div>
+        </div>
+      `;
+
+      function close(result = '') {
+        backdrop.remove();
+        resolve(result);
+      }
+
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) close('');
+      });
+      backdrop.querySelector('[data-save-action="cancel"]')?.addEventListener('click', () => close(''));
+      backdrop.querySelector('[data-save-action="single"]')?.addEventListener('click', () => close('single'));
+      backdrop.querySelector('[data-save-action="week"]')?.addEventListener('click', () => close('week'));
+
+      document.body.appendChild(backdrop);
+    });
+  }
+
+  async function toggleSave() {
     const selectedDate = Store.getSelectedDevotionDate();
-    const saved = Store.toggleSavedDevotion(selectedDate, currentSession);
+    const isSaved = Store.isSavedDevotion(selectedDate, currentSession);
+    let saved = isSaved;
+
+    if (isSaved) {
+      saved = Store.toggleSavedDevotion(selectedDate, currentSession);
+    } else {
+      const choice = await askSaveScope();
+      if (!choice) return;
+      if (choice === 'week') {
+        Store.saveEntirePlan();
+        saved = true;
+      } else {
+        saved = Store.toggleSavedDevotion(selectedDate, currentSession);
+      }
+    }
+
     const btn = document.getElementById('save-devotion-btn');
     if (btn) {
       btn.className = `btn ${saved ? 'btn-primary' : 'btn-secondary'}`;
@@ -585,7 +634,7 @@ const HomeView = (() => {
       {
         route: '/scripture', selector: '#passage-dive-btn', calloutPos: 'below', highlightPadding: 10,
         title: 'Deep Dive Any Verse',
-        body: "Use Dive Deeper on any passage to explore context and meaning. John 15:5 is loaded here because it's the inspiration for the name Abide.",
+        body: "Use Dive Deeper on any passage to explore context and meaning with original-language insights. John 15:5 is loaded here because it inspired the name Abide.",
         setup: async () => {
           if (window.ScriptureView?.loadPassage) {
             await window.ScriptureView.loadPassage('John 15:5');

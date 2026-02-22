@@ -796,6 +796,88 @@ export async function handleAIProbe(request, url, env, origin, json) {
   return json({ ok: true, results }, 200, origin);
 }
 
+// ---------------------------------------------------------------------------
+// POST /ai/summarize
+// Summarize a long topic/prompt into a 3-5 word series label
+// ---------------------------------------------------------------------------
+export async function handleAISummarize(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  let body = {};
+  try { body = await request.json(); } catch {}
+  const topic = String(body?.topic || '').trim();
+  if (!topic) return json({ error: 'Missing topic' }, 400, origin);
+
+  const words = topic.split(/\s+/).filter(Boolean);
+  if (words.length <= 5 && topic.length <= 42) {
+    return json({ ok: true, label: topic }, 200, origin);
+  }
+
+  const systemPrompt = 'You create short devotional series titles. Respond with valid JSON only.';
+  const userPrompt = `Summarize this devotional request into a reverent 3-5 word title.
+
+Rules:
+- 3 to 5 words only
+- No punctuation other than apostrophes
+- Keep it human and pastoral
+- Return JSON only as: {"label":"..."}
+
+Request:
+${topic}`;
+
+  const providerOrder = buildPlanProviderOrder(env).filter((p) => providerConfigured(env, p));
+  const providers = providerOrder.length ? providerOrder : ['gemini', 'openrouter', 'groq'];
+  let lastErr = null;
+
+  for (const provider of providers) {
+    try {
+      let response = null;
+      if (provider === 'gemini') {
+        response = await runGemini(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.2,
+          maxOutputTokens: 90,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      } else if (provider === 'openrouter') {
+        response = await runOpenRouter(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.2,
+          maxOutputTokens: 90,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      } else if (provider === 'groq') {
+        response = await runGroq(env, {
+          systemPrompt,
+          userPrompt,
+          temperature: 0.2,
+          maxOutputTokens: 90,
+          jsonMode: true,
+          preferredModel: providerPreferredModel(env, provider) || '',
+        });
+      }
+      const parsed = parseJsonBlock(response?.text || '');
+      const label = String(parsed?.label || '').replace(/[^\w\s']/g, '').replace(/\s+/g, ' ').trim();
+      const trimmed = label.split(/\s+/).slice(0, 5).join(' ').trim();
+      if (!trimmed || trimmed.split(/\s+/).length < 3) throw new Error('Invalid summary label');
+      return json({
+        ok: true,
+        label: trimmed,
+        provider: response?.provider || provider,
+        model: response?.model || '',
+      }, 200, origin);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  return json({ error: lastErr?.message || 'Could not summarize topic' }, 500, origin);
+}
+
 function extractFirstJsonObject(input) {
   const text = String(input || '');
   let inString = false;
@@ -870,6 +952,35 @@ function parseJsonBlock(raw) {
   }
 
   throw new Error(`Unable to parse model JSON: ${lastErr?.message || 'unknown parse error'}`);
+}
+
+function sanitizeWordLookupReply(raw) {
+  const input = String(raw || '').trim();
+  if (!input) return '';
+
+  const tryParse = (candidate) => {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object' && typeof parsed.reply === 'string') {
+        return String(parsed.reply).trim();
+      }
+    } catch {}
+    return '';
+  };
+
+  if (input.startsWith('{') && input.endsWith('}')) {
+    const parsedWhole = tryParse(input);
+    if (parsedWhole) return parsedWhole;
+  }
+
+  const fenced = input.match(/```json\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    const parsedFence = tryParse(fenced[1].trim());
+    if (parsedFence) return parsedFence;
+  }
+
+  const leakPattern = /\s*,?\s*"word"\s*:\s*"[^"]*"\s*,\s*"transliteration"\s*:\s*"[^"]*"\s*,\s*"strongsNumber"\s*:\s*"[^"]*"\s*,\s*"language"\s*:\s*"[^"]*"\s*\}?\s*$/i;
+  return input.replace(leakPattern, '').trim();
 }
 
 function normalizeVerseList(data) {
@@ -1490,7 +1601,7 @@ theologically significant words where knowing the original language deepens unde
 ${verseAnchor}\
 CRITICAL RULES: (1) The "english" field MUST be the exact word as it appears in the English Bible text — NOT "key", "concept", or "theme". \
 (2) If a VERIFIED WORDS list is provided above, you MUST use ONLY those Strong's numbers — do not invent any others. \
-(3) For each word provide original Hebrew/Greek script, transliteration, its Strong's number, and a 2–3 sentence theological explanation. \
+(3) For each word provide original Hebrew/Greek script, transliteration, its Strong's number, and a rich explanation (about 90-150 words) that includes lexical meaning, passage context, and theological implications. \
 Respond ONLY with valid JSON matching exactly this schema: \
 { "mode": "passage", "words": [ { "english": "<exact word from the verse>", "original": "<Hebrew or Greek script>", \
 "transliteration": "...", "strongsNumber": "<G#### or H####>", "language": "Hebrew|Greek", \
@@ -1612,7 +1723,7 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
         const hasOriginalScript = /[\u0370-\u03FF\u05D0-\u05EA\u0590-\u05CF\u1F00-\u1FFF]/.test(parsed.word || '');
         result = {
           mode: 'word',
-          reply: parsed.reply || response.text,
+          reply: sanitizeWordLookupReply(parsed.reply || response.text),
           word: hasOriginalScript ? parsed.word : (verifiedEntry?.lemma || parsed.word || word),
           transliteration: parsed.transliteration || verifiedEntry?.translit || '',
           strongsNumber: parsed.strongsNumber || '',
@@ -1623,7 +1734,7 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
         // Follow-up turn: plain markdown reply, preserve lexical data from context
         result = {
           mode: 'word',
-          reply: response.text,
+          reply: sanitizeWordLookupReply(response.text),
           // Carry forward the verified lexical data from the original context
           word: verifiedEntry ? verifiedEntry.lemma : (context.originalWord || word),
           transliteration: verifiedEntry ? verifiedEntry.translit : (context.transliteration || ''),

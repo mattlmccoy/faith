@@ -54,7 +54,7 @@ const PlanView = (() => {
       .replace(/'/g, '&#39;');
   }
 
-  function summarizeTopic(raw) {
+  function summarizeTopicLocal(raw) {
     if (!raw || raw.length <= 40) return raw;
     // Extract the first sentence fragment or first 6 words — whichever is shorter
     const firstSentence = raw.split(/[.!?]/)[0].trim();
@@ -237,20 +237,45 @@ const PlanView = (() => {
         let recognition = null;
         let isRecording = false;
         let fullTranscript = '';
+        let stopTimer = null;
+
+        const clearStopTimer = () => {
+          if (stopTimer) {
+            clearTimeout(stopTimer);
+            stopTimer = null;
+          }
+        };
+
+        const resetMicUi = () => {
+          isRecording = false;
+          clearStopTimer();
+          micBtn.classList.remove('recording');
+          micBtn.setAttribute('aria-label', 'Start voice dictation');
+        };
 
         micBtn.addEventListener('click', () => {
           if (isRecording) {
-            recognition?.stop();
+            try { recognition?.stop(); } catch {}
+            resetMicUi();
             return;
           }
 
-          recognition = new SR();
-          recognition.continuous = true;
+          try {
+            recognition = new SR();
+          } catch (err) {
+            console.warn('Could not initialize speech recognition:', err);
+            alert('Voice dictation is not available on this browser.');
+            return;
+          }
+
+          // Safari is more stable with single-shot recognition than continuous mode.
+          recognition.continuous = false;
           recognition.interimResults = true;
           recognition.lang = 'en-US';
+          recognition.maxAlternatives = 1;
 
           isRecording = true;
-          fullTranscript = customInput ? customInput.value.trim() : '';
+          fullTranscript = customInput ? customInput.value.trim() : (selectedTopic || '');
           micBtn.classList.add('recording');
           micBtn.setAttribute('aria-label', 'Stop recording');
 
@@ -269,21 +294,31 @@ const PlanView = (() => {
           };
 
           recognition.onend = () => {
-            isRecording = false;
-            micBtn.classList.remove('recording');
-            micBtn.setAttribute('aria-label', 'Start voice dictation');
+            resetMicUi();
             if (customInput) customInput.value = fullTranscript;
-            selectedTopic = fullTranscript;
+            selectedTopic = (customInput ? customInput.value.trim() : fullTranscript).trim();
           };
 
           recognition.onerror = (e) => {
             console.warn('Speech recognition error:', e.error);
-            isRecording = false;
-            micBtn.classList.remove('recording');
-            micBtn.setAttribute('aria-label', 'Start voice dictation');
+            resetMicUi();
+            if (e.error && !['no-speech', 'aborted'].includes(e.error)) {
+              alert('Voice dictation could not start. Please type your topic or try again.');
+            }
           };
 
-          recognition.start();
+          try {
+            recognition.start();
+            // Failsafe: if the recognizer stalls and never resolves, recover UI.
+            stopTimer = setTimeout(() => {
+              try { recognition?.stop(); } catch {}
+              resetMicUi();
+            }, 15000);
+          } catch (err) {
+            console.warn('Speech recognition start failed:', err);
+            resetMicUi();
+            alert('Voice dictation could not start. Please type your topic.');
+          }
         });
       }
     }
@@ -300,7 +335,16 @@ const PlanView = (() => {
     }
 
     const topic = rawTopic;               // full text sent to AI
-    const displayTopic = summarizeTopic(rawTopic); // short title for plan theme
+    let displayTopic = summarizeTopicLocal(rawTopic); // short title for plan theme
+    if (rawTopic.split(/\s+/).filter(Boolean).length > 5) {
+      try {
+        const summary = await API.summarizeTopic(rawTopic);
+        const label = String(summary?.label || '').trim();
+        if (label) displayTopic = label;
+      } catch (err) {
+        console.warn('AI topic summary failed, using local summary:', err.message || err);
+      }
+    }
     selectedTopic = rawTopic;
 
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);

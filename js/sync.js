@@ -485,6 +485,7 @@ const Sync = (() => {
       session,
       savedAt: String(entry.savedAt || new Date().toISOString()),
       weekKey,
+      seriesId: String(entry.seriesId || devotionData.seriesId || ''),
       seriesTheme,
       dayTheme,
       theme: seriesTheme || dayTheme || '',
@@ -500,6 +501,7 @@ const Sync = (() => {
         : (Array.isArray(entry.inspiredBy) ? entry.inspiredBy : []),
       devotionData: {
         theme: seriesTheme || dayTheme || '',
+        seriesId: String(entry.seriesId || devotionData.seriesId || ''),
         seriesTheme,
         dayTheme,
         sources: Array.isArray(devotionData.sources) ? devotionData.sources : [],
