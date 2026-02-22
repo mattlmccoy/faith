@@ -876,6 +876,199 @@
   letter-spacing: 0.04em;
 }
 
+/* ── Ask-Anything Bible Chat ── */
+
+/* Floating action button */
+.ask-fab {
+  position: fixed;
+  bottom: calc(var(--tab-bar-height, 64px) + env(safe-area-inset-bottom, 0px) + 16px);
+  right: 20px;
+  z-index: 800;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ask-fab:active { transform: scale(0.93); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+
+/* Backdrop */
+.ask-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  background: rgba(0, 0, 0, 0.48);
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.ask-backdrop--visible { opacity: 1; }
+
+/* Sheet */
+.ask-sheet {
+  width: 100%;
+  max-height: 80vh;
+  background: var(--glass-fill, rgba(255, 255, 255, 0.97));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+  border: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(40px);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.ask-backdrop--visible .ask-sheet { transform: translateY(0); }
+
+/* Handle */
+.ask-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--divider);
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+
+/* Header */
+.ask-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+.ask-header__title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.ask-close {
+  background: var(--divider);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Conversation */
+.ask-conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  -webkit-overflow-scrolling: touch;
+}
+.ask-hint {
+  padding: var(--space-3);
+  background: var(--color-surface-sunken, rgba(0,0,0,0.04));
+  border-radius: var(--radius-md);
+}
+.ask-hint p {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+}
+.ask-msg { display: flex; flex-direction: column; }
+.ask-msg--assistant .ask-bubble {
+  background: var(--color-surface-sunken, rgba(0,0,0,0.04));
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-primary);
+}
+.ask-msg--assistant .ask-bubble p { margin: 0 0 var(--space-2); }
+.ask-msg--assistant .ask-bubble p:last-child { margin-bottom: 0; }
+.ask-msg--user { align-items: flex-end; }
+.ask-msg--user .ask-bubble {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  max-width: 82%;
+}
+
+/* Loading dots */
+.ask-loading {
+  display: flex;
+  gap: 6px;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  align-items: center;
+  flex-shrink: 0;
+}
+.ask-loading[hidden] { display: none; }
+.ask-loading__dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0.3;
+  animation: wl-pulse 1.2s ease-in-out infinite;
+}
+.ask-loading__dot:nth-child(2) { animation-delay: 0.2s; }
+.ask-loading__dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* Input row */
+.ask-input-row {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--divider);
+  flex-shrink: 0;
+  transition: opacity 200ms ease;
+}
+.ask-input {
+  flex: 1;
+  border-radius: 99px;
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--color-surface-sunken, rgba(0,0,0,0.04));
+  color: var(--color-text-primary);
+  outline: none;
+}
+.ask-input:focus { border-color: var(--color-primary); }
+.ask-send {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ask-send:disabled { opacity: 0.45; cursor: default; }
+
 /* ── Word Lookup / Hebrew-Greek Deep Dive ── */
 .wl-backdrop {
   position: fixed;

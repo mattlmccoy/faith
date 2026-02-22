@@ -1813,3 +1813,87 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
 
   return json(result, 200, origin);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ask-Anything Bible Chat
+// POST /ai/ask  { question, history: [{role,content}] }
+// Returns: { reply: "<markdown>" }
+// ─────────────────────────────────────────────────────────────────────────────
+export async function handleAIAsk(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  let body = {};
+  try { body = await request.json(); } catch {}
+
+  const question = (body.question || '').trim();
+  if (!question) return json({ error: 'question is required' }, 400, origin);
+
+  const history = Array.isArray(body.history) ? body.history : [];
+
+  const systemPrompt = `You are a knowledgeable, warm, evangelical Protestant Bible teacher. \
+A Christian is asking you a sincere question about Scripture or theology. \
+
+Rules:
+1. Ground every answer in Scripture — cite at least 2 specific Bible verses (book, chapter:verse).
+2. Write in clear, accessible prose — not bullet points unless listing multiple passages.
+3. Stay within historic evangelical Protestant orthodoxy. Do not speculate beyond Scripture.
+4. Keep answers focused and substantive — around 150–250 words.
+5. Do not engage with political topics, denominational disputes, or extra-biblical claims.
+6. If the question is outside the Bible's scope, gently redirect to what Scripture does say.
+7. Format citations as (John 3:16) inline. Use **bold** for key terms sparingly.`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history.map(h => ({ role: h.role === 'user' ? 'user' : 'assistant', content: h.content })),
+    { role: 'user', content: question },
+  ];
+
+  const providerOrder = [
+    {
+      name: 'groq',
+      run: () => runGroq(env, {
+        systemPrompt,
+        userPrompt: question,
+        messages,
+        temperature: 0.4,
+        maxOutputTokens: 1200,
+        jsonMode: false,
+        preferredModel: 'llama-3.3-70b-versatile',
+      }),
+    },
+    {
+      name: 'openrouter',
+      run: () => runOpenRouter(env, {
+        systemPrompt,
+        userPrompt: question,
+        messages,
+        temperature: 0.4,
+        maxOutputTokens: 1200,
+        jsonMode: false,
+      }),
+    },
+    {
+      name: 'gemini',
+      run: () => runGemini(env, {
+        systemPrompt,
+        userPrompt: question,
+        temperature: 0.4,
+        maxOutputTokens: 1200,
+        jsonMode: false,
+      }),
+    },
+  ];
+
+  let lastErr;
+  for (const provider of providerOrder) {
+    try {
+      const { text, model, provider: pName } = await provider.run();
+      return json({ reply: text.trim(), provider: pName, model }, 200, origin);
+    } catch (err) {
+      console.error(`[ask] ${provider.name} failed:`, err.message);
+      lastErr = err;
+    }
+  }
+
+  return json({ error: `All AI providers failed: ${lastErr?.message}` }, 503, origin);
+}

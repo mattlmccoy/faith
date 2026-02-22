@@ -155,6 +155,21 @@ const SettingsView = (() => {
               ESV is copyrighted. Display is for personal devotional use with attribution.
             </div>
           </div>
+          <div class="settings-row" id="settings-devotion-length-row">
+            <div class="settings-row__icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div class="settings-row__content">
+              <div class="settings-row__label">Devotion Length</div>
+            </div>
+            <div class="settings-row__action">
+              <select id="devotion-length-select" class="input" style="width:auto;padding:6px 12px;">
+                <option value="short" ${(state.devotionLength || 'standard') === 'short' ? 'selected' : ''}>Brief</option>
+                <option value="standard" ${(state.devotionLength || 'standard') === 'standard' ? 'selected' : ''}>Standard</option>
+                <option value="long" ${(state.devotionLength || 'standard') === 'long' ? 'selected' : ''}>Deep Study</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -306,6 +321,8 @@ const SettingsView = (() => {
         return;
       }
 
+      const devotionLength = root.querySelector('#devotion-length-select')?.value || 'standard';
+
       Store.update({
         userName: name,
         theme,
@@ -317,6 +334,7 @@ const SettingsView = (() => {
         notificationsEnabled: notifEnabled,
         sundayReminderEnabled,
         palette: selectedPalette,
+        devotionLength,
       });
       Store.setTrustedPastors(trustedPastors);
       applyTheme(theme);

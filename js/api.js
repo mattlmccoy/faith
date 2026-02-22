@@ -186,10 +186,19 @@ const API = (() => {
   // --- AI Plan Builder (via Worker) ---
 
   async function buildAIPlan(topic, pastors = [], options = {}) {
+    // Map user's devotionLength preference to per-session word-count overrides
+    const lengthMap = {
+      short:    { minMorningWords: 180, minEveningWords: 130, minMorningParagraphs: 2, minEveningParagraphs: 2 },
+      standard: {},  // worker defaults (260 morning / 190 evening)
+      long:     { minMorningWords: 480, minEveningWords: 350, minMorningParagraphs: 5, minEveningParagraphs: 4 },
+    };
+    const devotionLength = Store.get('devotionLength') || 'standard';
+    const lengthOverrides = lengthMap[devotionLength] || {};
+
     const res = await fetch(`${workerUrl()}/ai/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, pastors, ...options }),
+      body: JSON.stringify({ topic, pastors, ...lengthOverrides, ...options }),
     });
     Store.trackUsage('aiPlanRequests', 1);
     if (!res.ok) {
@@ -211,6 +220,19 @@ const API = (() => {
     });
     if (!res.ok) {
       const detail = await readErrorMessage(res, 'Topic summary error');
+      throw new Error(detail);
+    }
+    return res.json();
+  }
+
+  async function askBibleQuestion(question, history = []) {
+    const res = await fetch(`${workerUrl()}/ai/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, history }),
+    });
+    if (!res.ok) {
+      const detail = await readErrorMessage(res, 'Ask error');
       throw new Error(detail);
     }
     return res.json();
@@ -384,6 +406,7 @@ const API = (() => {
     translationLabel,
     wordLookup,
     wordLookupPassage,
+    askBibleQuestion,
   };
 })();
 

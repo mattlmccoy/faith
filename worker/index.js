@@ -15,7 +15,7 @@
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
-import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleAISummarize, handleWordLookup } from './ai.js';
+import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleAISummarize, handleWordLookup, handleAIAsk } from './ai.js';
 import { handleFeedback } from './feedback.js';
 
 // CORS — allow GitHub Pages origin + local dev
@@ -88,6 +88,11 @@ export default {
       // Hebrew/Greek word deep dive
       if (url.pathname === '/word/lookup') {
         return handleWordLookup(request, url, env, origin, json);
+      }
+
+      // Ask-anything Bible chat
+      if (url.pathname === '/ai/ask') {
+        return handleAIAsk(request, url, env, origin, json);
       }
 
       // AI model diagnostics

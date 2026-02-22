@@ -74,6 +74,7 @@ const Store = (() => {
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
     planBuildStartMode: '',   // '' | 'today' | 'tomorrow'
+    devotionLength: 'standard', // 'short' | 'standard' | 'long'
     _defaultsVersion: 3,
   };
 
