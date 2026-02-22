@@ -10,10 +10,13 @@ const AskChat = (() => {
   // ── FAB (floating action button) ────────────────────────────────────────
 
   function mountFAB(container) {
-    // Remove any existing FAB first (e.g. on re-render)
-    container.querySelector('.ask-fab')?.remove();
+    // Always append the FAB to document.body so position:fixed works correctly
+    // even inside scroll containers (which create new stacking contexts on iOS).
+    // Remove any stale FAB first.
+    document.getElementById('ask-fab-btn')?.remove();
 
     const fab = document.createElement('button');
+    fab.id = 'ask-fab-btn';
     fab.className = 'ask-fab';
     fab.setAttribute('aria-label', 'Ask a Bible question');
     fab.title = 'Ask a Bible question';
@@ -23,7 +26,18 @@ const AskChat = (() => {
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>`;
     fab.addEventListener('click', openSheet);
-    container.appendChild(fab);
+    document.body.appendChild(fab);
+
+    // Remove the FAB when the user navigates away from the Scripture tab
+    const observer = new MutationObserver(() => {
+      if (!document.contains(container) || container.closest('.view-exit')) {
+        fab.remove();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.getElementById('view-container') || document.body, {
+      childList: true, subtree: false,
+    });
   }
 
   // ── Sheet ────────────────────────────────────────────────────────────────
