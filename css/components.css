@@ -1378,6 +1378,153 @@
 }
 .passage-dive-btn:hover { opacity: 1; }
 .passage-dive-btn svg { flex-shrink: 0; }
+.passage-dive-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ── Collapsible passage sections (cross-refs, context) ── */
+.passage-section-card {
+  margin-top: var(--space-3);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.passage-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+.passage-section-toggle .toggle-chevron {
+  margin-left: auto;
+  transition: transform 240ms ease;
+  color: var(--color-text-muted);
+}
+.passage-section-toggle--open .toggle-chevron { transform: rotate(180deg); }
+.passage-section-toggle:hover { color: var(--color-text-primary); }
+.passage-section-body {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--divider);
+}
+.passage-section-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Cross-reference list */
+.xref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--space-2);
+}
+.xref-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms ease;
+}
+.xref-item:hover, .xref-item:active { background: var(--color-accent-warm); }
+.xref-item__ref {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.xref-item__why {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* Historical context card */
+.context-card-inner { padding-top: var(--space-2); }
+.context-meta {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 var(--space-2);
+}
+.context-text {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ── Parallel Translation panel ── */
+.passage-parallel-panel {
+  margin-top: var(--space-3);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.passage-parallel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--divider);
+}
+.passage-parallel-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.passage-parallel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.passage-parallel-col {
+  padding: var(--space-3) var(--space-3);
+}
+.passage-parallel-col + .passage-parallel-col {
+  border-left: 1px solid var(--divider);
+}
+.passage-parallel-col__label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+.passage-parallel-text {
+  font-size: var(--text-sm);
+  line-height: 1.8;
+}
+.passage-parallel-loading {
+  padding: var(--space-4) 0;
+  display: flex;
+  justify-content: center;
+}
 
 /* ── Word highlights — AI-selected words underlined in passage text ── */
 mark.wl-highlight {

@@ -878,6 +878,142 @@ ${topic}`;
   return json({ error: lastErr?.message || 'Could not summarize topic' }, 500, origin);
 }
 
+// ---------------------------------------------------------------------------
+// POST /ai/context  { reference: string }
+// Returns short historical/cultural context for a Bible passage, cached 90 days
+// ---------------------------------------------------------------------------
+export async function handleAIContext(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  let body = {};
+  try { body = await request.json(); } catch {}
+  const reference = String(body?.reference || '').trim();
+  if (!reference) return json({ error: 'Missing reference' }, 400, origin);
+
+  // Cache key — stable per reference, 90-day TTL
+  const cacheKey = `ai:context:v1:${reference.toLowerCase().replace(/\s+/g, '-')}`;
+  const TTL = 90 * 24 * 60 * 60; // 90 days in seconds
+
+  if (env.ABIDE_KV) {
+    const cached = await env.ABIDE_KV.get(cacheKey, 'json');
+    if (cached) return json({ ...cached, cached: true }, 200, origin);
+  }
+
+  const systemPrompt = `You are a Bible scholar. Write a short, pastoral historical and cultural context note for a scripture passage. Be concise, factual, and faith-enriching. Evangelical Protestant perspective. No politics. Return valid JSON only.`;
+
+  const userPrompt = `Passage: ${reference}
+
+Write a short historical context note (3–4 sentences max, ~60–80 words) covering:
+1. When and where this was written / who wrote it
+2. The key cultural or historical situation the original audience faced
+3. One sentence on why this context deepens our understanding today
+
+Return JSON as: {"context":"...","period":"...","author":"..."}
+- context: the 3–4 sentence note
+- period: e.g. "circa 60 AD", "circa 950 BC"
+- author: e.g. "Paul", "David", "Isaiah"`;
+
+  const providerOrder = buildPlanProviderOrder(env).filter(p => providerConfigured(env, p));
+  const providers = providerOrder.length ? providerOrder : ['gemini', 'openrouter', 'groq'];
+  let lastErr = null;
+
+  for (const provider of providers) {
+    try {
+      let response;
+      if (provider === 'gemini') {
+        response = await runGemini(env, { systemPrompt, userPrompt, temperature: 0.4, maxOutputTokens: 300, jsonMode: true });
+      } else if (provider === 'openrouter') {
+        response = await runOpenRouter(env, { systemPrompt, userPrompt, temperature: 0.4, maxOutputTokens: 300, jsonMode: true });
+      } else if (provider === 'groq') {
+        response = await runGroq(env, { systemPrompt, userPrompt, temperature: 0.4, maxOutputTokens: 300, jsonMode: true });
+      }
+      const parsed = parseJsonBlock(response?.text || '');
+      if (!parsed?.context) throw new Error('Missing context field in response');
+      const result = {
+        reference,
+        context: String(parsed.context || '').trim(),
+        period: String(parsed.period || '').trim(),
+        author: String(parsed.author || '').trim(),
+        provider: response?.provider || provider,
+        model: response?.model || '',
+      };
+      if (env.ABIDE_KV) {
+        await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: TTL });
+      }
+      return json(result, 200, origin);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  return json({ error: lastErr?.message || 'Could not generate context' }, 500, origin);
+}
+
+// ---------------------------------------------------------------------------
+// POST /ai/crossrefs  { reference: string }
+// Returns 3-5 thematically related cross-references, cached 90 days
+// ---------------------------------------------------------------------------
+export async function handleAICrossRefs(request, url, env, origin, json) {
+  if (request.method !== 'POST') return json({ error: 'POST required' }, 405, origin);
+
+  let body = {};
+  try { body = await request.json(); } catch {}
+  const reference = String(body?.reference || '').trim();
+  if (!reference) return json({ error: 'Missing reference' }, 400, origin);
+
+  const cacheKey = `ai:crossrefs:v1:${reference.toLowerCase().replace(/\s+/g, '-')}`;
+  const TTL = 90 * 24 * 60 * 60;
+
+  if (env.ABIDE_KV) {
+    const cached = await env.ABIDE_KV.get(cacheKey, 'json');
+    if (cached) return json({ ...cached, cached: true }, 200, origin);
+  }
+
+  const systemPrompt = `You are a Bible scholar. Suggest cross-reference passages that deepen understanding of a given scripture. Return valid JSON only.`;
+
+  const userPrompt = `Passage: ${reference}
+
+Suggest 4–5 related Bible passages (cross-references) that illuminate this passage through shared theme, fulfillment, contrast, or context.
+
+Rules:
+- Use standard Bible notation (e.g. "Romans 8:28", "Psalm 23:1")
+- Vary the books — don't cluster in the same book
+- For each, give a 6–10 word reason why it connects
+- Return JSON as: {"refs":[{"ref":"...","why":"..."},...]}`;
+
+  const providerOrder = buildPlanProviderOrder(env).filter(p => providerConfigured(env, p));
+  const providers = providerOrder.length ? providerOrder : ['gemini', 'openrouter', 'groq'];
+  let lastErr = null;
+
+  for (const provider of providers) {
+    try {
+      let response;
+      if (provider === 'gemini') {
+        response = await runGemini(env, { systemPrompt, userPrompt, temperature: 0.3, maxOutputTokens: 400, jsonMode: true });
+      } else if (provider === 'openrouter') {
+        response = await runOpenRouter(env, { systemPrompt, userPrompt, temperature: 0.3, maxOutputTokens: 400, jsonMode: true });
+      } else if (provider === 'groq') {
+        response = await runGroq(env, { systemPrompt, userPrompt, temperature: 0.3, maxOutputTokens: 400, jsonMode: true });
+      }
+      const parsed = parseJsonBlock(response?.text || '');
+      const refs = (Array.isArray(parsed?.refs) ? parsed.refs : [])
+        .filter(r => r?.ref && r?.why)
+        .map(r => ({ ref: String(r.ref).trim(), why: String(r.why).trim() }))
+        .slice(0, 5);
+      if (!refs.length) throw new Error('No refs returned');
+      const result = { reference, refs, provider: response?.provider || provider, model: response?.model || '' };
+      if (env.ABIDE_KV) {
+        await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: TTL });
+      }
+      return json(result, 200, origin);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  return json({ error: lastErr?.message || 'Could not generate cross-references' }, 500, origin);
+}
+
 function extractFirstJsonObject(input) {
   const text = String(input || '');
   let inString = false;

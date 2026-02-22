@@ -385,6 +385,60 @@ const API = (() => {
     return data;
   }
 
+  // --- Fetch a passage in a specific translation (for parallel view) ---
+  async function getPassage_translation(ref, translationId) {
+    const cacheKey = `bible:${ref}:${translationId}`;
+    const cached = Cache.get(cacheKey);
+    if (cached) return cached;
+    let data;
+    if (WORKER_TRANSLATIONS.includes(translationId)) {
+      const url = `${workerUrl()}/bible?ref=${encodeURIComponent(ref)}&translation=${translationId}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Bible API error: ${res.status}`);
+      data = await res.json();
+    } else {
+      const url = `${BIBLE_BASE}/${encodeURIComponent(ref)}?translation=${translationId}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Bible API error: ${res.status}`);
+      data = await res.json();
+    }
+    Cache.set(cacheKey, data, 7 * 24 * 60 * 60 * 1000);
+    return data;
+  }
+
+  // --- Historical / cultural context for a passage ---
+  async function getPassageContext(reference) {
+    const cacheKey = `context:v1:${reference.toLowerCase().replace(/\s+/g, '')}`;
+    const cached = Cache.get(cacheKey);
+    if (cached) return cached;
+    const res = await fetch(`${workerUrl()}/ai/context`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reference }),
+    });
+    if (!res.ok) throw new Error(`Context error: ${res.status}`);
+    const data = await res.json();
+    // Cache 90 days client-side too
+    Cache.set(cacheKey, data, 90 * 24 * 60 * 60 * 1000);
+    return data;
+  }
+
+  // --- AI cross-references for a passage ---
+  async function getPassageCrossRefs(reference) {
+    const cacheKey = `crossrefs:v1:${reference.toLowerCase().replace(/\s+/g, '')}`;
+    const cached = Cache.get(cacheKey);
+    if (cached) return cached;
+    const res = await fetch(`${workerUrl()}/ai/crossrefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reference }),
+    });
+    if (!res.ok) throw new Error(`Cross-ref error: ${res.status}`);
+    const data = await res.json();
+    Cache.set(cacheKey, data, 90 * 24 * 60 * 60 * 1000);
+    return data;
+  }
+
   return {
     getPassage,
     getVerses,
@@ -407,6 +461,9 @@ const API = (() => {
     wordLookup,
     wordLookupPassage,
     askBibleQuestion,
+    getPassageContext,
+    getPassageCrossRefs,
+    getPassage_translation,
   };
 })();
 

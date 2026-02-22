@@ -15,7 +15,7 @@
 import { handleBible } from './bible.js';
 import { handleSearch } from './search.js';
 import { handlePush } from './push.js';
-import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleAISummarize, handleWordLookup, handleAIAsk } from './ai.js';
+import { handleAIPlan, handleAIPhrase, handleAIModels, handleAIProviders, handleAIRouting, handleAIProbe, handleAISummarize, handleWordLookup, handleAIAsk, handleAIContext, handleAICrossRefs } from './ai.js';
 import { handleFeedback } from './feedback.js';
 
 // CORS — allow GitHub Pages origin + local dev
@@ -93,6 +93,16 @@ export default {
       // Ask-anything Bible chat
       if (url.pathname === '/ai/ask') {
         return handleAIAsk(request, url, env, origin, json);
+      }
+
+      // Historical/cultural context for a passage
+      if (url.pathname === '/ai/context') {
+        return handleAIContext(request, url, env, origin, json);
+      }
+
+      // AI-curated cross-references for a passage
+      if (url.pathname === '/ai/crossrefs') {
+        return handleAICrossRefs(request, url, env, origin, json);
       }
 
       // AI model diagnostics

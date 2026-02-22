@@ -451,7 +451,7 @@ const ScriptureView = (() => {
           `).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
         </div>
 
-        <!-- Dive Deeper -->
+        <!-- Action row: Dive Deeper + Parallel toggle -->
         <div class="passage-dive-row">
           <button class="passage-dive-btn" id="passage-dive-btn">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -460,6 +460,75 @@ const ScriptureView = (() => {
             </svg>
             Dive Deeper
           </button>
+          <button class="passage-dive-btn passage-parallel-btn" id="passage-parallel-btn" title="Side-by-side translation">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/>
+            </svg>
+            Compare
+          </button>
+        </div>
+
+        <!-- Parallel translation panel (hidden until toggled) -->
+        <div class="passage-parallel-panel" id="passage-parallel-panel" hidden>
+          <div class="passage-parallel-header">
+            <span class="passage-parallel-label" id="parallel-translation-label"></span>
+            <button class="icon-btn" id="passage-parallel-close" aria-label="Close comparison" title="Close">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="passage-parallel-grid" id="passage-parallel-grid">
+            <div class="passage-parallel-col">
+              <div class="passage-parallel-col__label">${translationLabel}</div>
+              <div class="passage-text passage-parallel-text" id="parallel-primary">
+                ${verses.length > 0 ? verses.map(v => `<span class="passage-verse"><sup class="verse-num">${v.verse}</sup>${v.text.trim()}</span> `).join('') : `<span class="passage-verse">${data.text || ''}</span>`}
+              </div>
+            </div>
+            <div class="passage-parallel-col">
+              <div class="passage-parallel-col__label" id="parallel-alt-label">—</div>
+              <div class="passage-text passage-parallel-text" id="parallel-alt">
+                <div class="passage-parallel-loading">
+                  <div class="plan-searching__spinner" style="width:20px;height:20px;margin:0 auto;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cross-references (See Also) — lazy loaded -->
+        <div class="passage-section-card" id="xref-card">
+          <button class="passage-section-toggle" id="xref-toggle" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            See Also
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="passage-section-body" id="xref-body" hidden>
+            <div class="passage-section-loading" id="xref-loading">
+              <div class="plan-searching__spinner" style="width:18px;height:18px;margin:0 auto;"></div>
+              <span>Loading cross-references…</span>
+            </div>
+            <div id="xref-list" hidden></div>
+          </div>
+        </div>
+
+        <!-- Historical Context — lazy loaded -->
+        <div class="passage-section-card" id="context-card">
+          <button class="passage-section-toggle" id="context-toggle" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Historical Context
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="passage-section-body" id="context-body" hidden>
+            <div class="passage-section-loading" id="context-loading">
+              <div class="plan-searching__spinner" style="width:18px;height:18px;margin:0 auto;"></div>
+              <span>Loading context…</span>
+            </div>
+            <div id="context-content" hidden></div>
+          </div>
         </div>
 
         <!-- Copyright attribution -->
@@ -488,7 +557,7 @@ const ScriptureView = (() => {
       });
     });
 
-    // Wire "Dive Deeper" — collects plain verse text for context
+    // Wire "Dive Deeper"
     const diveBtn = container.querySelector('#passage-dive-btn');
     const passageBody = container.querySelector('#passage-text-body');
     if (diveBtn && passageBody && window.WordLookup) {
@@ -499,6 +568,131 @@ const ScriptureView = (() => {
         WordLookup.openPassage({ reference, verseText }, diveBtn, passageBody);
       });
     }
+
+    // ── 1A: Cross-references (lazy, toggle) ──────────────────────────────
+    _wireCollapsibleSection({
+      toggleId: 'xref-toggle',
+      bodyId: 'xref-body',
+      loadingId: 'xref-loading',
+      contentId: 'xref-list',
+      fetch: async () => {
+        if (!API.hasWorker()) throw new Error('Worker not configured');
+        return API.getPassageCrossRefs(reference);
+      },
+      render: (data) => {
+        const refs = Array.isArray(data.refs) ? data.refs : [];
+        if (!refs.length) return '<p class="text-sm text-muted" style="padding:var(--space-2) 0;">No cross-references found.</p>';
+        return `<div class="xref-list">${refs.map(r => `
+          <button class="xref-item" onclick="ScriptureView.loadPassage('${r.ref.replace(/'/g, "\\'")}')">
+            <span class="xref-item__ref">${r.ref}</span>
+            <span class="xref-item__why">${r.why}</span>
+          </button>`).join('')}</div>`;
+      },
+    });
+
+    // ── 1B: Historical Context (lazy, toggle) ────────────────────────────
+    _wireCollapsibleSection({
+      toggleId: 'context-toggle',
+      bodyId: 'context-body',
+      loadingId: 'context-loading',
+      contentId: 'context-content',
+      fetch: async () => {
+        if (!API.hasWorker()) throw new Error('Worker not configured');
+        return API.getPassageContext(reference);
+      },
+      render: (data) => {
+        return `
+          <div class="context-card-inner">
+            ${data.author || data.period ? `<p class="context-meta">${[data.author, data.period].filter(Boolean).join(' · ')}</p>` : ''}
+            <p class="context-text">${data.context || ''}</p>
+          </div>`;
+      },
+    });
+
+    // ── 1C: Parallel Translation ─────────────────────────────────────────
+    _wireParallelTranslation({ container, reference, currentTranslationId: translationId, translationLabel });
+  }
+
+  // Helper: wire a collapsible section that lazy-fetches on first open
+  function _wireCollapsibleSection({ toggleId, bodyId, loadingId, contentId, fetch: doFetch, render }) {
+    const toggle = document.getElementById(toggleId);
+    const body   = document.getElementById(bodyId);
+    if (!toggle || !body) return;
+
+    let loaded = false;
+    toggle.addEventListener('click', async () => {
+      const isOpen = !body.hidden;
+      body.hidden = isOpen;
+      toggle.setAttribute('aria-expanded', String(!isOpen));
+      toggle.classList.toggle('passage-section-toggle--open', !isOpen);
+      haptic([6]);
+
+      if (!isOpen && !loaded) {
+        loaded = true;
+        const loadingEl = document.getElementById(loadingId);
+        const contentEl = document.getElementById(contentId);
+        try {
+          const data = await doFetch();
+          if (loadingEl) loadingEl.hidden = true;
+          if (contentEl) {
+            contentEl.innerHTML = render(data);
+            contentEl.hidden = false;
+          }
+        } catch (err) {
+          if (loadingEl) loadingEl.hidden = true;
+          if (contentEl) {
+            contentEl.innerHTML = `<p class="text-sm text-muted" style="padding:var(--space-2) 0;">Could not load: ${err.message}</p>`;
+            contentEl.hidden = false;
+          }
+        }
+      }
+    });
+  }
+
+  // Helper: wire parallel translation toggle
+  function _wireParallelTranslation({ container, reference, currentTranslationId, translationLabel }) {
+    const btn   = container.querySelector('#passage-parallel-btn');
+    const panel = container.querySelector('#passage-parallel-panel');
+    const close = container.querySelector('#passage-parallel-close');
+    const altEl = container.querySelector('#parallel-alt');
+    const altLabel = container.querySelector('#parallel-alt-label');
+    const panelLabel = container.querySelector('#parallel-translation-label');
+    if (!btn || !panel) return;
+
+    // Determine the "other" translation
+    const PARALLEL_PAIRS = { esv: 'web', web: 'esv', kjv: 'web', net: 'web', bbe: 'web', darby: 'web', asv: 'web' };
+    const altTranslationId = PARALLEL_PAIRS[currentTranslationId] || (currentTranslationId === 'web' ? 'kjv' : 'web');
+    const altLabel_ = altTranslationId.toUpperCase();
+    if (altLabel) altLabel.textContent = altLabel_;
+    if (panelLabel) panelLabel.textContent = `Comparing ${translationLabel} · ${altLabel_}`;
+
+    let loaded = false;
+    btn.addEventListener('click', async () => {
+      panel.hidden = false;
+      btn.style.display = 'none';
+      haptic([6]);
+
+      if (!loaded) {
+        loaded = true;
+        try {
+          const altData = await API.getPassage_translation(reference, altTranslationId);
+          const altVerses = altData.verses || [];
+          if (altEl) {
+            altEl.innerHTML = altVerses.length > 0
+              ? altVerses.map(v => `<span class="passage-verse"><sup class="verse-num">${v.verse}</sup>${v.text.trim()}</span> `).join('')
+              : `<span class="passage-verse">${altData.text || ''}</span>`;
+          }
+        } catch (err) {
+          if (altEl) altEl.innerHTML = `<p class="text-sm text-muted">Could not load ${altLabel_}: ${err.message}</p>`;
+        }
+      }
+    });
+
+    close.addEventListener('click', () => {
+      panel.hidden = true;
+      btn.style.display = '';
+      haptic([6]);
+    });
   }
 
   function loadPassageFromPhrase(ref) {
