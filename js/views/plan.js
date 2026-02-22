@@ -63,6 +63,19 @@ const PlanView = (() => {
     return words.replace(/\s+(a|an|the|in|of|on|and|but|or|for|to)$/i, '').trim();
   }
 
+  function dateKeyPlusDays(dateKey, days = 0) {
+    const base = DateUtils.fromKey(dateKey || DateUtils.today());
+    const out = new Date(base);
+    out.setDate(base.getDate() + Number(days || 0));
+    return DateUtils.toKey(out);
+  }
+
+  function buildConsecutiveKeys(startDateKey, count = 7) {
+    const keys = [];
+    for (let i = 0; i < count; i += 1) keys.push(dateKeyPlusDays(startDateKey, i));
+    return keys;
+  }
+
   function paragraphsFromSession(session = {}) {
     if (Array.isArray(session.body)) {
       return session.body
@@ -108,6 +121,7 @@ const PlanView = (() => {
     const isDefaultWeek = !currentPlan || !!currentPlan?.seedDefault;
     const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
     const hasPreviousPlan = Store.hasPlanHistory();
+    const pendingPlan = Store.getPendingPlanInfo();
     const dayKeys = Object.keys(currentPlan?.days || {}).sort((a, b) => a.localeCompare(b));
     const totalSessions = dayKeys.length * 2;
     const savedSessions = dayKeys.reduce((count, key) => {
@@ -121,6 +135,14 @@ const PlanView = (() => {
     div.className = 'view-content tab-switch-enter';
 
     div.innerHTML = `
+      ${pendingPlan?.activationDate ? `
+      <div style="background:var(--accent-soft);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);">
+        <div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Queued Plan</div>
+        <div class="text-sm" style="line-height:1.5;">
+          <strong>${escapeHtml(pendingPlan.theme || 'Next Plan')}</strong> will activate on <strong>${DateUtils.format(pendingPlan.activationDate)}</strong>.
+        </div>
+      </div>` : ''}
+
       <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div class="text-xs font-bold text-brand" style="text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">
@@ -394,9 +416,37 @@ const PlanView = (() => {
         if (lengthIssues.length) {
           throw new Error(`Plan too short: ${lengthIssues.slice(0, 2).join('; ')}`);
         }
-        const plan = convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors);
-        Store.savePlan(plan);
-        showSuccess(results, displayTopic, true, formatPlanModelLabel(aiPlan?.ai_meta));
+        const todayKey = DateUtils.today();
+        const tomorrowKey = dateKeyPlusDays(todayKey, 1);
+        const existingPlan = Store.getPlan();
+        const existingKeys = Object.keys(existingPlan?.days || {});
+        const hasExistingPlan = existingKeys.length > 0;
+        const preferredMode = String(Store.get('planBuildStartMode') || '').trim().toLowerCase();
+        let activationMode = 'today';
+
+        if (hasExistingPlan) {
+          activationMode = await askPlanActivationMode(preferredMode === 'tomorrow' ? 'tomorrow' : 'today');
+          if (!activationMode) {
+            if (buildBtn) {
+              buildBtn.disabled = false;
+              buildBtn.textContent = '✨ Build This Week\'s Plan';
+            }
+            Store.set('planBuildStartMode', '');
+            return;
+          }
+        }
+
+        const startDateKey = activationMode === 'tomorrow' ? tomorrowKey : todayKey;
+        const plan = convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors, startDateKey);
+
+        if (activationMode === 'tomorrow') {
+          Store.queuePlanForDate(plan, tomorrowKey);
+          showSuccess(results, displayTopic, true, formatPlanModelLabel(aiPlan?.ai_meta), true, tomorrowKey);
+        } else {
+          Store.savePlan(plan);
+          showSuccess(results, displayTopic, true, formatPlanModelLabel(aiPlan?.ai_meta));
+        }
+        Store.set('planBuildStartMode', '');
       } else {
         throw new Error('AI returned empty plan');
       }
@@ -435,25 +485,25 @@ const PlanView = (() => {
     return `Provider: ${provider} | Model${models.length > 1 ? 's' : ''}: ${models.join(', ')}`;
   }
 
-  function showSuccess(container, topic, isAI, modelLine = '') {
+  function showSuccess(container, topic, isAI, modelLine = '', queued = false, queuedDate = '') {
     container.innerHTML = `
       <div style="background:var(--color-primary-faint);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);text-align:center;">
         <div style="font-size:2rem;margin-bottom:var(--space-2);">✅</div>
-        <div class="font-serif text-xl" style="margin-bottom:var(--space-2);">Your week is ready</div>
+        <div class="font-serif text-xl" style="margin-bottom:var(--space-2);">${queued ? 'Your next week is queued' : 'Your week is ready'}</div>
         <p class="text-sm text-secondary" style="margin-bottom:var(--space-4);line-height:1.5;">
-          7-day devotional plan on <strong>${topic}</strong>${isAI ? ', written by AI from trusted ministry sources' : ''}.
+          7-day devotional plan on <strong>${topic}</strong>${isAI ? ', written by AI from trusted ministry sources' : ''}${queued ? `.<br>It will activate on <strong>${DateUtils.format(queuedDate)}</strong>.` : '.'}
         </p>
         ${modelLine ? `<p class="text-xs text-muted" style="margin-bottom:var(--space-3);">${escapeHtml(modelLine)}</p>` : ''}
         <button class="btn btn-primary" onclick="Router.navigate('/')">
-          Start Today's Devotion →
+          ${queued ? 'Return To Today →' : 'Start Today\'s Devotion →'}
         </button>
       </div>
     `;
   }
 
-  function convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors = []) {
-    const weekStart = DateUtils.weekStart(DateUtils.today());
-    const keys = DateUtils.weekKeys(weekStart);
+  function convertAIPlanToAppFormat(topic, displayTopic, aiPlan, trustedPastors = [], startDateKey = DateUtils.today()) {
+    const weekStart = DateUtils.weekStart(startDateKey);
+    const keys = buildConsecutiveKeys(startDateKey, 7);
     const translation = API.translationLabel(Store.get('bibleTranslation') || 'web');
 
     const days = {};
@@ -514,6 +564,7 @@ const PlanView = (() => {
 
     return {
       week: weekStart,
+      startDate: startDateKey,
       theme: displayTopic || topic,
       aiGenerated: true,
       seedDefault: false,
@@ -528,6 +579,7 @@ const PlanView = (() => {
       .then(r => r.json())
       .then(data => {
         data.seedDefault = true;
+        data.startDate = DateUtils.today();
         Store.savePlan(data);
         Router.navigate('/');
       })
@@ -540,8 +592,9 @@ const PlanView = (() => {
 
   // Minimal fallback if everything fails
   function buildFallbackPlan(topic) {
-    const weekStart = DateUtils.weekStart(DateUtils.today());
-    const keys = DateUtils.weekKeys(weekStart);
+    const startDate = DateUtils.today();
+    const weekStart = DateUtils.weekStart(startDate);
+    const keys = buildConsecutiveKeys(startDate, 7);
     const days = {};
     keys.forEach((key, i) => {
       days[key] = {
@@ -570,7 +623,41 @@ const PlanView = (() => {
         },
       };
     });
-    return { week: weekStart, theme: topic, seedDefault: true, days, createdAt: new Date().toISOString() };
+    return { week: weekStart, startDate, theme: topic, seedDefault: true, days, createdAt: new Date().toISOString() };
+  }
+
+  async function askPlanActivationMode(preferred = 'today') {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'abide-delete-dialog-backdrop';
+      backdrop.innerHTML = `
+        <div class="abide-delete-dialog" role="dialog" aria-modal="true" aria-label="Plan activation">
+          <div class="abide-delete-dialog__title">When should this plan start?</div>
+          <div class="abide-delete-dialog__body">
+            Start now to replace today immediately, or queue it for tomorrow so you can finish today’s study.
+          </div>
+          <div class="abide-delete-dialog__actions">
+            <button class="btn btn-secondary btn-sm" data-plan-action="cancel">Cancel</button>
+            <button class="btn ${preferred === 'today' ? 'btn-primary' : 'btn-secondary'} btn-sm" data-plan-action="today">Start today (Day 1)</button>
+            <button class="btn ${preferred === 'tomorrow' ? 'btn-primary' : 'btn-secondary'} btn-sm" data-plan-action="tomorrow">Start tomorrow</button>
+          </div>
+        </div>
+      `;
+      function close(value = '') {
+        backdrop.remove();
+        resolve(value);
+      }
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(''); });
+      backdrop.querySelector('[data-plan-action="cancel"]')?.addEventListener('click', () => close(''));
+      backdrop.querySelector('[data-plan-action="today"]')?.addEventListener('click', () => close('today'));
+      backdrop.querySelector('[data-plan-action="tomorrow"]')?.addEventListener('click', () => close('tomorrow'));
+      document.body.appendChild(backdrop);
+    });
+  }
+
+  function prepareNextStudy() {
+    Store.set('planBuildStartMode', 'tomorrow');
+    Router.navigate('/plan');
   }
 
   // Keep for backward compatibility
@@ -598,7 +685,7 @@ const PlanView = (() => {
     alert(`Restored previous plan${result.theme ? `: ${result.theme}` : ''}.`);
   }
 
-  return { render, startBuild, startSearch, loadSeedPlan, saveWholeWeek, revertPreviousPlan };
+  return { render, startBuild, startSearch, loadSeedPlan, saveWholeWeek, revertPreviousPlan, prepareNextStudy };
 })();
 
 window.PlanView = PlanView;

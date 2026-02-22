@@ -34,6 +34,7 @@ const Store = (() => {
     sundayReminderEnabled: true,
     pushSubscription: null,
     currentWeekPlan: null,    // Full week plan object from plan builder
+    pendingWeekPlan: null,    // { activationDate, createdAt, plan }
     planHistory: [],          // [{ id, savedAt, reason, plan, selectedDate, sessionOverride }]
     journalEntries: {},       // { 'YYYY-MM-DD': { prompt, text, savedAt } }
     completedDevotions: [],   // ['YYYY-MM-DD-morning', 'YYYY-MM-DD-evening']
@@ -72,6 +73,7 @@ const Store = (() => {
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
+    planBuildStartMode: '',   // '' | 'today' | 'tomorrow'
     _defaultsVersion: 3,
   };
 
@@ -291,18 +293,71 @@ const Store = (() => {
   }
 
   // --- Plan ---
+  function activatePendingPlanIfDue() {
+    const pending = _state.pendingWeekPlan;
+    if (!pending || typeof pending !== 'object') return false;
+
+    const activationDate = String(pending.activationDate || '').trim();
+    if (!activationDate) return false;
+    const today = DateUtils.today();
+    if (activationDate > today) return false;
+
+    const queuedPlan = pending.plan && typeof pending.plan === 'object'
+      ? cloneValue(pending.plan)
+      : null;
+    if (!queuedPlan) {
+      _state.pendingWeekPlan = null;
+      save();
+      return false;
+    }
+
+    pushCurrentPlanToHistory('activate-pending-plan');
+    _state.currentWeekPlan = queuedPlan;
+    _state.pendingWeekPlan = null;
+    const keys = Object.keys(_state.currentWeekPlan?.days || {}).sort((a, b) => a.localeCompare(b));
+    _state.selectedDevotionDate = keys.includes(today) ? today : (keys[0] || today);
+    save();
+    return true;
+  }
+
   function savePlan(plan) {
+    activatePendingPlanIfDue();
     pushCurrentPlanToHistory('save-plan');
     const nextPlan = plan && typeof plan === 'object' ? { ...plan } : plan;
     if (nextPlan && typeof nextPlan === 'object' && nextPlan.seedDefault !== true) {
       nextPlan.seedDefault = false;
     }
     set('currentWeekPlan', nextPlan);
+    _state.pendingWeekPlan = null;
     const keys = getPlanDayKeys();
     if (!keys.length) return;
     const today = DateUtils.today();
     _state.selectedDevotionDate = keys.includes(today) ? today : keys[0];
     save();
+  }
+
+  function queuePlanForDate(plan, activationDateKey) {
+    const nextPlan = plan && typeof plan === 'object' ? cloneValue(plan) : null;
+    const activationDate = String(activationDateKey || '').trim();
+    if (!nextPlan || !activationDate) return { ok: false };
+    _state.pendingWeekPlan = {
+      activationDate,
+      createdAt: new Date().toISOString(),
+      plan: nextPlan,
+    };
+    save();
+    return { ok: true, activationDate };
+  }
+
+  function getPendingPlanInfo() {
+    activatePendingPlanIfDue();
+    const pending = _state.pendingWeekPlan;
+    if (!pending || typeof pending !== 'object') return null;
+    return {
+      activationDate: String(pending.activationDate || ''),
+      createdAt: String(pending.createdAt || ''),
+      theme: String(pending.plan?.theme || ''),
+    };
   }
 
   function pushCurrentPlanToHistory(reason = 'replace-plan') {
@@ -349,21 +404,25 @@ const Store = (() => {
   }
 
   function getPlan() {
+    activatePendingPlanIfDue();
     return get('currentWeekPlan');
   }
 
   function getPlanDayKeys() {
+    activatePendingPlanIfDue();
     const plan = getPlan();
     const keys = Object.keys(plan?.days || {});
     return keys.sort((a, b) => a.localeCompare(b));
   }
 
   function getDevotionData(dateKey) {
+    activatePendingPlanIfDue();
     const plan = getPlan();
     return plan?.days?.[dateKey] || null;
   }
 
   function getSelectedDevotionDate() {
+    activatePendingPlanIfDue();
     const keys = getPlanDayKeys();
     if (!keys.length) return DateUtils.today();
     const current = _state.selectedDevotionDate;
@@ -1028,6 +1087,8 @@ const Store = (() => {
     getRecentJournalEntries,
     getAllJournalEntries,
     savePlan,
+    queuePlanForDate,
+    getPendingPlanInfo,
     hasPlanHistory,
     restorePreviousPlan,
     getPlan,

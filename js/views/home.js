@@ -114,10 +114,24 @@ const HomeView = (() => {
     const dayIndex = Math.max(0, dayKeys.indexOf(selectedDate));
     const hasPrev = dayIndex > 0;
     const hasNext = dayIndex < dayKeys.length - 1;
+    const isFinalDay = dayIndex === dayKeys.length - 1;
+    const pendingPlan = Store.getPendingPlanInfo();
     const googleCard = renderGooglePanel();
 
     div.innerHTML = `
       ${googleCard}
+      ${pendingPlan?.activationDate ? `
+      <div class="card-enter" style="margin-bottom:12px;">
+        <div class="midday-banner">
+          <div class="midday-banner__icon">📅</div>
+          <div class="midday-banner__content">
+            <div class="midday-banner__title">Next Study Queued</div>
+            <div class="midday-banner__text">
+              <strong>${pendingPlan.theme || 'Next Plan'}</strong> will start on ${DateUtils.format(pendingPlan.activationDate)}.
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
       <!-- Greeting -->
       <div class="home-greeting card-enter">
         <div class="home-greeting__time">${DateUtils.format(selectedDate)}</div>
@@ -278,6 +292,13 @@ const HomeView = (() => {
           View Saved Devotionals
         </button>
       </div>
+
+      ${isFinalDay ? `
+      <div class="home-complete-row card-enter" style="margin-top:12px;">
+        <button class="btn btn-primary btn-full" onclick="HomeView.prepareNextStudy()">
+          Prepare Next Study For Tomorrow
+        </button>
+      </div>` : ''}
     `;
 
     // Session toggle listeners
@@ -523,6 +544,11 @@ const HomeView = (() => {
     const next = Store.shiftSelectedDevotionDay(offset);
     if (!next) return;
     render(document.getElementById('view-container'));
+  }
+
+  function prepareNextStudy() {
+    Store.set('planBuildStartMode', 'tomorrow');
+    Router.navigate('/plan');
   }
 
   async function shareCurrentDevotion() {
@@ -874,7 +900,7 @@ const HomeView = (() => {
     void goToStep(0);
   }
 
-  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel, shareCurrentDevotion };
+  return { render, toggleComplete, toggleSave, shiftDay, connectGoogle, syncSavedNow, syncDownloadNow, toggleGooglePanel, shareCurrentDevotion, prepareNextStudy };
 })();
 
 // Global collapsible toggle helper
