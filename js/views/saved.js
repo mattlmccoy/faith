@@ -43,8 +43,7 @@ const SavedView = (() => {
     const explicit = String(entry.seriesId || entry?.devotionData?.seriesId || '').trim();
     if (explicit) return explicit;
     const weekKey = entryWeekKey(entry);
-    const theme = entryTheme(entry).toLowerCase();
-    return `${weekKey}::${theme}`;
+    return `${weekKey}::legacy`;
   }
 
   function buildSeries(entries = []) {

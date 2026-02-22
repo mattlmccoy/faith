@@ -506,6 +506,12 @@ const Store = (() => {
     return true;
   }
 
+  function markerIdFromSavedId(id = '') {
+    const value = String(id || '').trim();
+    if (!value) return '';
+    return value.includes('::') ? value.split('::').pop() : value;
+  }
+
   function saveEntirePlan() {
     const plan = getPlan();
     const keys = Object.keys(plan?.days || {}).sort((a, b) => a.localeCompare(b));
@@ -750,7 +756,11 @@ const Store = (() => {
       lib[id] = buildSavedEntry(id, dateKey, session, day, sessionData, lib[id]?.savedAt || '');
     });
 
-    const uniqueIds = Array.from(new Set([...list, ...Object.keys(lib)]));
+    // Persist marker IDs for "saved" state; avoid mixing marker + series IDs.
+    const uniqueIds = Array.from(new Set([
+      ...list.map(markerIdFromSavedId).filter(Boolean),
+      ...Object.keys(lib).map(markerIdFromSavedId).filter(Boolean),
+    ]));
 
     return {
       version: 2,
@@ -794,17 +804,36 @@ const Store = (() => {
     }
 
     const replaceExisting = options && options.replace === true;
-    const list = Array.isArray(normalizedSnapshot.savedDevotions) ? normalizedSnapshot.savedDevotions : [];
+    const list = (Array.isArray(normalizedSnapshot.savedDevotions) ? normalizedSnapshot.savedDevotions : [])
+      .map(markerIdFromSavedId)
+      .filter(Boolean);
     const lib = normalizedSnapshot.savedDevotionLibrary && typeof normalizedSnapshot.savedDevotionLibrary === 'object'
       ? normalizedSnapshot.savedDevotionLibrary
       : {};
 
+    // If both series IDs and marker IDs exist for the same marker, drop marker-only clones.
+    const byMarker = {};
+    Object.entries(lib).forEach(([id, entry]) => {
+      const marker = markerIdFromSavedId(id) || markerIdFromSavedId(entry?.id || '');
+      if (!marker) return;
+      if (!byMarker[marker]) byMarker[marker] = [];
+      byMarker[marker].push(id);
+    });
+    Object.values(byMarker).forEach((ids) => {
+      if (ids.length < 2) return;
+      const seriesIds = ids.filter((id) => String(id).includes('::'));
+      if (!seriesIds.length) return;
+      ids.forEach((id) => {
+        if (!String(id).includes('::')) delete lib[id];
+      });
+    });
+
     const mergedIds = new Set(replaceExisting
-      ? [...list, ...Object.keys(lib)]
+      ? [...list, ...Object.keys(lib).map(markerIdFromSavedId).filter(Boolean)]
       : [
-        ...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions : []),
+        ...(Array.isArray(_state.savedDevotions) ? _state.savedDevotions.map(markerIdFromSavedId) : []),
         ...list,
-        ...Object.keys(lib),
+        ...Object.keys(lib).map(markerIdFromSavedId).filter(Boolean),
       ]);
     _state.savedDevotions = [...mergedIds];
     _state.savedDevotionLibrary = replaceExisting
@@ -825,7 +854,9 @@ const Store = (() => {
       _state.trustedPastors = normalizeTrustedPastors(mergedPastors);
     }
     // Backfill library entries from current plan when older snapshots only contain IDs.
+    const libraryMarkers = new Set(Object.keys(_state.savedDevotionLibrary || {}).map(markerIdFromSavedId).filter(Boolean));
     _state.savedDevotions.forEach((id) => {
+      if (libraryMarkers.has(id)) return;
       if (_state.savedDevotionLibrary[id]) return;
       const parts = String(id).split('-');
       const session = parts.pop();

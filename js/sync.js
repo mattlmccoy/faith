@@ -651,10 +651,25 @@ const Sync = (() => {
       const res = await driveFetch(url);
       payload = normalizeJsonPayload(await res.text());
     } catch (err) {
-      if (String(err?.message || '').includes('404')) {
-        throw new Error(`Shared file was not found or is not accessible. Ask the sender to re-share with "Anyone with the link" and resend the full link.`);
+      const fallbackUrls = [
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : ''}`,
+        `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+        `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+      ];
+      for (const fallbackUrl of fallbackUrls) {
+        try {
+          const res = await fetch(fallbackUrl, { method: 'GET' });
+          if (!res.ok) continue;
+          payload = normalizeJsonPayload(await res.text());
+          if (payload && typeof payload === 'object') break;
+        } catch (_) {}
       }
-      throw err;
+      if (!payload) {
+        if (String(err?.message || '').includes('404')) {
+          throw new Error(`Shared file was not found or is not accessible. Ask the sender to re-share with "Anyone with the link" and resend the full link.`);
+        }
+        throw err;
+      }
     }
     if (!payload || typeof payload !== 'object') {
       throw new Error('Shared file did not contain valid JSON');
