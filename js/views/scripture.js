@@ -494,6 +494,24 @@ const ScriptureView = (() => {
           </div>
         </div>
 
+        <!-- Historical Context — lazy loaded -->
+        <div class="passage-section-card" id="context-card">
+          <button class="passage-section-toggle" id="context-toggle" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Historical Context
+            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="passage-section-body" id="context-body" hidden>
+            <div class="passage-section-loading" id="context-loading">
+              <div class="plan-searching__spinner" style="width:18px;height:18px;margin:0 auto;"></div>
+              <span>Loading context…</span>
+            </div>
+            <div id="context-content" hidden></div>
+          </div>
+        </div>
+
         <!-- Cross-references (See Also) — lazy loaded -->
         <div class="passage-section-card" id="xref-card">
           <button class="passage-section-toggle" id="xref-toggle" aria-expanded="false">
@@ -510,24 +528,6 @@ const ScriptureView = (() => {
               <span>Loading cross-references…</span>
             </div>
             <div id="xref-list" hidden></div>
-          </div>
-        </div>
-
-        <!-- Historical Context — lazy loaded -->
-        <div class="passage-section-card" id="context-card">
-          <button class="passage-section-toggle" id="context-toggle" aria-expanded="false">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            Historical Context
-            <svg class="toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="passage-section-body" id="context-body" hidden>
-            <div class="passage-section-loading" id="context-loading">
-              <div class="plan-searching__spinner" style="width:18px;height:18px;margin:0 auto;"></div>
-              <span>Loading context…</span>
-            </div>
-            <div id="context-content" hidden></div>
           </div>
         </div>
 
@@ -569,6 +569,25 @@ const ScriptureView = (() => {
       });
     }
 
+    // ── 1B: Historical Context (lazy, toggle) ────────────────────────────
+    _wireCollapsibleSection({
+      toggleId: 'context-toggle',
+      bodyId: 'context-body',
+      loadingId: 'context-loading',
+      contentId: 'context-content',
+      fetch: async () => {
+        if (!API.hasWorker()) throw new Error('Worker not configured');
+        return API.getPassageContext(reference);
+      },
+      render: (data) => {
+        return `
+          <div class="context-card-inner">
+            ${data.author || data.period ? `<p class="context-meta">${[data.author, data.period].filter(Boolean).join(' · ')}</p>` : ''}
+            <p class="context-text">${data.context || ''}</p>
+          </div>`;
+      },
+    });
+
     // ── 1A: Cross-references (lazy, toggle) ──────────────────────────────
     _wireCollapsibleSection({
       toggleId: 'xref-toggle',
@@ -590,25 +609,6 @@ const ScriptureView = (() => {
       },
     });
 
-    // ── 1B: Historical Context (lazy, toggle) ────────────────────────────
-    _wireCollapsibleSection({
-      toggleId: 'context-toggle',
-      bodyId: 'context-body',
-      loadingId: 'context-loading',
-      contentId: 'context-content',
-      fetch: async () => {
-        if (!API.hasWorker()) throw new Error('Worker not configured');
-        return API.getPassageContext(reference);
-      },
-      render: (data) => {
-        return `
-          <div class="context-card-inner">
-            ${data.author || data.period ? `<p class="context-meta">${[data.author, data.period].filter(Boolean).join(' · ')}</p>` : ''}
-            <p class="context-text">${data.context || ''}</p>
-          </div>`;
-      },
-    });
-
     // ── 1C: Parallel Translation ─────────────────────────────────────────
     _wireParallelTranslation({ container, reference, currentTranslationId: translationId, translationLabel });
   }
@@ -618,6 +618,10 @@ const ScriptureView = (() => {
     const toggle = document.getElementById(toggleId);
     const body   = document.getElementById(bodyId);
     if (!toggle || !body) return;
+
+    // Capture elements now while DOM is fresh — don't rely on getElementById after async gaps
+    const loadingEl = document.getElementById(loadingId);
+    const contentEl = document.getElementById(contentId);
 
     let loaded = false;
     toggle.addEventListener('click', async () => {
@@ -629,20 +633,18 @@ const ScriptureView = (() => {
 
       if (!isOpen && !loaded) {
         loaded = true;
-        const loadingEl = document.getElementById(loadingId);
-        const contentEl = document.getElementById(contentId);
         try {
           const data = await doFetch();
-          if (loadingEl) loadingEl.hidden = true;
+          if (loadingEl) loadingEl.remove();
           if (contentEl) {
             contentEl.innerHTML = render(data);
-            contentEl.hidden = false;
+            contentEl.removeAttribute('hidden');
           }
         } catch (err) {
-          if (loadingEl) loadingEl.hidden = true;
+          if (loadingEl) loadingEl.remove();
           if (contentEl) {
             contentEl.innerHTML = `<p class="text-sm text-muted" style="padding:var(--space-2) 0;">Could not load: ${err.message}</p>`;
-            contentEl.hidden = false;
+            contentEl.removeAttribute('hidden');
           }
         }
       }
