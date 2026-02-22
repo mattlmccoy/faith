@@ -430,10 +430,15 @@ const Sync = (() => {
     };
   }
 
-  function parseDriveFileId(linkOrId = '') {
+  function parseDriveShareReference(linkOrId = '') {
     const value = String(linkOrId || '').trim();
-    if (!value) return '';
-    if (/^[A-Za-z0-9_-]{20,}$/.test(value)) return value;
+    if (!value) return { fileId: '', resourceKey: '' };
+    if (/^[A-Za-z0-9_-]{20,}$/.test(value)) return { fileId: value, resourceKey: '' };
+    let resourceKey = '';
+    try {
+      const u = new URL(value);
+      resourceKey = String(u.searchParams.get('resourcekey') || u.searchParams.get('resourceKey') || '').trim();
+    } catch (_) {}
     const patterns = [
       /\/d\/([A-Za-z0-9_-]{20,})/i,
       /[?&]id=([A-Za-z0-9_-]{20,})/i,
@@ -441,13 +446,13 @@ const Sync = (() => {
     ];
     for (const re of patterns) {
       const match = value.match(re);
-      if (match?.[1]) return match[1];
+      if (match?.[1]) return { fileId: match[1], resourceKey };
     }
-    return '';
+    return { fileId: '', resourceKey };
   }
 
   async function getFileLinks(fileId) {
-    const fields = encodeURIComponent('id,name,webViewLink,webContentLink');
+    const fields = encodeURIComponent('id,name,webViewLink,webContentLink,resourceKey');
     const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=${fields}`;
     const res = await driveFetch(url);
     return res.json();
@@ -603,10 +608,12 @@ const Sync = (() => {
     await setAnyoneReaderPermission(fileId);
     const links = await getFileLinks(fileId);
 
+    const resourceKey = String(links.resourceKey || '').trim();
+    const canonicalShareUrl = `https://drive.google.com/file/d/${fileId}/view${resourceKey ? `?resourcekey=${encodeURIComponent(resourceKey)}` : ''}`;
     return {
       fileId,
       fileName,
-      shareUrl: links.webViewLink || links.webContentLink || `https://drive.google.com/file/d/${fileId}/view`,
+      shareUrl: canonicalShareUrl || links.webViewLink || links.webContentLink || `https://drive.google.com/file/d/${fileId}/view`,
     };
   }
 
@@ -634,12 +641,21 @@ const Sync = (() => {
   }
 
   async function importSharedDevotion(linkOrId = '') {
-    const fileId = parseDriveFileId(linkOrId);
+    const { fileId, resourceKey } = parseDriveShareReference(linkOrId);
     if (!fileId) throw new Error('Could not parse a Google Drive file ID from that link');
 
-    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
-    const res = await driveFetch(url);
-    const payload = normalizeJsonPayload(await res.text());
+    let payload = null;
+    try {
+      const rkParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
+      const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${rkParam}`;
+      const res = await driveFetch(url);
+      payload = normalizeJsonPayload(await res.text());
+    } catch (err) {
+      if (String(err?.message || '').includes('404')) {
+        throw new Error(`Shared file was not found or is not accessible. Ask the sender to re-share with "Anyone with the link" and resend the full link.`);
+      }
+      throw err;
+    }
     if (!payload || typeof payload !== 'object') {
       throw new Error('Shared file did not contain valid JSON');
     }
