@@ -79,6 +79,167 @@ async function lookupStrongs(env, strongsNumber) {
   }
 }
 
+// ── MorphGNT — per-verse Greek lemma → Strong's number mapping ───────────────
+// MorphGNT (morphgnt/sblgnt, CC-BY-SA) provides the Greek NT with per-word lemmas.
+// We cross-reference lemmas with the cached Strong's dictionary to get G-numbers.
+// Book file numbers: Matthew=61 … Revelation=87 (NT only; OT uses morphhb XML).
+const MORPHGNT_BASE = 'https://raw.githubusercontent.com/morphgnt/sblgnt/master/';
+const MORPHGNT_CACHE_TTL = 90 * 24 * 60 * 60; // 90 days (static data)
+
+// Map of common book name variants → {fileNum, bookNum}
+// fileNum: the MorphGNT file prefix (61–87); bookNum: 2-digit book code in reference lines
+const MORPHGNT_BOOK_MAP = {
+  // Matthew
+  'matthew':1,'matt':1,'mt':1,
+  // Mark
+  'mark':2,'mk':2,'mar':2,
+  // Luke
+  'luke':3,'lk':3,'luk':3,
+  // John
+  'john':4,'jn':4,'joh':4,
+  // Acts
+  'acts':5,'ac':5,'act':5,
+  // Romans
+  'romans':6,'rom':6,'ro':6,
+  // 1 Corinthians
+  '1corinthians':7,'1cor':7,'1co':7,'ico':7,
+  // 2 Corinthians
+  '2corinthians':8,'2cor':8,'2co':8,'iico':8,
+  // Galatians
+  'galatians':9,'gal':9,'ga':9,
+  // Ephesians
+  'ephesians':10,'eph':10,'ep':10,
+  // Philippians
+  'philippians':11,'phil':11,'php':11,'phpl':11,'phi':11,
+  // Colossians
+  'colossians':12,'col':12,'co':12,
+  // 1 Thessalonians
+  '1thessalonians':13,'1thess':13,'1th':13,'1thes':13,
+  // 2 Thessalonians
+  '2thessalonians':14,'2thess':14,'2th':14,'2thes':14,
+  // 1 Timothy
+  '1timothy':15,'1tim':15,'1ti':15,
+  // 2 Timothy
+  '2timothy':16,'2tim':16,'2ti':16,
+  // Titus
+  'titus':17,'tit':17,'ti':17,
+  // Philemon
+  'philemon':18,'phlm':18,'phm':18,'philem':18,
+  // Hebrews
+  'hebrews':19,'heb':19,'he':19,
+  // James
+  'james':20,'jas':20,'jm':20,
+  // 1 Peter
+  '1peter':21,'1pet':21,'1pe':21,'1pt':21,
+  // 2 Peter
+  '2peter':22,'2pet':22,'2pe':22,'2pt':22,
+  // 1 John
+  '1john':23,'1jn':23,'1jo':23,
+  // 2 John
+  '2john':24,'2jn':24,'2jo':24,
+  // 3 John
+  '3john':25,'3jn':25,'3jo':25,
+  // Jude
+  'jude':26,'jud':26,'jd':26,
+  // Revelation
+  'revelation':27,'rev':27,'re':27,'rv':27,
+};
+
+function buildLemmaIndex(dict) {
+  // Build reverse map: Greek lemma → Strong's number
+  // dict: { "G3563": { lemma: "νοῦς", ... }, ... }
+  const idx = {};
+  for (const [num, entry] of Object.entries(dict)) {
+    if (entry.lemma) idx[entry.lemma] = num;
+  }
+  return idx;
+}
+
+async function fetchVerseStrongs(env, reference) {
+  // Returns { lemma: strongsNumber, ... } for all verifiable words in a NT verse.
+  // Returns null for OT passages (MorphGNT is NT only) or on any error.
+  if (!reference) return null;
+
+  // Parse reference: "Philippians 4:7", "Phil 4:7", "1 Cor 3:16", etc.
+  const m = reference.trim().match(/^(\d?\s*[a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(\d+):(\d+)/);
+  if (!m) return null;
+
+  // Normalize book name: lowercase, strip spaces/digits
+  const rawBook = m[1].trim().toLowerCase().replace(/\s+/g, '');
+  const chapter = parseInt(m[2], 10);
+  const verse   = parseInt(m[3], 10);
+
+  const bookInfo = MORPHGNT_BOOK_MAP[rawBook];
+  if (!bookInfo) return null; // OT or unrecognized → skip
+
+  // Build MorphGNT reference code: BBCCVV (2-digit each, zero-padded)
+  // MorphGNT book numbers: bookInfo (1–27), offset to file numbers 61–87
+  const bookNum = bookInfo; // 1 = Matthew … 27 = Revelation
+  const fileNum = bookNum + 60; // 61 = Matthew … 87 = Revelation
+  const refCode = String(bookNum).padStart(2, '0') +
+                  String(chapter).padStart(2, '0') +
+                  String(verse).padStart(2, '0');
+
+  // Check KV cache for this book's MorphGNT text
+  const kvKey = `morphgnt:book:${fileNum}:v1`;
+  let bookText = null;
+  if (env.ABIDE_KV) {
+    bookText = await env.ABIDE_KV.get(kvKey, 'text').catch(() => null);
+  }
+  if (!bookText) {
+    // File names: "61-Mt-morphgnt.txt" etc. — derive from fileNum
+    const fileNames = {
+      61:'61-Mt-morphgnt.txt', 62:'62-Mk-morphgnt.txt', 63:'63-Lk-morphgnt.txt',
+      64:'64-Jn-morphgnt.txt', 65:'65-Ac-morphgnt.txt', 66:'66-Ro-morphgnt.txt',
+      67:'67-1Co-morphgnt.txt', 68:'68-2Co-morphgnt.txt', 69:'69-Ga-morphgnt.txt',
+      70:'70-Eph-morphgnt.txt', 71:'71-Php-morphgnt.txt', 72:'72-Col-morphgnt.txt',
+      73:'73-1Th-morphgnt.txt', 74:'74-2Th-morphgnt.txt', 75:'75-1Ti-morphgnt.txt',
+      76:'76-2Ti-morphgnt.txt', 77:'77-Tit-morphgnt.txt', 78:'78-Phm-morphgnt.txt',
+      79:'79-Heb-morphgnt.txt', 80:'80-Jas-morphgnt.txt', 81:'81-1Pe-morphgnt.txt',
+      82:'82-2Pe-morphgnt.txt', 83:'83-1Jn-morphgnt.txt', 84:'84-2Jn-morphgnt.txt',
+      85:'85-3Jn-morphgnt.txt', 86:'86-Jud-morphgnt.txt', 87:'87-Re-morphgnt.txt',
+    };
+    const fileName = fileNames[fileNum];
+    if (!fileName) return null;
+    const res = await fetch(`${MORPHGNT_BASE}${fileName}`).catch(() => null);
+    if (!res?.ok) return null;
+    bookText = await res.text();
+    if (env.ABIDE_KV) {
+      env.ABIDE_KV.put(kvKey, bookText, { expirationTtl: MORPHGNT_CACHE_TTL }).catch(() => {});
+    }
+  }
+
+  // Filter lines for this verse (refCode matches start of line)
+  const verseLines = bookText
+    .split('\n')
+    .filter(l => l.startsWith(refCode + ' ') || l.startsWith(refCode + '\t'));
+
+  if (!verseLines.length) return null;
+
+  // Extract lemmas: last whitespace-separated token, strip trailing punctuation
+  const lemmas = [...new Set(
+    verseLines.map(l => {
+      const parts = l.trim().split(/\s+/);
+      const raw = parts[parts.length - 1] || '';
+      return raw.replace(/[.,;:·!?⸂⸃"'()[\]{}]/g, '').trim();
+    }).filter(l => l.length > 1)
+  )];
+
+  if (!lemmas.length) return null;
+
+  // Build reverse index from Strong's Greek dict and map lemmas → G-numbers
+  const greekDict = await loadStrongsDict(env, 'greek').catch(() => null);
+  if (!greekDict) return null;
+
+  const lemmaIndex = buildLemmaIndex(greekDict);
+  const result = {};
+  for (const lemma of lemmas) {
+    const num = lemmaIndex[lemma];
+    if (num) result[lemma] = num;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
 function wordCount(text = '') {
   return String(text)
     .trim()
@@ -1266,13 +1427,28 @@ export async function handleWordLookup(request, url, env, origin, json) {
   // ── Cache key ──────────────────────────────────────────────────────────────
   const refSlug = (context.reference || '').toLowerCase().replace(/\s+/g, '');
   const cacheKey = isPassageMode
-    ? `word:passage:v2:${refSlug}`
+    ? `word:passage:v3:${refSlug}`
     : `word:lookup:v3:${word.toLowerCase().trim()}:${refSlug}`;
 
   if (isFirstTurn && env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
   }
+
+  // ── Mode A: pre-fetch verified verse words from MorphGNT (NT only) ──────────
+  // This gives us the actual Greek lemmas present in the verse plus their
+  // confirmed Strong's numbers — injected into the prompt so the AI picks from
+  // real data instead of guessing from memory.
+  const verseStrongs = isPassageMode
+    ? await fetchVerseStrongs(env, context.reference).catch(() => null)
+    : null;
+
+  const verseAnchor = verseStrongs && Object.keys(verseStrongs).length
+    ? `\n\nVERIFIED ORIGINAL LANGUAGE WORDS IN THIS VERSE (from morphological tagging of the Greek NT — you MUST use ONLY these Strong's numbers for words you identify; do not invent other numbers):\n` +
+      Object.entries(verseStrongs)
+        .map(([lemma, num]) => `  ${num}: ${lemma}`)
+        .join('\n') + '\n'
+    : '';
 
   // ── Mode B: pre-fetch verified Strong's entry to anchor the prompt ──────────
   // If the caller passes context.strongsNumber (set by openWithSummary on the
@@ -1299,10 +1475,11 @@ as it appears in the English Bible text provided — NOT a label like "key", "co
 For example if the passage says "grace" use "grace", if it says "saved" use "saved". \
 For each word return its original Hebrew/Greek script, transliteration, Strong's number, and a \
 2–3 sentence explanation of its theological significance. \
+IMPORTANT: the strongsNumber field MUST be a real Strong's number (G#### for Greek, H#### for Hebrew). \
 Respond ONLY with valid JSON matching exactly this schema: \
 { "mode": "passage", "words": [ { "english": "<exact word from the verse>", "original": "<Hebrew or Greek script>", \
 "transliteration": "...", "strongsNumber": "...", "language": "Hebrew|Greek", \
-"summary": "..." } ] }`
+"summary": "..." } ] }${verseAnchor}`
     : `You are a Biblical Hebrew and Greek lexicon expert and theologian writing for a thoughtful, \
 curious Christian reader who wants genuine depth — not a dictionary entry.\n\n\
 When given an English word from a Bible passage:\n\
@@ -1416,20 +1593,21 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
   }
 
   // ── Mode A: verify AI-proposed Strong's numbers against the real dictionary ─
-  // Replace AI-hallucinated lemma/transliteration with confirmed dictionary data.
-  // The AI's summary (theological commentary) is kept as-is.
+  // Only keep chips whose proposed Strong's number resolves to a real entry.
+  // Chips with hallucinated/invented numbers are DROPPED entirely — a chip with
+  // a fabricated Greek word is worse than no chip.
   if (isPassageMode && result.words.length) {
-    result.words = await Promise.all(result.words.map(async (w) => {
-      if (!w.strongsNumber) return w;
+    result.words = (await Promise.all(result.words.map(async (w) => {
+      if (!w.strongsNumber) return null; // no number → unverifiable → drop
       const entry = await lookupStrongs(env, w.strongsNumber).catch(() => null);
-      if (!entry) return w; // number not found — leave AI data unchanged
+      if (!entry) return null; // not in Strong's dictionary → hallucinated → drop
       return {
         ...w,
         original:        entry.lemma    || w.original,
         transliteration: entry.translit || w.transliteration,
         language:        entry.language || w.language,
       };
-    }));
+    }))).filter(Boolean);
   }
 
   // ── Mode B: override lexical fields with verified Strong's data ────────────
