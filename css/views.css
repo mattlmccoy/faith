@@ -1058,7 +1058,8 @@
   position: sticky;
   bottom: 0;
   padding-top: var(--space-2);
-  background: linear-gradient(to top, var(--glass-fill, rgba(255, 255, 255, 0.95)) 70%, transparent);
+  /* Use the same glass-fill as the card — no white fallback so dark themes match */
+  background: var(--glass-fill);
 }
 
 .tour-callout__back,
