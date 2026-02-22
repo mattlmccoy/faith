@@ -29,6 +29,56 @@ const MODEL_LIST_CACHE_MS = 15 * 60 * 1000;
 let _modelListCache = null;
 let _modelListCachedAt = 0;
 
+// ── Strong's Concordance (Open Scriptures, CC-BY-SA, public domain 1890) ────
+// Cached in KV on first use — fetched once ever per language, ~1–2MB each.
+const STRONGS_GREEK_URL   = 'https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.js';
+const STRONGS_HEBREW_URL  = 'https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.js';
+const STRONGS_CACHE_TTL   = 30 * 24 * 60 * 60; // 30 days
+
+async function loadStrongsDict(env, language) {
+  const kvKey = `strongs:dict:${language}:v1`;
+  if (env.ABIDE_KV) {
+    const cached = await env.ABIDE_KV.get(kvKey, 'json');
+    if (cached) return cached;
+  }
+  const url = language === 'greek' ? STRONGS_GREEK_URL : STRONGS_HEBREW_URL;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Strong's ${language} fetch failed: ${res.status}`);
+  const text = await res.text();
+  // Strip JS wrapper: `var strongsXDictionary = {...}; module.exports = ...`
+  const start = text.indexOf('{');
+  const end   = text.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error(`Could not parse Strong's ${language} file`);
+  const dict = JSON.parse(text.slice(start, end + 1));
+  if (env.ABIDE_KV) {
+    await env.ABIDE_KV.put(kvKey, JSON.stringify(dict), { expirationTtl: STRONGS_CACHE_TTL });
+  }
+  return dict;
+}
+
+async function lookupStrongs(env, strongsNumber) {
+  if (!strongsNumber?.trim()) return null;
+  const num  = strongsNumber.trim().toUpperCase();
+  const lang = num.startsWith('G') ? 'greek' : num.startsWith('H') ? 'hebrew' : null;
+  if (!lang) return null;
+  try {
+    const dict  = await loadStrongsDict(env, lang);
+    const entry = dict[num];
+    if (!entry) return null;
+    return {
+      strongsNumber: num,
+      lemma:      entry.lemma || '',
+      translit:   entry.translit || entry.xlit || '',
+      definition: entry.strongs_def || '',
+      kjv:        entry.kjv_def || '',
+      language:   lang === 'greek' ? 'Greek' : 'Hebrew',
+    };
+  } catch (err) {
+    console.warn(`Strong's lookup failed for ${num}:`, err.message);
+    return null;
+  }
+}
+
 function wordCount(text = '') {
   return String(text)
     .trim()
@@ -1224,6 +1274,22 @@ export async function handleWordLookup(request, url, env, origin, json) {
     if (cached) return json(cached, 200, origin);
   }
 
+  // ── Mode B: pre-fetch verified Strong's entry to anchor the prompt ──────────
+  // If the caller passes context.strongsNumber (set by openWithSummary on the
+  // client after Mode A verified it), we look up the real dictionary entry and
+  // inject it as ground truth so the model cannot hallucinate the lemma.
+  const verifiedEntry = (!isPassageMode && isFirstTurn && context.strongsNumber)
+    ? await lookupStrongs(env, context.strongsNumber).catch(() => null)
+    : null;
+
+  const strongsAnchor = verifiedEntry
+    ? `\n\nVERIFIED LEXICAL DATA (Strong's Exhaustive Concordance — treat as absolute ground truth, do not contradict or alter):\n` +
+      `Strong's number: ${verifiedEntry.strongsNumber}\n` +
+      `Original word:   ${verifiedEntry.lemma}\n` +
+      `Transliteration: ${verifiedEntry.translit}\n` +
+      `Core definition: ${verifiedEntry.definition}\n`
+    : '';
+
   // ── Build prompts ──────────────────────────────────────────────────────────
   const systemPrompt = isPassageMode
     ? `You are a Biblical Hebrew and Greek scholar. Given a Bible passage, identify the 3–5 most \
@@ -1249,14 +1315,14 @@ Be thorough but not exhaustive — quality over length.\n\n\
 Respond ONLY with valid JSON: \
 { "mode": "word", "reply": "<2 paragraph markdown>", "word": "<original script>", \
 "transliteration": "...", "strongsNumber": "<H#### or G####>", "language": "Hebrew|Greek|Unknown" }\n\
-The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
+The reply field is plain Markdown prose — no code blocks, no JSON inside it.${strongsAnchor}`;
 
   const firstUserMsg = isPassageMode
     ? `Passage — ${context.reference || ''}:\n"${context.verseText || ''}"\n\nIdentify the 3–5 key Hebrew or Greek words that would most deepen a reader's understanding of this passage.`
     : isFirstTurn
       ? `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
-Give the original Hebrew or Greek word, its transliteration, Strong's number, and core definition. \
-Then write 2 rich paragraphs explaining its theological significance in this passage.`
+${verifiedEntry ? `The verified Strong's entry is ${verifiedEntry.strongsNumber} (${verifiedEntry.lemma}, "${verifiedEntry.translit}"). ` : ''}\
+Write 2 rich paragraphs explaining its theological significance in this passage, its range of meaning, and how it is used elsewhere in Scripture.`
       : history[history.length - 1]?.content || '';
 
   // ── Provider chain: Groq (70B) → OpenRouter (24B) → Gemini ───────────────
@@ -1347,6 +1413,32 @@ Then write 2 rich paragraphs explaining its theological significance in this pas
       words: [],
       reply: 'Could not look up this passage right now. Please try again.',
     }, 500, origin);
+  }
+
+  // ── Mode A: verify AI-proposed Strong's numbers against the real dictionary ─
+  // Replace AI-hallucinated lemma/transliteration with confirmed dictionary data.
+  // The AI's summary (theological commentary) is kept as-is.
+  if (isPassageMode && result.words.length) {
+    result.words = await Promise.all(result.words.map(async (w) => {
+      if (!w.strongsNumber) return w;
+      const entry = await lookupStrongs(env, w.strongsNumber).catch(() => null);
+      if (!entry) return w; // number not found — leave AI data unchanged
+      return {
+        ...w,
+        original:        entry.lemma    || w.original,
+        transliteration: entry.translit || w.transliteration,
+        language:        entry.language || w.language,
+      };
+    }));
+  }
+
+  // ── Mode B: override lexical fields with verified Strong's data ────────────
+  // The AI writes the theological commentary; the dictionary owns the lemma.
+  if (!isPassageMode && verifiedEntry) {
+    result.word            = verifiedEntry.lemma;
+    result.transliteration = verifiedEntry.translit;
+    result.strongsNumber   = verifiedEntry.strongsNumber;
+    result.language        = verifiedEntry.language;
   }
 
   // Cache: passage 24h, first-turn word lookup 30 days

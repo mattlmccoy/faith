@@ -324,7 +324,9 @@ const WordLookup = (() => {
   // ── public: openWithSummary(word, context, wordEntry) ─────────────
   function openWithSummary(word, context, wordEntry) {
     _word    = wordEntry.english || word;
-    _context = context || {};
+    // Forward the verified strongsNumber into context so the worker can
+    // look up the real Strong's entry and anchor the Mode B response.
+    _context = { ...(context || {}), strongsNumber: wordEntry.strongsNumber || '' };
     _history = [];
 
     buildPanel();
