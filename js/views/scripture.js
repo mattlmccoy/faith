@@ -141,9 +141,6 @@ const ScriptureView = (() => {
     if (currentRef) {
       loadPassage(currentRef);
     }
-
-    // Mount the floating Ask button (once per render)
-    AskChat.mountFAB(container);
   }
 
   function setupModeToggle(root) {

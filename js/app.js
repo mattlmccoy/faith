@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.22.11';
+  const APP_VERSION = '2026.02.22.12';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v56';
+  window.__ABIDE_SW_VERSION__ = 'abide-v57';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -94,6 +94,11 @@
     Router.register('/plan', (container) => {
       Router.setTitle('Build This Week');
       PlanView.render(container);
+    });
+
+    Router.register('/ask', (container) => {
+      Router.setTitle('Ask the Bible');
+      AskView.render(container);
     });
 
     Router.register('/settings', (container) => {
