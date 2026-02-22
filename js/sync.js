@@ -361,9 +361,10 @@ const Sync = (() => {
       const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
       const res = await driveFetch(url);
       const contentType = String(res.headers.get('content-type') || '').toLowerCase();
-      const data = contentType.includes('application/json')
+      const raw = contentType.includes('application/json')
         ? await res.json()
-        : normalizeJsonPayload(await res.text());
+        : await res.text();
+      const data = normalizeJsonPayload(raw);
       return { found: true, fileId, fileName: '', data };
     } catch (_) {
       return { found: false, fileId: '', fileName: '', data: null };
@@ -393,7 +394,9 @@ const Sync = (() => {
     if (!fileId) return { found: false, fileId: '', data: null };
     const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
     const res = await driveFetch(url);
-    const data = await res.json();
+    const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+    const raw = contentType.includes('application/json') ? await res.json() : await res.text();
+    const data = normalizeJsonPayload(raw);
     return { found: true, fileId, data };
   }
 
@@ -418,17 +421,12 @@ const Sync = (() => {
     const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
     const res = await driveFetch(url);
     const contentType = String(res.headers.get('content-type') || '').toLowerCase();
-    let data;
-    if (contentType.includes('application/json')) {
-      data = await res.json();
-    } else {
-      data = await res.text();
-    }
+    const raw = contentType.includes('application/json') ? await res.json() : await res.text();
     return {
       found: true,
       fileId,
       fileName,
-      data: normalizeJsonPayload(data),
+      data: normalizeJsonPayload(raw),
     };
   }
 

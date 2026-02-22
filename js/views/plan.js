@@ -119,7 +119,8 @@ const PlanView = (() => {
     const currentWeekTheme = String(currentPlan?.theme || '').trim() || inferThemeFromDays(currentPlan) || DEFAULT_WEEK_THEME;
     const currentWeekStart = currentPlan?.week || defaultWeekStart;
     const isDefaultWeek = !currentPlan || !!currentPlan?.seedDefault;
-    const trustedPastors = Store.getTrustedPastors().filter(p => p.enabled).map(p => p.name);
+    const trustedPastorsState = Store.getTrustedPastors();
+    const trustedPastors = trustedPastorsState.filter(p => p.enabled).map(p => p.name);
     const hasPreviousPlan = Store.hasPlanHistory();
     const pendingPlan = Store.getPendingPlanInfo();
     const dayKeys = Object.keys(currentPlan?.days || {}).sort((a, b) => a.localeCompare(b));
@@ -166,12 +167,21 @@ const PlanView = (() => {
       <div style="background:var(--glass-fill);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);margin-bottom:var(--space-5);">
         <div style="font-size:var(--text-xs);font-weight:var(--weight-bold);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:var(--space-2);">Inspired by trusted teachers</div>
         <div id="pastor-chips" style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3);">
-          ${trustedPastors.length
-            ? trustedPastors.map(name => `<span class="pastor-chip">${name}</span>`).join('')
+          ${trustedPastorsState.length
+            ? trustedPastorsState.map((pastor) => `
+                <button
+                  type="button"
+                  class="pastor-chip"
+                  data-pastor-chip="${escapeHtml(pastor.name)}"
+                  aria-pressed="${pastor.enabled ? 'true' : 'false'}"
+                  style="${pastor.enabled ? '' : 'opacity:0.55;'}"
+                  title="${pastor.enabled ? 'Included in AI influence' : 'Not included in AI influence'}"
+                >${escapeHtml(pastor.name)}</button>
+              `).join('')
             : '<span class="text-sm text-secondary">No trusted pastors selected yet.</span>'}
         </div>
         <p style="font-size:var(--text-xs);color:var(--text-tertiary);line-height:1.5;">
-          Manage trusted pastors in Settings. Every generated day will list who influenced it.
+          Tap names to include/exclude them for this build. This also updates Settings.
         </p>
       </div>
 
@@ -248,6 +258,26 @@ const PlanView = (() => {
         }
       });
     }
+
+    root.querySelectorAll('[data-pastor-chip]').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const name = String(chip.getAttribute('data-pastor-chip') || '').trim();
+        if (!name) return;
+        const pastors = Store.getTrustedPastors();
+        const idx = pastors.findIndex((p) => String(p?.name || '').trim().toLowerCase() === name.toLowerCase());
+        if (idx < 0) return;
+        pastors[idx] = { ...pastors[idx], enabled: !pastors[idx].enabled };
+        if (!pastors.some((p) => p.enabled)) {
+          pastors[idx] = { ...pastors[idx], enabled: true };
+          alert('At least one trusted pastor must stay enabled.');
+          return;
+        }
+        Store.setTrustedPastors(pastors);
+        chip.setAttribute('aria-pressed', pastors[idx].enabled ? 'true' : 'false');
+        chip.style.opacity = pastors[idx].enabled ? '1' : '0.55';
+        chip.title = pastors[idx].enabled ? 'Included in AI influence' : 'Not included in AI influence';
+      });
+    });
 
     // Voice dictation
     const micBtn = root.querySelector('#btn-mic');

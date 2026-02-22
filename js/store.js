@@ -895,6 +895,9 @@ const Store = (() => {
   }
 
   function importDevotionsSnapshot(snapshot = {}, options = {}) {
+    if (snapshot && typeof snapshot === 'object' && snapshot.data && typeof snapshot.data === 'object') {
+      snapshot = snapshot.data;
+    }
     if (snapshot && typeof snapshot === 'object' && snapshot.devotions && typeof snapshot.devotions === 'object') {
       snapshot = snapshot.devotions;
     }
@@ -1021,7 +1024,8 @@ const Store = (() => {
     Object.assign(_state, merged);
 
     if (Array.isArray(snapshot.trustedPastors) && snapshot.trustedPastors.length) {
-      _state.trustedPastors = normalizeTrustedPastors([...(snapshot.trustedPastors || []), ...getTrustedPastors()]);
+      // Preserve locally-added pastors/flags first, then merge in Drive pastors.
+      _state.trustedPastors = normalizeTrustedPastors([...getTrustedPastors(), ...(snapshot.trustedPastors || [])]);
     }
     save();
     return { importedSettings: true, importedPastors: Array.isArray(snapshot.trustedPastors) ? snapshot.trustedPastors.length : 0 };
