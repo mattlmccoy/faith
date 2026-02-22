@@ -1217,7 +1217,7 @@ export async function handleWordLookup(request, url, env, origin, json) {
   const refSlug = (context.reference || '').toLowerCase().replace(/\s+/g, '');
   const cacheKey = isPassageMode
     ? `word:passage:v2:${refSlug}`
-    : `word:lookup:v2:${word.toLowerCase().trim()}:${refSlug}`;
+    : `word:lookup:v3:${word.toLowerCase().trim()}:${refSlug}`;
 
   if (isFirstTurn && env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
@@ -1237,13 +1237,20 @@ Respond ONLY with valid JSON matching exactly this schema: \
 { "mode": "passage", "words": [ { "english": "<exact word from the verse>", "original": "<Hebrew or Greek script>", \
 "transliteration": "...", "strongsNumber": "...", "language": "Hebrew|Greek", \
 "summary": "..." } ] }`
-    : `You are a Biblical Hebrew and Greek lexicon expert and theologian. \
-When given an English word from a Bible passage, identify the most likely underlying \
-Hebrew (OT) or Greek (NT) word and explain it for a thoughtful Christian reader. \
-Keep initial responses concise but theologically rich. For follow-up questions, go deeper. \
-Respond ONLY with valid JSON: { "mode": "word", "reply": "<2–3 paragraph markdown>", \
-"word": "<original script>", "transliteration": "...", "strongsNumber": "<H#### or G####>", \
-"language": "Hebrew|Greek|Unknown" } \
+    : `You are a Biblical Hebrew and Greek lexicon expert and theologian writing for a thoughtful, \
+curious Christian reader who wants genuine depth — not a dictionary entry.\n\n\
+When given an English word from a Bible passage:\n\
+1. Identify the underlying Hebrew (OT) or Greek (NT) word\n\
+2. Give its original script, transliteration, Strong's number, and literal meaning\n\
+3. Explain the word's range of meaning and how it differs from its simple English translation\n\
+4. Explain its theological significance in this specific passage — what does understanding \
+the original word reveal that the English obscures?\n\
+5. If relevant, note how this word is used elsewhere in Scripture to illuminate its meaning here\n\n\
+Write 3–4 substantial paragraphs in clear, engaging prose. Use **bold** for key terms. \
+Do NOT be brief — depth and theological richness are the entire point of this feature.\n\n\
+Respond ONLY with valid JSON: \
+{ "mode": "word", "reply": "<3-4 paragraph markdown>", "word": "<original script>", \
+"transliteration": "...", "strongsNumber": "<H#### or G####>", "language": "Hebrew|Greek|Unknown" }\n\
 The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
 
   const firstUserMsg = isPassageMode
@@ -1251,10 +1258,10 @@ The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
     : isFirstTurn
       ? `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
 Give the original Hebrew or Greek word, its transliteration, Strong's number, and core definition. \
-Then explain its theological significance in this passage.`
+Then write 3–4 paragraphs explaining its full theological significance in this passage.`
       : history[history.length - 1]?.content || '';
 
-  // ── Provider chain: Groq → OpenRouter → Gemini ────────────────────────────
+  // ── Provider chain: Groq (70B) → OpenRouter (24B) → Gemini ───────────────
   const providers = [
     {
       name: 'groq',
@@ -1262,8 +1269,9 @@ Then explain its theological significance in this passage.`
         systemPrompt,
         userPrompt: firstUserMsg,
         temperature: 0.25,
-        maxOutputTokens: 1400,
+        maxOutputTokens: 2000,
         jsonMode: true,
+        preferredModel: 'llama-3.3-70b-versatile', // force 70B — much richer output
       }),
     },
     {
@@ -1272,8 +1280,9 @@ Then explain its theological significance in this passage.`
         systemPrompt,
         userPrompt: firstUserMsg,
         temperature: 0.25,
-        maxOutputTokens: 1400,
+        maxOutputTokens: 2000,
         jsonMode: true,
+        preferredModel: 'mistralai/mistral-small-3.1-24b-instruct:free', // 24B free model
       }),
     },
     {
@@ -1287,7 +1296,7 @@ Then explain its theological significance in this passage.`
           const payload = {
             systemInstruction: { parts: [{ text: systemPrompt }] },
             contents: [{ role: 'user', parts: [{ text: firstUserMsg }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 1400, responseMimeType: 'application/json' },
+            generationConfig: { temperature: 0.25, maxOutputTokens: 2000, responseMimeType: 'application/json' },
           };
           const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
           if (!res.ok) { const t = await res.text(); console.warn(`Gemini(${model}) word lookup ${res.status}: ${t.slice(0, 200)}`); continue; }
