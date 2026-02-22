@@ -1073,10 +1073,12 @@
   color: var(--color-primary);
   opacity: 0.75;
   background: none;
-  border: none;
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  padding: 4px 0;
+  padding: 4px 8px;
   font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
 }
 .passage-dive-btn:hover { opacity: 1; }
 .passage-dive-btn svg { flex-shrink: 0; }
@@ -1127,6 +1129,7 @@ mark.wl-highlight:focus {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  -webkit-tap-highlight-color: transparent;
   padding: 7px 12px;
   border-radius: var(--radius-md);
   background: var(--glass-fill, rgba(255,255,255,0.7));
@@ -1189,6 +1192,7 @@ mark.wl-highlight:focus {
   cursor: pointer;
   font-family: inherit;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 .wl-explore-btn:hover,
 .wl-explore-btn:focus {

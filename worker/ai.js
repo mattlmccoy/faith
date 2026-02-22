@@ -1607,13 +1607,16 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
       } else if (isFirstTurn) {
         // First turn: expect JSON with word/transliteration/strongsNumber/reply
         const parsed = parseJsonBlock(response.text);
+        // Use parsed.word only if it looks like non-Latin script (Greek/Hebrew).
+        // Models often echo the English word back — we prefer the original script.
+        const hasOriginalScript = /[\u0370-\u03FF\u05D0-\u05EA\u0590-\u05CF\u1F00-\u1FFF]/.test(parsed.word || '');
         result = {
           mode: 'word',
           reply: parsed.reply || response.text,
-          word: parsed.word || word,
-          transliteration: parsed.transliteration || '',
+          word: hasOriginalScript ? parsed.word : (verifiedEntry?.lemma || parsed.word || word),
+          transliteration: parsed.transliteration || verifiedEntry?.translit || '',
           strongsNumber: parsed.strongsNumber || '',
-          language: parsed.language || 'Unknown',
+          language: parsed.language || verifiedEntry?.language || 'Unknown',
           provider: response.provider || provider.name,
         };
       } else {

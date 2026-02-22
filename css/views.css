@@ -1003,6 +1003,7 @@
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 6px;
+  -webkit-tap-highlight-color: transparent;
 }
 .tour-callout__skip:hover {
   background: var(--divider, rgba(0, 0, 0, 0.06));
@@ -1060,6 +1061,7 @@
 .tour-callout__back,
 .tour-callout__next {
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tour-callout--centered {
