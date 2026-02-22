@@ -333,9 +333,49 @@ const WordLookup = (() => {
   }
 
   // ── public: open(word, context) ───────────────────────────────────
-  function open(word, context) {
+  async function resolveWordContext(word, context = {}) {
+    const base = { ...(context || {}) };
+    if (base.strongsNumber) return base;
+    const refSlug = String(base.reference || '').toLowerCase().replace(/\s+/g, '');
+    if (!refSlug) return base;
+
+    const normalize = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const target = normalize(word);
+    if (!target) return base;
+
+    let words = [];
+    const cached = window.Cache?.get?.(`wordpassage:v3:${refSlug}`);
+    if (Array.isArray(cached?.words) && cached.words.length) {
+      words = cached.words;
+    } else if (base.reference && base.verseText) {
+      try {
+        const analysed = await API.wordLookupPassage({ reference: base.reference, verseText: base.verseText });
+        words = Array.isArray(analysed?.words) ? analysed.words : [];
+      } catch {
+        words = [];
+      }
+    }
+
+    if (!words.length) return base;
+    const exact = words.find((w) => normalize(w.english) === target);
+    const loose = words.find((w) => {
+      const e = normalize(w.english);
+      return e === target.replace(/s$/, '') || target === e.replace(/s$/, '');
+    });
+    const match = exact || loose;
+    if (!match) return base;
+    return {
+      ...base,
+      strongsNumber: match.strongsNumber || '',
+      originalWord: match.original || '',
+      transliteration: match.transliteration || '',
+      language: match.language || '',
+    };
+  }
+
+  async function open(word, context) {
     _word    = word.replace(/[^\w\u0370-\u03FF\u0400-\u04FF\u05D0-\u05EA\u0600-\u06FF'\-]/g, '').trim() || word.trim();
-    _context = context || {};
+    _context = await resolveWordContext(_word, context || {});
     _history = [];
 
     buildPanel();

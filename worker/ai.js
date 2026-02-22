@@ -1568,7 +1568,7 @@ export async function handleWordLookup(request, url, env, origin, json) {
   // This gives us the actual Greek lemmas present in the verse plus their
   // confirmed Strong's numbers — injected into the prompt so the AI picks from
   // real data instead of guessing from memory.
-  const verseStrongs = isPassageMode
+  const verseStrongs = context.reference
     ? await fetchVerseStrongs(env, context.reference).catch(() => null)
     : null;
 
@@ -1592,6 +1592,11 @@ export async function handleWordLookup(request, url, env, origin, json) {
       `Original word:   ${verifiedEntry.lemma}\n` +
       `Transliteration: ${verifiedEntry.translit}\n` +
       `Core definition: ${verifiedEntry.definition}\n`
+    : '';
+  const verseWordAnchor = (!verifiedEntry && !isPassageMode && verseStrongs && Object.keys(verseStrongs).length)
+    ? `\n\nVERIFIED ORIGINAL LANGUAGE WORDS IN THIS VERSE (Greek NT tagging):\n` +
+      Object.entries(verseStrongs).map(([lemma, num]) => `  ${num}: ${lemma}`).join('\n') +
+      `\nYou must choose the underlying word from this list and must not invent Strong's numbers outside this set.\n`
     : '';
 
   // ── Build prompts ──────────────────────────────────────────────────────────
@@ -1618,7 +1623,7 @@ Be thorough but not exhaustive — quality over length.\n\n\
 Respond ONLY with valid JSON: \
 { "mode": "word", "reply": "<2 paragraph markdown>", "word": "<original script>", \
 "transliteration": "...", "strongsNumber": "<H#### or G####>", "language": "Hebrew|Greek|Unknown" }\n\
-The reply field is plain Markdown prose — no code blocks, no JSON inside it.${strongsAnchor}`;
+The reply field is plain Markdown prose — no code blocks, no JSON inside it.${strongsAnchor}${verseWordAnchor}`;
 
   // ── Build the message list for this turn ──────────────────────────────────
   // Mode A (passage): always single-turn JSON
@@ -1730,6 +1735,14 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
           language: parsed.language || verifiedEntry?.language || 'Unknown',
           provider: response.provider || provider.name,
         };
+        if (!verifiedEntry && verseStrongs && Object.keys(verseStrongs).length) {
+          const allowed = new Set(Object.values(verseStrongs).map((v) => String(v || '').toUpperCase()).filter(Boolean));
+          const claimed = String(result.strongsNumber || '').toUpperCase();
+          if (claimed && !allowed.has(claimed)) {
+            result.strongsNumber = '';
+            result.language = 'Unknown';
+          }
+        }
       } else {
         // Follow-up turn: plain markdown reply, preserve lexical data from context
         result = {
