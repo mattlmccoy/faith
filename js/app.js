@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.22.1';
+  const APP_VERSION = '2026.02.22.2';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v46';
+  window.__ABIDE_SW_VERSION__ = 'abide-v47';
 
   function getBasePath() {
     const path = window.location.pathname || '/';

@@ -160,17 +160,20 @@ async function fetchVerseStrongs(env, reference) {
   // Returns null for OT passages (MorphGNT is NT only) or on any error.
   if (!reference) return null;
 
-  // Parse reference: "Philippians 4:7", "Phil 4:7", "1 Cor 3:16", etc.
+  // Parse reference: "Philippians 4:7", "Phil 4:7", "1 Cor 3:16", "Phil 4:6-7", etc.
+  // Multi-verse ranges like "4:6-7" → use the FIRST verse (the passage context gives full text)
   const m = reference.trim().match(/^(\d?\s*[a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(\d+):(\d+)/);
-  if (!m) return null;
+  if (!m) { console.log(`[fetchVerseStrongs] Could not parse reference: "${reference}"`); return null; }
 
-  // Normalize book name: lowercase, strip spaces/digits
+  // Normalize book name: lowercase, strip spaces
   const rawBook = m[1].trim().toLowerCase().replace(/\s+/g, '');
   const chapter = parseInt(m[2], 10);
   const verse   = parseInt(m[3], 10);
 
+  console.log(`[fetchVerseStrongs] ref="${reference}" → book="${rawBook}" ch=${chapter} v=${verse}`);
+
   const bookInfo = MORPHGNT_BOOK_MAP[rawBook];
-  if (!bookInfo) return null; // OT or unrecognized → skip
+  if (!bookInfo) { console.log(`[fetchVerseStrongs] OT or unknown book: "${rawBook}"`); return null; }
 
   // Build MorphGNT reference code: BBCCVV (2-digit each, zero-padded)
   // MorphGNT book numbers: bookInfo (1–27), offset to file numbers 61–87
@@ -179,6 +182,7 @@ async function fetchVerseStrongs(env, reference) {
   const refCode = String(bookNum).padStart(2, '0') +
                   String(chapter).padStart(2, '0') +
                   String(verse).padStart(2, '0');
+  console.log(`[fetchVerseStrongs] bookNum=${bookNum} fileNum=${fileNum} refCode=${refCode}`);
 
   // Check KV cache for this book's MorphGNT text
   const kvKey = `morphgnt:book:${fileNum}:v1`;
@@ -214,29 +218,37 @@ async function fetchVerseStrongs(env, reference) {
     .split('\n')
     .filter(l => l.startsWith(refCode + ' ') || l.startsWith(refCode + '\t'));
 
-  if (!verseLines.length) return null;
+  if (!verseLines.length) {
+    console.log(`[fetchVerseStrongs] No lines found for refCode=${refCode}`);
+    return null;
+  }
+  console.log(`[fetchVerseStrongs] Found ${verseLines.length} lines for refCode=${refCode}`);
 
   // Extract lemmas: last whitespace-separated token, strip trailing punctuation
   const lemmas = [...new Set(
     verseLines.map(l => {
       const parts = l.trim().split(/\s+/);
       const raw = parts[parts.length - 1] || '';
-      return raw.replace(/[.,;:·!?⸂⸃"'()[\]{}]/g, '').trim();
+      return raw.replace(/[.,;:·!?⸂⸃"'()[\]{}⌈⌉]/g, '').trim();
     }).filter(l => l.length > 1)
   )];
+
+  console.log(`[fetchVerseStrongs] Lemmas: ${lemmas.join(', ')}`);
 
   if (!lemmas.length) return null;
 
   // Build reverse index from Strong's Greek dict and map lemmas → G-numbers
   const greekDict = await loadStrongsDict(env, 'greek').catch(() => null);
-  if (!greekDict) return null;
+  if (!greekDict) { console.log('[fetchVerseStrongs] Greek dict load failed'); return null; }
 
   const lemmaIndex = buildLemmaIndex(greekDict);
   const result = {};
   for (const lemma of lemmas) {
     const num = lemmaIndex[lemma];
     if (num) result[lemma] = num;
+    else console.log(`[fetchVerseStrongs] No Strong's match for lemma: "${lemma}"`);
   }
+  console.log(`[fetchVerseStrongs] Resolved ${Object.keys(result).length} of ${lemmas.length} lemmas`);
   return Object.keys(result).length ? result : null;
 }
 
@@ -423,6 +435,7 @@ function extractTextFromOpenAIChoice(content) {
 async function runOpenRouter(env, {
   systemPrompt,
   userPrompt,
+  messages: messagesOverride = null, // optional: full conversation history (overrides systemPrompt+userPrompt)
   temperature = 0.65,
   maxOutputTokens = 4096,
   jsonMode = false,
@@ -438,6 +451,11 @@ async function runOpenRouter(env, {
     ...DEFAULT_OPENROUTER_MODELS,
   ].filter(Boolean);
 
+  const messages = messagesOverride || [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+
   let lastError = null;
   for (const model of [...new Set(candidates)]) {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
@@ -451,10 +469,7 @@ async function runOpenRouter(env, {
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
         temperature,
         max_tokens: maxOutputTokens,
         ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
@@ -483,6 +498,7 @@ async function runOpenRouter(env, {
 async function runGroq(env, {
   systemPrompt,
   userPrompt,
+  messages: messagesOverride = null, // optional: full conversation history (overrides systemPrompt+userPrompt)
   temperature = 0.65,
   maxOutputTokens = 4096,
   jsonMode = false,
@@ -498,6 +514,11 @@ async function runGroq(env, {
     ...DEFAULT_GROQ_MODELS,
   ].filter(Boolean);
 
+  const messages = messagesOverride || [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ];
+
   let lastError = null;
   for (const model of [...new Set(candidates)]) {
     const endpoint = 'https://api.groq.com/openai/v1/chat/completions';
@@ -509,10 +530,7 @@ async function runGroq(env, {
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
+        messages,
         temperature,
         max_tokens: maxOutputTokens,
         ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
@@ -1451,10 +1469,9 @@ export async function handleWordLookup(request, url, env, origin, json) {
     : '';
 
   // ── Mode B: pre-fetch verified Strong's entry to anchor the prompt ──────────
-  // If the caller passes context.strongsNumber (set by openWithSummary on the
-  // client after Mode A verified it), we look up the real dictionary entry and
-  // inject it as ground truth so the model cannot hallucinate the lemma.
-  const verifiedEntry = (!isPassageMode && isFirstTurn && context.strongsNumber)
+  // Fetch for ALL Mode B turns (not just first turn) so the system prompt always
+  // contains the verified lexical data regardless of conversation depth.
+  const verifiedEntry = (!isPassageMode && context.strongsNumber)
     ? await lookupStrongs(env, context.strongsNumber).catch(() => null)
     : null;
 
@@ -1469,17 +1486,15 @@ export async function handleWordLookup(request, url, env, origin, json) {
   // ── Build prompts ──────────────────────────────────────────────────────────
   const systemPrompt = isPassageMode
     ? `You are a Biblical Hebrew and Greek scholar. Given a Bible passage, identify the 3–5 most \
-theologically significant words where knowing the original language deepens understanding. \
-CRITICAL RULES for the "english" field: it MUST be the exact word (or a root form of the word) \
-as it appears in the English Bible text provided — NOT a label like "key", "concept", or "theme". \
-For example if the passage says "grace" use "grace", if it says "saved" use "saved". \
-For each word return its original Hebrew/Greek script, transliteration, Strong's number, and a \
-2–3 sentence explanation of its theological significance. \
-IMPORTANT: the strongsNumber field MUST be a real Strong's number (G#### for Greek, H#### for Hebrew). \
+theologically significant words where knowing the original language deepens understanding.\
+${verseAnchor}\
+CRITICAL RULES: (1) The "english" field MUST be the exact word as it appears in the English Bible text — NOT "key", "concept", or "theme". \
+(2) If a VERIFIED WORDS list is provided above, you MUST use ONLY those Strong's numbers — do not invent any others. \
+(3) For each word provide original Hebrew/Greek script, transliteration, its Strong's number, and a 2–3 sentence theological explanation. \
 Respond ONLY with valid JSON matching exactly this schema: \
 { "mode": "passage", "words": [ { "english": "<exact word from the verse>", "original": "<Hebrew or Greek script>", \
-"transliteration": "...", "strongsNumber": "...", "language": "Hebrew|Greek", \
-"summary": "..." } ] }${verseAnchor}`
+"transliteration": "...", "strongsNumber": "<G#### or H####>", "language": "Hebrew|Greek", \
+"summary": "..." } ] }`
     : `You are a Biblical Hebrew and Greek lexicon expert and theologian writing for a thoughtful, \
 curious Christian reader who wants genuine depth — not a dictionary entry.\n\n\
 When given an English word from a Bible passage:\n\
@@ -1494,24 +1509,37 @@ Respond ONLY with valid JSON: \
 "transliteration": "...", "strongsNumber": "<H#### or G####>", "language": "Hebrew|Greek|Unknown" }\n\
 The reply field is plain Markdown prose — no code blocks, no JSON inside it.${strongsAnchor}`;
 
+  // ── Build the message list for this turn ──────────────────────────────────
+  // Mode A (passage): always single-turn JSON
+  // Mode B first turn: JSON response with word/transliteration/strongsNumber fields
+  // Mode B follow-up: plain markdown reply; pass full history as conversation context
   const firstUserMsg = isPassageMode
     ? `Passage — ${context.reference || ''}:\n"${context.verseText || ''}"\n\nIdentify the 3–5 key Hebrew or Greek words that would most deepen a reader's understanding of this passage.`
-    : isFirstTurn
-      ? `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
+    : `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
 ${verifiedEntry ? `The verified Strong's entry is ${verifiedEntry.strongsNumber} (${verifiedEntry.lemma}, "${verifiedEntry.translit}"). ` : ''}\
-Write 2 rich paragraphs explaining its theological significance in this passage, its range of meaning, and how it is used elsewhere in Scripture.`
-      : history[history.length - 1]?.content || '';
+Write 2 rich paragraphs explaining its theological significance in this passage, its range of meaning, and how it is used elsewhere in Scripture.`;
+
+  // For follow-up turns, build a full chat history: [system, user, assistant, user, ...]
+  // history = [{role:'user',content:...},{role:'assistant',content:...}, ...]
+  const conversationMessages = (!isPassageMode && !isFirstTurn)
+    ? [
+        { role: 'system', content: systemPrompt },
+        ...history.map(h => ({ role: h.role, content: h.content })),
+      ]
+    : null; // null = use default systemPrompt+firstUserMsg construction
 
   // ── Provider chain: Groq (70B) → OpenRouter (24B) → Gemini ───────────────
+  const useJsonMode = isPassageMode || isFirstTurn; // follow-ups respond with plain markdown
   const providers = [
     {
       name: 'groq',
       run: () => runGroq(env, {
         systemPrompt,
         userPrompt: firstUserMsg,
+        messages: conversationMessages || undefined,
         temperature: 0.25,
         maxOutputTokens: 2000,
-        jsonMode: true,
+        jsonMode: useJsonMode,
         preferredModel: 'llama-3.3-70b-versatile', // force 70B — much richer output
       }),
     },
@@ -1520,9 +1548,10 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
       run: () => runOpenRouter(env, {
         systemPrompt,
         userPrompt: firstUserMsg,
+        messages: conversationMessages || undefined,
         temperature: 0.25,
         maxOutputTokens: 2000,
-        jsonMode: true,
+        jsonMode: useJsonMode,
         preferredModel: 'mistralai/mistral-small-3.1-24b-instruct:free', // 24B free model
       }),
     },
@@ -1534,10 +1563,20 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
         const modelCandidates = buildModelCandidates(env, discoveredModels, '');
         for (const model of modelCandidates) {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+          // For follow-up turns, build multi-turn Gemini contents array
+          const contents = conversationMessages
+            ? conversationMessages
+                .filter(m => m.role !== 'system')
+                .map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }))
+            : [{ role: 'user', parts: [{ text: firstUserMsg }] }];
           const payload = {
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: firstUserMsg }] }],
-            generationConfig: { temperature: 0.25, maxOutputTokens: 2000, responseMimeType: 'application/json' },
+            contents,
+            generationConfig: {
+              temperature: 0.25,
+              maxOutputTokens: 2000,
+              ...(useJsonMode ? { responseMimeType: 'application/json' } : {}),
+            },
           };
           const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
           if (!res.ok) { const t = await res.text(); console.warn(`Gemini(${model}) word lookup ${res.status}: ${t.slice(0, 200)}`); continue; }
@@ -1556,16 +1595,18 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
   for (const provider of providers) {
     try {
       const response = await provider.run();
-      const parsed = parseJsonBlock(response.text);
 
       if (isPassageMode) {
+        const parsed = parseJsonBlock(response.text);
         result = {
           mode: 'passage',
           words: Array.isArray(parsed.words) ? parsed.words.slice(0, 5) : [],
           provider: response.provider || provider.name,
         };
         if (!result.words.length) throw new Error('Empty words array from ' + provider.name);
-      } else {
+      } else if (isFirstTurn) {
+        // First turn: expect JSON with word/transliteration/strongsNumber/reply
+        const parsed = parseJsonBlock(response.text);
         result = {
           mode: 'word',
           reply: parsed.reply || response.text,
@@ -1575,6 +1616,19 @@ Write 2 rich paragraphs explaining its theological significance in this passage,
           language: parsed.language || 'Unknown',
           provider: response.provider || provider.name,
         };
+      } else {
+        // Follow-up turn: plain markdown reply, preserve lexical data from context
+        result = {
+          mode: 'word',
+          reply: response.text,
+          // Carry forward the verified lexical data from the original context
+          word: verifiedEntry ? verifiedEntry.lemma : (context.originalWord || word),
+          transliteration: verifiedEntry ? verifiedEntry.translit : (context.transliteration || ''),
+          strongsNumber: context.strongsNumber || '',
+          language: verifiedEntry ? verifiedEntry.language : (context.language || 'Unknown'),
+          provider: response.provider || provider.name,
+        };
+        if (!result.reply?.trim()) throw new Error('Empty follow-up reply from ' + provider.name);
       }
       break;
     } catch (err) {
