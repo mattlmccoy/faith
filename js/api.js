@@ -281,8 +281,33 @@ const API = (() => {
   }
 
   // --- Hebrew / Greek Word Deep Dive ---
+
+  // Mode A: passage analysis — AI picks 3–5 key words for the whole passage
+  async function wordLookupPassage(context) {
+    const cacheKey = `wordpassage:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+    const cached = Cache.get(cacheKey);
+    if (cached) return cached;
+
+    const res = await fetch(`${workerUrl()}/word/lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ context }), // no `word` field → Mode A
+    });
+
+    if (!res.ok) {
+      let msg = 'Passage analysis failed';
+      try { const d = await res.json(); msg = d?.error || msg; } catch {}
+      throw new Error(msg);
+    }
+
+    const data = await res.json();
+    Store.trackUsage('wordLookupQueries', 1);
+    Cache.set(cacheKey, data, 24 * 60 * 60 * 1000); // 24h
+    return data;
+  }
+
+  // Mode B: single word follow-up conversation
   async function wordLookup(word, context = {}, history = []) {
-    // word: string, context: { reference, verseText }, history: [{role, content}]
     const isFirstTurn = history.length === 0;
     const cacheKey = `wordlookup:${word.toLowerCase()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
 
@@ -330,6 +355,7 @@ const API = (() => {
     bibleTranslation,
     translationLabel,
     wordLookup,
+    wordLookupPassage,
   };
 })();
 

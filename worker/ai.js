@@ -1208,80 +1208,142 @@ export async function handleWordLookup(request, url, env, origin, json) {
   try { body = await request.json(); } catch {}
 
   const { word, context = {}, history = [] } = body;
-  if (!word?.trim()) return json({ error: 'word required' }, 400, origin);
 
-  const isFirstTurn = history.length === 0;
-  const cacheKey = `word:lookup:v2:${word.toLowerCase().trim()}:${(context.reference || '').toLowerCase().replace(/\s+/g, '')}`;
+  // Mode A = passage analysis (no word supplied); Mode B = single word follow-up
+  const isPassageMode = !word?.trim();
+  const isFirstTurn   = history.length === 0;
+
+  // ── Cache key ──────────────────────────────────────────────────────────────
+  const refSlug = (context.reference || '').toLowerCase().replace(/\s+/g, '');
+  const cacheKey = isPassageMode
+    ? `word:passage:v1:${refSlug}`
+    : `word:lookup:v2:${word.toLowerCase().trim()}:${refSlug}`;
 
   if (isFirstTurn && env.ABIDE_KV) {
     const cached = await env.ABIDE_KV.get(cacheKey, 'json');
     if (cached) return json(cached, 200, origin);
   }
 
-  if (!env.GEMINI_API_KEY) {
-    return json({ error: 'GEMINI_API_KEY not configured', reply: 'Word lookup is not available right now.' }, 503, origin);
-  }
-
-  const systemPrompt = `You are a Biblical Hebrew and Greek lexicon expert and theologian. \
+  // ── Build prompts ──────────────────────────────────────────────────────────
+  const systemPrompt = isPassageMode
+    ? `You are a Biblical Hebrew and Greek scholar. Given a Bible passage, identify the 3–5 most \
+theologically significant words where knowing the original language deepens understanding. \
+For each word return its original Hebrew/Greek, transliteration, Strong's number, and a \
+2–3 sentence explanation of its theological significance. \
+Respond ONLY with valid JSON matching exactly this schema: \
+{ "mode": "passage", "words": [ { "english": "...", "original": "...", \
+"transliteration": "...", "strongsNumber": "...", "language": "Hebrew|Greek", \
+"summary": "..." } ] }`
+    : `You are a Biblical Hebrew and Greek lexicon expert and theologian. \
 When given an English word from a Bible passage, identify the most likely underlying \
 Hebrew (OT) or Greek (NT) word and explain it for a thoughtful Christian reader. \
 Keep initial responses concise but theologically rich. For follow-up questions, go deeper. \
-Always respond in JSON: { "reply": "<markdown>", "word": "<original script>", "transliteration": "<romanized>", "strongsNumber": "<H#### or G####>", "language": "<Hebrew|Greek|Unknown>" } \
+Respond ONLY with valid JSON: { "mode": "word", "reply": "<2–3 paragraph markdown>", \
+"word": "<original script>", "transliteration": "...", "strongsNumber": "<H#### or G####>", \
+"language": "Hebrew|Greek|Unknown" } \
 The reply field is plain Markdown prose — no code blocks, no JSON inside it.`;
 
-  // Build first-turn user message
-  const firstUserMsg = `In ${context.reference || 'this verse'}: "${context.verseText || ''}" — \
-explain the word "${word}". Give the original Hebrew or Greek word, its transliteration, \
-Strong's number, and core definition. Then explain its theological significance in this passage.`;
+  const firstUserMsg = isPassageMode
+    ? `Passage — ${context.reference || ''}:\n"${context.verseText || ''}"\n\nIdentify the 3–5 key Hebrew or Greek words that would most deepen a reader's understanding of this passage.`
+    : isFirstTurn
+      ? `In ${context.reference || 'this passage'}: "${context.verseText || ''}" — explain the word "${word}". \
+Give the original Hebrew or Greek word, its transliteration, Strong's number, and core definition. \
+Then explain its theological significance in this passage.`
+      : history[history.length - 1]?.content || '';
 
-  // Build Gemini contents array (handles multi-turn)
-  const contents = isFirstTurn
-    ? [{ role: 'user', parts: [{ text: firstUserMsg }] }]
-    : [
-        { role: 'user', parts: [{ text: firstUserMsg }] },
-        ...history.slice(1).map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        })),
-      ];
+  // ── Provider chain: Groq → OpenRouter → Gemini ────────────────────────────
+  const providers = [
+    {
+      name: 'groq',
+      run: () => runGroq(env, {
+        systemPrompt,
+        userPrompt: firstUserMsg,
+        temperature: 0.25,
+        maxOutputTokens: 1400,
+        jsonMode: true,
+      }),
+    },
+    {
+      name: 'openrouter',
+      run: () => runOpenRouter(env, {
+        systemPrompt,
+        userPrompt: firstUserMsg,
+        temperature: 0.25,
+        maxOutputTokens: 1400,
+        jsonMode: true,
+      }),
+    },
+    {
+      name: 'gemini',
+      run: async () => {
+        if (!env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured');
+        const discoveredModels = await listGeminiGenerateModels(env);
+        const modelCandidates = buildModelCandidates(env, discoveredModels, '');
+        for (const model of modelCandidates) {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+          const payload = {
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: firstUserMsg }] }],
+            generationConfig: { temperature: 0.25, maxOutputTokens: 1400, responseMimeType: 'application/json' },
+          };
+          const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (!res.ok) { const t = await res.text(); console.warn(`Gemini(${model}) word lookup ${res.status}: ${t.slice(0, 200)}`); continue; }
+          const data = await res.json();
+          const text = (data?.candidates || []).flatMap(c => c?.content?.parts || []).map(p => p?.text || '').join('\n').trim();
+          if (text) return { text, model, provider: 'gemini' };
+        }
+        throw new Error('All Gemini models returned empty');
+      },
+    },
+  ];
 
-  try {
-    const discoveredModels = await listGeminiGenerateModels(env);
-    const modelCandidates = buildModelCandidates(env, discoveredModels, '');
+  let result = null;
+  let lastErr = null;
 
-    let response = null;
-    for (const model of modelCandidates) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
-      const payload = {
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { temperature: 0.3, maxOutputTokens: 900, responseMimeType: 'application/json' },
-      };
-      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!res.ok) { const t = await res.text(); console.warn(`Gemini(${model}) word lookup ${res.status}: ${t.slice(0, 200)}`); continue; }
-      const data = await res.json();
-      const text = (data?.candidates || []).flatMap(c => c?.content?.parts || []).map(p => p?.text || '').join('\n').trim();
-      if (text) { response = { text, model }; break; }
+  for (const provider of providers) {
+    try {
+      const response = await provider.run();
+      const parsed = parseJsonBlock(response.text);
+
+      if (isPassageMode) {
+        result = {
+          mode: 'passage',
+          words: Array.isArray(parsed.words) ? parsed.words.slice(0, 5) : [],
+          provider: response.provider || provider.name,
+        };
+        if (!result.words.length) throw new Error('Empty words array from ' + provider.name);
+      } else {
+        result = {
+          mode: 'word',
+          reply: parsed.reply || response.text,
+          word: parsed.word || word,
+          transliteration: parsed.transliteration || '',
+          strongsNumber: parsed.strongsNumber || '',
+          language: parsed.language || 'Unknown',
+          provider: response.provider || provider.name,
+        };
+      }
+      break;
+    } catch (err) {
+      console.warn(`Word lookup ${provider.name} failed:`, err.message);
+      lastErr = err;
     }
-
-    if (!response) throw new Error('All Gemini models returned empty');
-
-    const parsed = parseJsonBlock(response.text);
-    const result = {
-      reply: parsed.reply || response.text,
-      word: parsed.word || word,
-      transliteration: parsed.transliteration || '',
-      strongsNumber: parsed.strongsNumber || '',
-      language: parsed.language || 'Unknown',
-      provider: 'gemini',
-    };
-
-    if (isFirstTurn && env.ABIDE_KV) {
-      await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: 30 * 24 * 60 * 60 });
-    }
-    return json(result, 200, origin);
-  } catch (err) {
-    console.error('Word lookup error:', err.message);
-    return json({ error: err.message, reply: 'Could not look up this word. Please try again.', word, transliteration: '', strongsNumber: '', language: 'Unknown' }, 500, origin);
   }
+
+  if (!result) {
+    return json({
+      error: lastErr?.message || 'All providers failed',
+      mode: isPassageMode ? 'passage' : 'word',
+      words: [],
+      reply: 'Could not look up this passage right now. Please try again.',
+    }, 500, origin);
+  }
+
+  // Cache: passage 24h, first-turn word lookup 30 days
+  if (isFirstTurn && env.ABIDE_KV) {
+    const ttl = isPassageMode ? 24 * 60 * 60 : 30 * 24 * 60 * 60;
+    await env.ABIDE_KV.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl });
+  }
+
+  return json(result, 200, origin);
 }
