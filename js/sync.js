@@ -644,35 +644,64 @@ const Sync = (() => {
     const { fileId, resourceKey } = parseDriveShareReference(linkOrId);
     if (!fileId) throw new Error('Could not parse a Google Drive file ID from that link');
 
+    // ── Strategy 1: Route through the Cloudflare Worker as a server-side proxy.
+    // The Worker fetches the file without any user OAuth token, which is the only
+    // reliable way to read files from another user's Drive when using
+    // "Anyone with the link" permission (Drive API v3 cross-account reads are
+    // blocked even for public files when the recipient's own token is attached).
     let payload = null;
+    const DEFAULT_WORKER = 'https://abide-worker.mattlmccoy.workers.dev';
+    const workerBase = String(Store.get('workerUrl') || DEFAULT_WORKER).replace(/\/$/, '');
+
     try {
-      const rkParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
-      const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${rkParam}`;
-      const res = await driveFetch(url);
-      payload = normalizeJsonPayload(await res.text());
-    } catch (err) {
-      const fallbackUrls = [
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : ''}`,
-        `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+      const proxyRes = await fetch(`${workerBase}/drive/proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, resourceKey: resourceKey || undefined }),
+      });
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data && typeof data === 'object' && !data.error) {
+          payload = data;
+        }
+      }
+    } catch (_) {}
+
+    // ── Strategy 2: Direct unauthenticated fetch (no Drive API, no OAuth).
+    // Works if the browser isn't blocking cross-origin and Google serves the file.
+    if (!payload) {
+      const publicUrls = [
         `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+        `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
       ];
-      for (const fallbackUrl of fallbackUrls) {
+      for (const u of publicUrls) {
         try {
-          const res = await fetch(fallbackUrl, { method: 'GET' });
-          if (!res.ok) continue;
-          payload = normalizeJsonPayload(await res.text());
+          const r = await fetch(u, { method: 'GET' });
+          if (!r.ok) continue;
+          const ct = String(r.headers.get('content-type') || '');
+          if (ct.includes('text/html')) continue; // login redirect
+          payload = normalizeJsonPayload(await r.text());
           if (payload && typeof payload === 'object') break;
+          payload = null;
         } catch (_) {}
       }
-      if (!payload) {
-        if (String(err?.message || '').includes('404')) {
-          throw new Error(`Shared file was not found or is not accessible. Ask the sender to re-share with "Anyone with the link" and resend the full link.`);
-        }
-        throw err;
-      }
     }
+
+    // ── Strategy 3: Authenticated Drive API (only works if recipient happens to
+    // have access, e.g. same Google Workspace domain or explicit share).
+    if (!payload) {
+      try {
+        const rkParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
+        const apiUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${rkParam}`;
+        const res = await driveFetch(apiUrl);
+        payload = normalizeJsonPayload(await res.text());
+      } catch (_) {}
+    }
+
     if (!payload || typeof payload !== 'object') {
-      throw new Error('Shared file did not contain valid JSON');
+      throw new Error(
+        'Could not access the shared file. Make sure the sender shared it with "Anyone with the link" access, then try again.'
+      );
     }
 
     let entries = [];

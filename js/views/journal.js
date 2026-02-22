@@ -129,10 +129,49 @@ const JournalView = (() => {
             <p class="empty-state__description">Your reflections will appear here as you write each day.</p>
           </div>`}
       </div>
+
+      <!-- Ask the Bible -->
+      <div class="section-header" style="margin-top:8px;">
+        <span class="section-title">Ask the Bible</span>
+      </div>
+      <div class="journal-ask-panel" id="journal-ask-panel">
+        <div class="journal-ask-convo" id="journal-ask-convo">
+          <div class="ask-hint" style="padding:var(--space-5) var(--space-3) var(--space-3);text-align:center;">
+            <p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin:0 0 var(--space-3);line-height:var(--leading-normal);">Ask anything — what does the Bible say about anxiety? Who was Melchizedek?</p>
+            <div class="ask-suggestions">
+              <button class="ask-suggestion-chip" data-q="What does the Bible say about anxiety?">Anxiety</button>
+              <button class="ask-suggestion-chip" data-q="What does it mean to abide in Christ?">Abide</button>
+              <button class="ask-suggestion-chip" data-q="Who was Melchizedek?">Melchizedek</button>
+              <button class="ask-suggestion-chip" data-q="What is the armor of God?">Armor of God</button>
+            </div>
+          </div>
+        </div>
+        <div class="ask-loading" id="journal-ask-loading" hidden>
+          <span class="ask-loading__dot"></span>
+          <span class="ask-loading__dot"></span>
+          <span class="ask-loading__dot"></span>
+        </div>
+        <div class="ask-input-row journal-ask-input-row" id="journal-ask-input-row">
+          <input class="ask-input" id="journal-ask-input" type="text"
+            placeholder="Ask a Bible question…"
+            autocomplete="off" autocorrect="off" spellcheck="false" />
+          <button class="ask-send" id="journal-ask-send" aria-label="Send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     `;
 
     container.innerHTML = '';
     container.appendChild(div);
+
+    // Wire up inline Ask panel
+    _mountInlineAsk(div);
 
     // Auto-save on type
     const textarea = div.querySelector('#journal-textarea');
@@ -328,6 +367,105 @@ const JournalView = (() => {
     }
     if (openPastDate === key) openPastDate = '';
     render(document.getElementById('view-container'));
+  }
+
+  // ── Inline Ask the Bible panel ───────────────────────────────────────────
+
+  let _askHistory = [];  // persists across journal re-renders
+  let _askLoading = false;
+
+  function _escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function _mdToHtml(md) {
+    return md
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>').replace(/$/, '</p>');
+  }
+
+  function _appendAskBubble(role, htmlContent) {
+    const conv = document.getElementById('journal-ask-convo');
+    if (!conv) return;
+    conv.querySelector('.ask-hint')?.remove();
+    const el = document.createElement('div');
+    el.className = `ask-msg ask-msg--${role}`;
+    el.innerHTML = `<div class="ask-bubble">${htmlContent}</div>`;
+    conv.appendChild(el);
+    conv.scrollTop = conv.scrollHeight;
+  }
+
+  function _mountInlineAsk(root) {
+    // Re-render any existing history
+    if (_askHistory.length) {
+      const conv = document.getElementById('journal-ask-convo');
+      if (conv) {
+        conv.innerHTML = '';
+        _askHistory.forEach(h => {
+          const el = document.createElement('div');
+          el.className = `ask-msg ask-msg--${h.role}`;
+          el.innerHTML = `<div class="ask-bubble">${h.role === 'user' ? _escHtml(h.content) : _mdToHtml(h.content)}</div>`;
+          conv.appendChild(el);
+        });
+        conv.scrollTop = conv.scrollHeight;
+      }
+    }
+
+    const input = document.getElementById('journal-ask-input');
+    const send  = document.getElementById('journal-ask-send');
+    if (!input || !send) return;
+
+    async function handleAskSend(text) {
+      text = text || input.value.trim();
+      if (!text || _askLoading) return;
+      input.value = '';
+      _appendAskBubble('user', _escHtml(text));
+      _askHistory.push({ role: 'user', content: text });
+
+      if (!API.hasWorker()) {
+        _appendAskBubble('assistant', '<em>Worker URL not configured. Go to More → Settings → Advanced.</em>');
+        return;
+      }
+
+      _askLoading = true;
+      const loadingEl = document.getElementById('journal-ask-loading');
+      const inputRow  = document.getElementById('journal-ask-input-row');
+      if (loadingEl) loadingEl.hidden = false;
+      if (inputRow)  inputRow.style.opacity = '0.4';
+
+      try {
+        const historyToSend = _askHistory.slice(0, -1);
+        const data = await API.askBibleQuestion(text, historyToSend);
+        const reply = data.reply || "Sorry, I couldn't find an answer. Please try again.";
+        _askHistory.push({ role: 'assistant', content: reply });
+        _appendAskBubble('assistant', _mdToHtml(reply));
+      } catch (err) {
+        _appendAskBubble('assistant', `<em>Error: ${_escHtml(err.message)}</em>`);
+      } finally {
+        _askLoading = false;
+        const le = document.getElementById('journal-ask-loading');
+        const ir = document.getElementById('journal-ask-input-row');
+        if (le) le.hidden = true;
+        if (ir) ir.style.opacity = '';
+        input.focus();
+      }
+    }
+
+    send.addEventListener('click', () => handleAskSend());
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAskSend(); }
+    });
+
+    // Suggestion chips
+    root.querySelectorAll('#journal-ask-panel .ask-suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => { const q = chip.dataset.q; if (q) handleAskSend(q); });
+    });
   }
 
   return { render, saveEntry, usePrompt, togglePast, uploadHistory, downloadHistory, deleteEntry };

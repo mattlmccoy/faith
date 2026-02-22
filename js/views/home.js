@@ -45,6 +45,8 @@ const HomeView = (() => {
       let _refreshPill = null;
 
       container.addEventListener('touchstart', (e) => {
+        // Only activate on the home view
+        if (Router.current !== '/') return;
         if (container.scrollTop === 0) {
           _pullStartY = e.touches[0].clientY;
           _pulling = true;

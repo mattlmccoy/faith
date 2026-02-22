@@ -123,6 +123,44 @@ export default {
         return handleFeedback(request, url, env, origin, json);
       }
 
+      // Drive share proxy — fetches a public "anyoneWithLink" Drive file server-side
+      // so the recipient doesn't need the sender's OAuth token.
+      // POST /drive/proxy  body: { fileId, resourceKey? }
+      if (url.pathname === '/drive/proxy' && request.method === 'POST') {
+        let body;
+        try { body = await request.json(); } catch (_) { return json({ error: 'Invalid JSON' }, 400, origin); }
+        const { fileId, resourceKey } = body || {};
+        if (!fileId || typeof fileId !== 'string' || !/^[A-Za-z0-9_-]{10,}$/.test(fileId)) {
+          return json({ error: 'Missing or invalid fileId' }, 400, origin);
+        }
+        const rkParam = resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : '';
+        // Try Drive API v3 (works for public files without auth)
+        const candidates = [
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true${rkParam}`,
+          `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+          `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}${resourceKey ? `&resourcekey=${encodeURIComponent(resourceKey)}` : ''}`,
+        ];
+        let text = null;
+        for (const candidate of candidates) {
+          try {
+            const r = await fetch(candidate, { redirect: 'follow' });
+            if (!r.ok) continue;
+            const ct = String(r.headers.get('content-type') || '');
+            if (ct.includes('text/html')) continue; // Drive login redirect
+            text = await r.text();
+            if (text && text.trim().startsWith('{')) break;
+            text = null;
+          } catch (_) {}
+        }
+        if (!text) return json({ error: 'Could not fetch shared file — check permissions' }, 502, origin);
+        let data;
+        try { data = JSON.parse(text); } catch (_) { return json({ error: 'Shared file is not valid JSON' }, 502, origin); }
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+        });
+      }
+
       return json({ error: 'Not found' }, 404, origin);
     } catch (err) {
       console.error('Worker error:', err);

@@ -6,7 +6,7 @@ const Router = (() => {
   const routes = {};
   let currentRoute = null;
   let prevTab = null;
-  const TAB_ORDER = ['/', '/scripture', '/prayer', '/journal', '/ask'];
+  const TAB_ORDER = ['/', '/scripture', '/prayer', '/journal', '/settings'];
 
   function register(path, handler) {
     routes[path] = handler;
