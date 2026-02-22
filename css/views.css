@@ -953,11 +953,12 @@
   position: fixed;
   z-index: 910;
   border-radius: var(--radius-md, 12px);
-  /* Subtle ring — highlights the target without dimming the whole screen */
-  box-shadow:
-    0 0 0 3px var(--color-primary, #2D5016),
-    0 0 0 6px color-mix(in srgb, var(--color-primary, #2D5016) 25%, transparent),
-    0 4px 20px rgba(0, 0, 0, 0.15);
+  /* box-shadow trick: dims everything OUTSIDE the highlighted rect.
+     The JS isVisible check ensures this element is only made visible
+     (opacity: 1) when the target is actually within the viewport,
+     so the shadow never covers the whole screen on off-screen targets. */
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
+  outline: 2px solid rgba(255, 255, 255, 0.30);
   pointer-events: none;
   opacity: 0;
   transition:

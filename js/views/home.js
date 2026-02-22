@@ -699,9 +699,11 @@ const HomeView = (() => {
       // this prevents the box-shadow from covering the whole screen when the
       // highlighted element (e.g. a tab icon) is below the Safari bottom bar.
       const rect = target ? target.getBoundingClientRect() : null;
+      // Use visual viewport height when available (accounts for iOS Safari chrome).
+      const vvHeight = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
       const isVisible = rect &&
         rect.width > 0 && rect.height > 0 &&
-        rect.top  < window.innerHeight && rect.bottom > 0 &&
+        rect.top  < vvHeight && rect.bottom > 0 &&
         rect.left < window.innerWidth  && rect.right  > 0;
 
       if (target && isVisible) {
