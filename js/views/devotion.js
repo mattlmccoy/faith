@@ -302,28 +302,10 @@ const DevotionView = (() => {
     }
     if (Store.get('googleProfile')) {
       try {
-        const entry = {
-          id: `${selectedDate}-${session}`,
-          dateKey: selectedDate,
-          session,
-          title: sessionData?.title || sessionData?.opening_verse?.reference || '',
-          theme: devotionData?.theme || '',
-          openingVerse: sessionData?.opening_verse || null,
-          body: sessionData?.body || [],
-          reflectionPrompts: sessionData?.reflection_prompts || [],
-          prayer: sessionData?.prayer || '',
-          devotionData: JSON.parse(JSON.stringify({
-            theme: devotionData?.theme || '',
-            sources: Array.isArray(devotionData?.sources) ? devotionData.sources : [],
-            faith_stretch: devotionData?.faith_stretch || null,
-            morning: devotionData?.morning || null,
-            evening: devotionData?.evening || null,
-          })),
-        };
-        const shared = await Sync.createSharedDevotionLink(entry);
+        const shared = await Sync.createSharedCurrentWeekLink();
         const linkShare = await DevotionShare.shareLink({
-          title: payload.title,
-          text: 'Open this shared devotional from Abide',
+          title: `${devotionData?.theme || 'Weekly Devotional'} — Shared Abide Week`,
+          text: 'Open this shared weekly devotion series from Abide',
           url: shared.shareUrl,
         });
         if (!linkShare.ok && !linkShare.aborted) {

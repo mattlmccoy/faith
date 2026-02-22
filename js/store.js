@@ -68,7 +68,7 @@ const Store = (() => {
     googleClientId: DEFAULT_GOOGLE_CLIENT_ID,
     googleDriveFolderId: '',
     googleDriveFileId: '',
-    googleDriveFiles: { devotions: '', journals: '', settings: '' },
+    googleDriveFiles: { devotions: '', journals: '', settings: '', shares: '' },
     lastDriveSyncAt: null,
     googleProfile: null,      // { sub, email, name, picture }
     googleConnectedAt: null,
@@ -98,12 +98,13 @@ const Store = (() => {
         _state.googleClientId = DEFAULT_GOOGLE_CLIENT_ID;
       }
       if (!_state.googleDriveFiles || typeof _state.googleDriveFiles !== 'object') {
-        _state.googleDriveFiles = { devotions: '', journals: '', settings: '' };
+        _state.googleDriveFiles = { devotions: '', journals: '', settings: '', shares: '' };
       } else {
         _state.googleDriveFiles = {
           devotions: String(_state.googleDriveFiles.devotions || ''),
           journals: String(_state.googleDriveFiles.journals || ''),
           settings: String(_state.googleDriveFiles.settings || ''),
+          shares: String(_state.googleDriveFiles.shares || ''),
         };
       }
       if (Number(_state._defaultsVersion || 0) < 3) {

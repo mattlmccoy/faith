@@ -7,6 +7,7 @@ const Sync = (() => {
   const DEVOTIONS_FILE_NAME = 'abide-devotions.json';
   const JOURNALS_FILE_NAME = 'abide-journals.json';
   const SETTINGS_FILE_NAME = 'abide-settings.json';
+  const SHARES_FOLDER_NAME = 'abide-shares';
   const FOLDER_NAME = 'abidefaith-docs';
   const LEGACY_FOLDER_NAMES = ['abide-devotions', 'abide-devotions-docs', 'abidefaith'];
   const DEVOTIONS_FILE_CANDIDATES = [DEVOTIONS_FILE_NAME, 'abide-devotions', LEGACY_FILE_NAME, 'abide-saved-devotions'];
@@ -228,6 +229,51 @@ const Sync = (() => {
     return folderId;
   }
 
+  async function findSubfolderId(parentFolderId, folderName) {
+    if (!parentFolderId || !folderName) return '';
+    const q = encodeURIComponent(
+      `name='${escapeQueryValue(folderName)}' and '${escapeQueryValue(parentFolderId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    );
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1&orderBy=modifiedTime desc`;
+    const res = await driveFetch(url);
+    const data = await res.json();
+    return data?.files?.[0]?.id || '';
+  }
+
+  async function createSubfolder(parentFolderId, folderName) {
+    const metadata = {
+      name: folderName,
+      parents: [parentFolderId],
+      mimeType: 'application/vnd.google-apps.folder',
+    };
+    const res = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(metadata),
+    });
+    const data = await res.json();
+    return data?.id || '';
+  }
+
+  async function findOrCreateSharesFolderId(rootFolderId) {
+    let shareFolderId = String((Store.get('googleDriveFiles') || {}).shares || '').trim();
+    if (shareFolderId) return shareFolderId;
+    shareFolderId = await findSubfolderId(rootFolderId, SHARES_FOLDER_NAME);
+    if (!shareFolderId) shareFolderId = await createSubfolder(rootFolderId, SHARES_FOLDER_NAME);
+    if (shareFolderId) {
+      const files = Store.get('googleDriveFiles') || {};
+      Store.update({
+        googleDriveFiles: {
+          devotions: String(files.devotions || ''),
+          journals: String(files.journals || ''),
+          settings: String(files.settings || ''),
+          shares: shareFolderId,
+        },
+      });
+    }
+    return shareFolderId;
+  }
+
   async function findExistingFolderId() {
     let folderId = (Store.get('googleDriveFolderId') || '').trim();
     if (!folderId) folderId = await findFolderId();
@@ -411,35 +457,122 @@ const Sync = (() => {
     });
   }
 
-  async function createSharedDevotionLink(entry = {}) {
-    const folderId = await findOrCreateFolderId();
-    if (!folderId) throw new Error('Could not create/find Google Drive folder');
-
-    const profile = Store.get('googleProfile') || {};
-    const now = new Date();
-    const datePart = now.toISOString().slice(0, 10);
-    const random = Math.random().toString(36).slice(2, 8);
-    const safeTitle = String(entry.title || entry.openingVerse?.reference || 'devotion')
+  function slugify(value = '') {
+    return String(value || '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '')
-      .slice(0, 36) || 'devotion';
-    const fileName = `abide-share-${datePart}-${safeTitle}-${random}.json`;
+      .slice(0, 48);
+  }
+
+  function entryToSavedShape(entry = {}) {
+    const devotionData = entry.devotionData && typeof entry.devotionData === 'object' ? entry.devotionData : {};
+    const session = entry.session === 'evening' ? 'evening' : 'morning';
+    const sessionData = devotionData?.[session] || {};
+    const id = String(entry.id || `${entry.dateKey || DateUtils.today()}-${session}`);
+    return {
+      id,
+      dateKey: String(entry.dateKey || DateUtils.today()),
+      session,
+      savedAt: String(entry.savedAt || new Date().toISOString()),
+      theme: String(entry.theme || devotionData.theme || ''),
+      title: String(entry.title || sessionData.title || ''),
+      openingVerse: sessionData.opening_verse || entry.openingVerse || null,
+      body: Array.isArray(sessionData.body) && sessionData.body.length ? sessionData.body : (Array.isArray(entry.body) ? entry.body : []),
+      reflectionPrompts: Array.isArray(sessionData.reflection_prompts) && sessionData.reflection_prompts.length
+        ? sessionData.reflection_prompts
+        : (Array.isArray(entry.reflectionPrompts) ? entry.reflectionPrompts : []),
+      prayer: String(sessionData.prayer || entry.prayer || ''),
+      inspiredBy: Array.isArray(sessionData.inspired_by) && sessionData.inspired_by.length
+        ? sessionData.inspired_by
+        : (Array.isArray(entry.inspiredBy) ? entry.inspiredBy : []),
+      devotionData: {
+        theme: String(devotionData.theme || entry.theme || ''),
+        sources: Array.isArray(devotionData.sources) ? devotionData.sources : [],
+        faith_stretch: devotionData.faith_stretch || null,
+        morning: devotionData.morning || null,
+        evening: devotionData.evening || null,
+      },
+    };
+  }
+
+  function normalizeShareEntries(entries = []) {
+    return (Array.isArray(entries) ? entries : [])
+      .filter((entry) => entry && typeof entry === 'object')
+      .map((entry) => entryToSavedShape(entry));
+  }
+
+  function buildCurrentWeekShareEntries() {
+    const plan = Store.getPlan();
+    const days = plan?.days && typeof plan.days === 'object' ? plan.days : {};
+    const dayKeys = Object.keys(days).sort((a, b) => a.localeCompare(b));
+    const entries = [];
+
+    dayKeys.forEach((dateKey) => {
+      const day = days[dateKey] || {};
+      ['morning', 'evening'].forEach((session) => {
+        const sessionData = day?.[session];
+        if (!sessionData) return;
+        entries.push(entryToSavedShape({
+          id: `${dateKey}-${session}`,
+          dateKey,
+          session,
+          theme: day.theme || plan?.theme || '',
+          title: sessionData.title || '',
+          openingVerse: sessionData.opening_verse || null,
+          body: Array.isArray(sessionData.body) ? sessionData.body : [],
+          reflectionPrompts: Array.isArray(sessionData.reflection_prompts) ? sessionData.reflection_prompts : [],
+          prayer: sessionData.prayer || '',
+          inspiredBy: Array.isArray(sessionData.inspired_by) ? sessionData.inspired_by : [],
+          devotionData: {
+            theme: day.theme || plan?.theme || '',
+            sources: Array.isArray(day.sources) ? day.sources : [],
+            faith_stretch: day.faith_stretch || null,
+            morning: day.morning || null,
+            evening: day.evening || null,
+          },
+        }));
+      });
+    });
+
+    return entries;
+  }
+
+  async function createSharedSeriesLink(series = {}) {
+    const rootFolderId = await findOrCreateFolderId();
+    if (!rootFolderId) throw new Error('Could not create/find Google Drive folder');
+    const sharesFolderId = await findOrCreateSharesFolderId(rootFolderId);
+    if (!sharesFolderId) throw new Error('Could not create/find share folder');
+
+    const profile = Store.get('googleProfile') || {};
+    const entries = normalizeShareEntries(series.entries || []);
+    if (!entries.length) throw new Error('No devotion entries found for this series');
+
+    const weekKey = String(series.weekKey || DateUtils.weekStart(entries[0].dateKey || DateUtils.today()));
+    const theme = String(series.theme || entries[0].theme || 'Shared Week').trim() || 'Shared Week';
+    const seriesSlug = slugify(`${weekKey}-${theme}`) || `week-${weekKey}`;
+    const fileName = `abide-share-week-${seriesSlug}.json`;
 
     const payload = {
-      type: 'abide-shared-devotion',
-      version: 1,
-      sharedAt: now.toISOString(),
+      type: 'abide-shared-series',
+      version: 2,
+      sharedAt: new Date().toISOString(),
       from: {
         name: profile.name || '',
         email: profile.email || '',
         sub: profile.sub || '',
       },
-      entry,
+      series: {
+        id: String(series.id || `${weekKey}::${theme.toLowerCase()}`),
+        weekKey,
+        theme,
+        entryCount: entries.length,
+      },
+      entries,
     };
 
-    const fileId = await createFile(payload, folderId, fileName);
-    if (!fileId) throw new Error('Could not create share file');
+    const fileId = await upsertJsonFile(sharesFolderId, fileName, payload);
+    if (!fileId) throw new Error('Could not create shared series file');
     await setAnyoneReaderPermission(fileId);
     const links = await getFileLinks(fileId);
 
@@ -448,6 +581,29 @@ const Sync = (() => {
       fileName,
       shareUrl: links.webViewLink || links.webContentLink || `https://drive.google.com/file/d/${fileId}/view`,
     };
+  }
+
+  async function createSharedCurrentWeekLink() {
+    const entries = buildCurrentWeekShareEntries();
+    if (!entries.length) throw new Error('No weekly devotion plan available to share yet');
+    const firstDate = entries[0].dateKey || DateUtils.today();
+    const plan = Store.getPlan() || {};
+    return createSharedSeriesLink({
+      id: `${DateUtils.weekStart(firstDate)}::${String(plan.theme || entries[0].theme || 'shared').toLowerCase()}`,
+      weekKey: DateUtils.weekStart(firstDate),
+      theme: String(plan.theme || entries[0].theme || 'Shared Week'),
+      entries,
+    });
+  }
+
+  async function createSharedDevotionLink(entry = {}) {
+    const normalized = entryToSavedShape(entry || {});
+    return createSharedSeriesLink({
+      id: `${DateUtils.weekStart(normalized.dateKey)}::${String(normalized.theme || 'shared').toLowerCase()}`,
+      weekKey: DateUtils.weekStart(normalized.dateKey),
+      theme: normalized.theme || 'Shared Week',
+      entries: [normalized],
+    });
   }
 
   async function importSharedDevotion(linkOrId = '') {
@@ -461,30 +617,41 @@ const Sync = (() => {
       throw new Error('Shared file did not contain valid JSON');
     }
 
-    let entry = null;
-    if (payload.type === 'abide-shared-devotion' && payload.entry && typeof payload.entry === 'object') {
-      entry = payload.entry;
+    let entries = [];
+    let shareMeta = {};
+    if (payload.type === 'abide-shared-series' && Array.isArray(payload.entries)) {
+      entries = payload.entries;
+      shareMeta = payload.series || {};
+    } else if (payload.type === 'abide-shared-devotion' && payload.entry && typeof payload.entry === 'object') {
+      entries = [payload.entry];
     } else if (payload.devotion && typeof payload.devotion === 'object') {
-      entry = payload.devotion;
+      entries = [payload.devotion];
     } else if (payload.id && typeof payload === 'object') {
-      entry = payload;
+      entries = [payload];
     }
 
-    if (!entry) throw new Error('This file is not a supported shared devotional format');
-
-    const id = String(entry.id || `${entry.dateKey || DateUtils.today()}-${entry.session || 'morning'}-shared-${fileId.slice(-6)}`);
-    const normalizedEntry = { ...entry, id, importedFromShare: fileId };
+    if (!entries.length) throw new Error('This file is not a supported shared devotional format');
+    const normalizedEntries = normalizeShareEntries(entries).map((entry, index) => {
+      const baseId = String(entry.id || `${entry.dateKey || DateUtils.today()}-${entry.session || 'morning'}`);
+      const hasExisting = !!Store.getSavedDevotionById(baseId);
+      const safeId = hasExisting ? `${baseId}-shared-${fileId.slice(-6)}-${index + 1}` : baseId;
+      return { ...entry, id: safeId, importedFromShare: fileId };
+    });
+    const ids = normalizedEntries.map((entry) => entry.id);
+    const lib = {};
+    normalizedEntries.forEach((entry) => { lib[entry.id] = entry; });
 
     Store.importSavedDevotionsSnapshot({
-      savedDevotions: [id],
-      savedDevotionLibrary: { [id]: normalizedEntry },
+      savedDevotions: ids,
+      savedDevotionLibrary: lib,
     });
 
     return {
       imported: true,
-      id,
+      id: ids[0] || '',
+      importedCount: ids.length,
       fileId,
-      title: normalizedEntry.title || normalizedEntry.openingVerse?.reference || 'Shared devotion',
+      title: String(shareMeta.theme || normalizedEntries[0]?.title || normalizedEntries[0]?.openingVerse?.reference || 'Shared devotion'),
       from: payload.from || null,
     };
   }
@@ -497,7 +664,7 @@ const Sync = (() => {
     if (!folderId) throw new Error('Could not create/find Google Drive folder');
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '' };
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '' };
     const [devotionsFileId, journalsFileId, settingsFileId] = await Promise.all([
       upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions, knownFiles.devotions || ''),
       upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals, knownFiles.journals || ''),
@@ -507,7 +674,12 @@ const Sync = (() => {
     Store.update({
       googleDriveFolderId: folderId,
       googleDriveFileId: devotionsFileId,
-      googleDriveFiles: { devotions: devotionsFileId, journals: journalsFileId, settings: settingsFileId },
+      googleDriveFiles: {
+        devotions: devotionsFileId,
+        journals: journalsFileId,
+        settings: settingsFileId,
+        shares: String(knownFiles.shares || ''),
+      },
       lastDriveSyncAt: new Date().toISOString(),
     });
     return {
@@ -524,7 +696,7 @@ const Sync = (() => {
     if (!folderId) return { fileId: '', count: 0, imported: false };
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '' };
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '' };
     const [knownDevotions, knownJournals, knownSettings] = await Promise.all([
       readJsonFileById(knownFiles.devotions || ''),
       readJsonFileById(knownFiles.journals || ''),
@@ -573,6 +745,7 @@ const Sync = (() => {
         devotions: devotionsFile.fileId || '',
         journals: journalsFile.fileId || '',
         settings: settingsFile.fileId || '',
+        shares: String(knownFiles.shares || ''),
       },
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -612,7 +785,7 @@ const Sync = (() => {
       tokenExpiresInSec: _accessTokenExpiresAt ? Math.max(0, Math.round((_accessTokenExpiresAt - Date.now()) / 1000)) : 0,
       connectedProfile: !!state.googleProfile,
       googleDriveFolderId: state.googleDriveFolderId || '',
-      googleDriveFiles: state.googleDriveFiles || { devotions: '', journals: '', settings: '' },
+      googleDriveFiles: state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '' },
       lastDriveSyncAt: state.lastDriveSyncAt || null,
     };
   }
@@ -625,6 +798,8 @@ const Sync = (() => {
     pushSavedDevotions,
     pullSavedDevotions,
     createSharedDevotionLink,
+    createSharedSeriesLink,
+    createSharedCurrentWeekLink,
     importSharedDevotion,
     clearSession,
     getDebugState,

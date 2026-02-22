@@ -123,6 +123,7 @@ const SavedView = (() => {
               <div class="devotion-library-item__theme">Week of ${escapeHtml(DateUtils.format(series.weekKey))}</div>
               <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.useSeries('${escapeAttr(series.id)}')">Use This Week</button>
+                <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSeries('${escapeAttr(series.id)}')">Share Week</button>
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.deleteSeries('${escapeAttr(series.id)}')">Delete Series</button>
                 <button class="btn btn-secondary btn-sm" onclick="SavedView.toggleSeries('${escapeAttr(series.id)}')">${isOpen ? 'Hide Series' : 'Open Series'}</button>
               </div>
@@ -141,7 +142,6 @@ const SavedView = (() => {
                         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.openSaved('${escapeAttr(item.id)}')">${itemOpen ? 'Hide' : 'Open'}</button>
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.goToDay('${escapeAttr(item.dateKey)}','${escapeAttr(item.session || 'morning')}','${escapeAttr(series.id)}')">Go to day</button>
-                          <button class="btn btn-secondary btn-sm" onclick="SavedView.shareSaved('${escapeAttr(item.id)}')">Share</button>
                           <button class="btn btn-secondary btn-sm" onclick="SavedView.deleteSaved('${escapeAttr(item.id)}')">Delete</button>
                         </div>
                         ${itemOpen ? renderSavedDetail(openEntry) : ''}
@@ -313,8 +313,51 @@ const SavedView = (() => {
     }
   }
 
+  async function shareSeries(seriesId) {
+    const series = buildSeries(Store.getSavedDevotionLibrary()).find((s) => s.id === seriesId);
+    if (!series) {
+      alert('Could not find that saved devotional series.');
+      return;
+    }
+
+    const googleConnected = !!Store.get('googleProfile');
+    if (googleConnected) {
+      try {
+        const shared = await Sync.createSharedSeriesLink({
+          id: series.id,
+          weekKey: series.weekKey,
+          theme: series.theme,
+          entries: series.entries,
+        });
+        const result = await DevotionShare.shareLink({
+          title: `${series.theme} — Shared Abide Week`,
+          text: 'Open this shared weekly devotion series from Abide',
+          url: shared.shareUrl,
+        });
+        if (!result.ok && !result.aborted) {
+          alert(`Share failed: ${result.error || 'Could not share weekly link.'}`);
+          return;
+        }
+        if (result.method === 'clipboard') alert('Share link copied to clipboard.');
+        return;
+      } catch (err) {
+        alert(`Google share failed: ${err.message}`);
+        return;
+      }
+    }
+
+    const firstEntry = series.entries[0];
+    const payload = firstEntry ? DevotionShare.fromSavedEntry(firstEntry) : null;
+    const result = await DevotionShare.share(payload);
+    if (!result.ok && !result.aborted) {
+      alert(`Share failed: ${result.error || 'Could not share devotion.'}`);
+      return;
+    }
+    if (result.method === 'clipboard') alert('Devotion copied to clipboard.');
+  }
+
   async function importSharedLinkPrompt() {
-    const link = window.prompt('Paste a Google Drive shared devotional link or file ID:');
+    const link = window.prompt('Paste a Google Drive shared week/devotional link or file ID:');
     if (!link) return;
     try {
       const result = await Sync.importSharedDevotion(link);
@@ -460,7 +503,8 @@ const SavedView = (() => {
     useSeries,
     openSaved,
     goToDay,
-    shareSaved,
+      shareSaved,
+      shareSeries,
     deleteSaved,
     deleteSeries,
     importSharedLinkPrompt,
