@@ -246,7 +246,7 @@ const Sync = (() => {
     const q = encodeURIComponent(
       `name='${escapeQueryValue(fileName)}' and '${escapeQueryValue(folderId)}' in parents and trashed=false`
     );
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1`;
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&pageSize=1&orderBy=modifiedTime desc`;
     const res = await driveFetch(url);
     const data = await res.json();
     return data?.files?.[0]?.id || '';
@@ -299,8 +299,32 @@ const Sync = (() => {
     return fileId;
   }
 
-  async function upsertJsonFile(folderId, fileName, jsonBody) {
-    let fileId = await findFileIdByName(folderId, fileName);
+  async function readJsonFileById(fileId) {
+    if (!fileId) return { found: false, fileId: '', fileName: '', data: null };
+    try {
+      const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`;
+      const res = await driveFetch(url);
+      const contentType = String(res.headers.get('content-type') || '').toLowerCase();
+      const data = contentType.includes('application/json')
+        ? await res.json()
+        : normalizeJsonPayload(await res.text());
+      return { found: true, fileId, fileName: '', data };
+    } catch (_) {
+      return { found: false, fileId: '', fileName: '', data: null };
+    }
+  }
+
+  async function upsertJsonFile(folderId, fileName, jsonBody, preferredFileId = '') {
+    let fileId = String(preferredFileId || '').trim();
+    if (fileId) {
+      try {
+        await updateFile(fileId, jsonBody);
+        return fileId;
+      } catch (_) {
+        fileId = '';
+      }
+    }
+    fileId = await findFileIdByName(folderId, fileName);
     if (fileId) {
       await updateFile(fileId, jsonBody);
       return fileId;
@@ -472,10 +496,12 @@ const Sync = (() => {
     const folderId = await findOrCreateFolderId();
     if (!folderId) throw new Error('Could not create/find Google Drive folder');
 
+    const state = Store.get();
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '' };
     const [devotionsFileId, journalsFileId, settingsFileId] = await Promise.all([
-      upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions),
-      upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals),
-      upsertJsonFile(folderId, SETTINGS_FILE_NAME, settings),
+      upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions, knownFiles.devotions || ''),
+      upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals, knownFiles.journals || ''),
+      upsertJsonFile(folderId, SETTINGS_FILE_NAME, settings, knownFiles.settings || ''),
     ]);
 
     Store.update({
@@ -497,10 +523,18 @@ const Sync = (() => {
     const folderId = await findExistingFolderId();
     if (!folderId) return { fileId: '', count: 0, imported: false };
 
+    const state = Store.get();
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '' };
+    const [knownDevotions, knownJournals, knownSettings] = await Promise.all([
+      readJsonFileById(knownFiles.devotions || ''),
+      readJsonFileById(knownFiles.journals || ''),
+      readJsonFileById(knownFiles.settings || ''),
+    ]);
+
     const [devotionsFile, journalsFile, settingsFile] = await Promise.all([
-      readJsonFileByCandidates(folderId, DEVOTIONS_FILE_CANDIDATES),
-      readJsonFileByCandidates(folderId, JOURNALS_FILE_CANDIDATES),
-      readJsonFileByCandidates(folderId, SETTINGS_FILE_CANDIDATES),
+      knownDevotions.found ? knownDevotions : readJsonFileByCandidates(folderId, DEVOTIONS_FILE_CANDIDATES),
+      knownJournals.found ? knownJournals : readJsonFileByCandidates(folderId, JOURNALS_FILE_CANDIDATES),
+      knownSettings.found ? knownSettings : readJsonFileByCandidates(folderId, SETTINGS_FILE_CANDIDATES),
     ]);
 
     let imported = false;
