@@ -824,6 +824,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--color-surface-sunken, rgba(0,0,0,0.06));
   color: var(--color-text-primary);
 }
+.header-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.header-action-btn:hover,
+.header-action-btn:active {
+  background: var(--color-surface-sunken, rgba(0,0,0,0.06));
+  color: var(--color-text-primary);
+}
 
 /* ============================================================
    VIEW CONTAINER
