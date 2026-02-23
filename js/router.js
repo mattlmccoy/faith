@@ -116,7 +116,7 @@ const Router = (() => {
         <div class="sidebar-profile__meta">
           <div class="sidebar-profile__name">Not signed in</div>
           <div class="sidebar-profile__status">
-            <a href="#/" class="sidebar-profile__connect">Connect Google</a>
+            <a href="#" class="sidebar-profile__connect" onclick="event.preventDefault();if(typeof Sync!=='undefined'){Sync.connectGoogle().then(()=>Router.updateSidebarProfile()).catch(()=>{});}else{Router.navigate('/settings');}">Connect Google</a>
           </div>
         </div>`;
     }

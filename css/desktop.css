@@ -250,9 +250,53 @@
   }
 
   .view-content {
-    max-width: 1120px;
+    max-width: 740px;
     margin: 0 auto;
     padding: var(--space-8) var(--space-8) var(--space-10);
+  }
+
+  /* ── AMBIENT BACKGROUND GRAPHICS ────────────────────────
+     Decorative orbs fill the empty flanking space in the
+     content column. Purely visual, non-interactive. */
+  .view-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .view-container::before,
+  .view-container::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.28;
+    filter: blur(72px);
+  }
+
+  /* Top-right orb */
+  .view-container::before {
+    width: 380px;
+    height: 380px;
+    top: -60px;
+    right: -60px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  }
+
+  /* Bottom-left orb */
+  .view-container::after {
+    width: 320px;
+    height: 320px;
+    bottom: 80px;
+    left: -40px;
+    background: radial-gradient(circle, var(--accent-warm, var(--accent)) 0%, transparent 70%);
+    opacity: 0.18;
+  }
+
+  /* Ensure view content renders above the orbs */
+  .view-content {
+    position: relative;
+    z-index: 1;
   }
 
   .app-legal {
@@ -266,35 +310,14 @@
 
   /* ── PER-VIEW LAYOUTS ───────────────────────────────── */
 
-  /* Today page desktop layout */
+  /* Today page desktop layout — single column at 1024px (content is already narrow) */
   body[data-route="/"] .home-view {
-    max-width: 1200px;
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.88fr);
-    column-gap: var(--space-8);
-    row-gap: var(--space-4);
-    align-items: start;
+    max-width: 660px;
+    display: block;
   }
 
   body[data-route="/"] .home-view > * {
-    grid-column: 1;
-    margin-bottom: 0;
-  }
-
-  body[data-route="/"] .home-view .google-panel,
-  body[data-route="/"] .home-view .google-panel-wrap,
-  body[data-route="/"] .home-view .setup-prompt,
-  body[data-route="/"] .home-view .empty-state {
-    grid-column: 1 / -1;
-  }
-
-  body[data-route="/"] .home-view .home-prompts,
-  body[data-route="/"] .home-view .home-midday,
-  body[data-route="/"] .home-view .home-prayer,
-  body[data-route="/"] .home-view .home-stretch,
-  body[data-route="/"] .home-view .home-actions,
-  body[data-route="/"] .home-view .home-complete-row {
-    grid-column: 2;
+    margin-bottom: var(--space-4);
   }
 
   body[data-route="/"] .home-view .home-greeting__name {
@@ -468,16 +491,40 @@
   .app-legal    { border-left: none; justify-content: center; }
 
   .view-content {
-    max-width: min(1480px, calc(100vw - 120px));
+    max-width: min(860px, calc(100vw - var(--desktop-sidebar-width) - 120px));
     padding: var(--space-8) var(--space-10) var(--space-12);
   }
 
-  /* Per-view wider grids at 1280px */
+  /* At 1280+ the orbs get bigger since there's more flanking space */
+  .view-container::before {
+    width: 480px;
+    height: 480px;
+    top: -80px;
+    right: -80px;
+    opacity: 0.22;
+  }
+
+  .view-container::after {
+    width: 420px;
+    height: 420px;
+    bottom: 120px;
+    left: -60px;
+    opacity: 0.14;
+  }
+
+  /* Per-view wider grids at 1280px — restore two-column layout */
   body[data-route="/"] .home-view {
-    max-width: 1380px;
-    grid-template-columns: minmax(760px, 1fr) minmax(340px, 410px);
+    display: grid;
+    max-width: min(1100px, calc(100vw - var(--desktop-sidebar-width) - 80px));
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
     column-gap: var(--space-8);
     row-gap: var(--space-5);
+    align-items: start;
+  }
+
+  body[data-route="/"] .home-view > * {
+    grid-column: 1;
+    margin-bottom: 0;
   }
 
   body[data-route="/"] .home-view .home-greeting,
@@ -490,7 +537,6 @@
   body[data-route="/"] .home-view .home-actions,
   body[data-route="/"] .home-view .home-complete-row {
     grid-column: 1;
-    max-width: 900px;
   }
 
   body[data-route="/"] .home-view .home-prompts,
@@ -557,7 +603,7 @@
   body[data-route="/settings"] .view-content,
   body[data-route="/scripture"] .view-content,
   body[data-route="/journal"] .view-content {
-    max-width: min(1460px, calc(100vw - 120px));
+    max-width: min(960px, calc(100vw - var(--desktop-sidebar-width) - 120px));
   }
 }
 
