@@ -419,9 +419,13 @@ const ScriptureView = (() => {
     const attribution = TRANSLATION_ATTRIBUTION[translationId] || '';
     const isCopyrighted = ['esv', 'niv'].includes(translationId);
 
-    // Track reading progress
-    const chMatchProg = reference.match(/(.+?)\s+(\d+)/);
-    if (chMatchProg) Store.markChapterRead(chMatchProg[1].trim(), parseInt(chMatchProg[2]));
+    // Track reading progress — only count a full chapter load (no verse range in reference)
+    // A reference with ':' means a specific verse or range (e.g. "John 3:16"), not a full chapter.
+    const isFullChapter = !reference.includes(':');
+    if (isFullChapter) {
+      const chMatchProg = reference.match(/(.+?)\s+(\d+)/);
+      if (chMatchProg) Store.markChapterRead(chMatchProg[1].trim(), parseInt(chMatchProg[2]));
+    }
 
     // Load existing highlights for this passage
     const highlights = Store.getVerseHighlights();
