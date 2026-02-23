@@ -7,12 +7,16 @@ const Sync = (() => {
   const DEVOTIONS_FILE_NAME = 'abide-devotions.json';
   const JOURNALS_FILE_NAME = 'abide-journals.json';
   const SETTINGS_FILE_NAME = 'abide-settings.json';
+  const HIGHLIGHTS_FILE_NAME = 'abide-highlights.json';
+  const PROGRESS_FILE_NAME = 'abide-progress.json';
   const SHARES_FOLDER_NAME = 'abide-shares';
   const FOLDER_NAME = 'abidefaith-docs';
   const LEGACY_FOLDER_NAMES = ['abide-devotions', 'abide-devotions-docs', 'abidefaith'];
   const DEVOTIONS_FILE_CANDIDATES = [DEVOTIONS_FILE_NAME, 'abide-devotions', LEGACY_FILE_NAME, 'abide-saved-devotions'];
   const JOURNALS_FILE_CANDIDATES = [JOURNALS_FILE_NAME, 'abide-journals'];
   const SETTINGS_FILE_CANDIDATES = [SETTINGS_FILE_NAME, 'abide-settings'];
+  const HIGHLIGHTS_FILE_CANDIDATES = [HIGHLIGHTS_FILE_NAME, 'abide-highlights'];
+  const PROGRESS_FILE_CANDIDATES = [PROGRESS_FILE_NAME, 'abide-progress'];
   const LEGACY_SNAPSHOT_FILE_CANDIDATES = [LEGACY_FILE_NAME, 'abide-saved-devotions', 'abide-devotions.json', 'abide-devotions'];
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const PROFILE_SCOPE = 'openid email profile';
@@ -269,6 +273,8 @@ const Sync = (() => {
           journals: String(files.journals || ''),
           settings: String(files.settings || ''),
           shares: shareFolderId,
+          highlights: String(files.highlights || ''),
+          progress: String(files.progress || ''),
         },
       });
     }
@@ -747,15 +753,19 @@ const Sync = (() => {
     const devotions = Store.exportDevotionsSnapshot();
     const journals = Store.exportJournalSnapshot();
     const settings = Store.exportSettingsSnapshot();
+    const highlights = Store.exportHighlightsSnapshot();
+    const progress = Store.exportProgressSnapshot();
     const folderId = await findOrCreateFolderId();
     if (!folderId) throw new Error('Could not create/find Google Drive folder');
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '' };
-    const [devotionsFileId, journalsFileId, settingsFileId] = await Promise.all([
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' };
+    const [devotionsFileId, journalsFileId, settingsFileId, highlightsFileId, progressFileId] = await Promise.all([
       upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions, knownFiles.devotions || ''),
       upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals, knownFiles.journals || ''),
       upsertJsonFile(folderId, SETTINGS_FILE_NAME, settings, knownFiles.settings || ''),
+      upsertJsonFile(folderId, HIGHLIGHTS_FILE_NAME, highlights, knownFiles.highlights || ''),
+      upsertJsonFile(folderId, PROGRESS_FILE_NAME, progress, knownFiles.progress || ''),
     ]);
 
     Store.update({
@@ -766,6 +776,8 @@ const Sync = (() => {
         journals: journalsFileId,
         settings: settingsFileId,
         shares: String(knownFiles.shares || ''),
+        highlights: highlightsFileId,
+        progress: progressFileId,
       },
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -774,7 +786,9 @@ const Sync = (() => {
       count: (devotions.savedDevotions || []).length,
       journals: Object.keys(journals.journalEntries || {}).length,
       pastors: Array.isArray(settings.trustedPastors) ? settings.trustedPastors.length : 0,
-      files: 3,
+      highlights: Object.keys(highlights.verseHighlights || {}).length,
+      progress: Object.keys(progress.readingProgress || {}).length,
+      files: 5,
     };
   }
 
@@ -783,17 +797,21 @@ const Sync = (() => {
     if (!folderId) return { fileId: '', count: 0, imported: false };
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '' };
-    const [knownDevotions, knownJournals, knownSettings] = await Promise.all([
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' };
+    const [knownDevotions, knownJournals, knownSettings, knownHighlights, knownProgress] = await Promise.all([
       readJsonFileById(knownFiles.devotions || ''),
       readJsonFileById(knownFiles.journals || ''),
       readJsonFileById(knownFiles.settings || ''),
+      readJsonFileById(knownFiles.highlights || ''),
+      readJsonFileById(knownFiles.progress || ''),
     ]);
 
-    let [devotionsFile, journalsFile, settingsFile] = await Promise.all([
+    let [devotionsFile, journalsFile, settingsFile, highlightsFile, progressFile] = await Promise.all([
       knownDevotions.found ? knownDevotions : readJsonFileByCandidates(folderId, DEVOTIONS_FILE_CANDIDATES),
       knownJournals.found ? knownJournals : readJsonFileByCandidates(folderId, JOURNALS_FILE_CANDIDATES),
       knownSettings.found ? knownSettings : readJsonFileByCandidates(folderId, SETTINGS_FILE_CANDIDATES),
+      knownHighlights.found ? knownHighlights : readJsonFileByCandidates(folderId, HIGHLIGHTS_FILE_CANDIDATES),
+      knownProgress.found ? knownProgress : readJsonFileByCandidates(folderId, PROGRESS_FILE_CANDIDATES),
     ]);
 
     // Backward compatibility: older installs may store data in legacy folder names.
@@ -820,6 +838,8 @@ const Sync = (() => {
     let devResult = { count: 0, importedIds: 0, importedLibrary: 0, importedPlanDays: 0 };
     let journalResult = { importedJournal: 0 };
     let settingsResult = { importedSettings: false, importedPastors: 0 };
+    let highlightsResult = { imported: 0 };
+    let progressResult = { imported: 0 };
 
     if (devotionsFile.found && devotionsFile.data && typeof devotionsFile.data === 'object') {
       devResult = Store.importDevotionsSnapshot(devotionsFile.data || {}, { replaceSaved: true });
@@ -831,6 +851,14 @@ const Sync = (() => {
     }
     if (settingsFile.found && settingsFile.data && typeof settingsFile.data === 'object') {
       settingsResult = Store.importSettingsSnapshot(settingsFile.data || {});
+      imported = true;
+    }
+    if (highlightsFile.found && highlightsFile.data && typeof highlightsFile.data === 'object') {
+      highlightsResult = Store.importHighlightsSnapshot(highlightsFile.data || {});
+      imported = true;
+    }
+    if (progressFile.found && progressFile.data && typeof progressFile.data === 'object') {
+      progressResult = Store.importProgressSnapshot(progressFile.data || {});
       imported = true;
     }
 
@@ -874,6 +902,8 @@ const Sync = (() => {
         journals: journalsFile.fileId || '',
         settings: settingsFile.fileId || '',
         shares: String(knownFiles.shares || ''),
+        highlights: highlightsFile.fileId || '',
+        progress: progressFile.fileId || '',
       },
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -885,11 +915,15 @@ const Sync = (() => {
       importedJournal: journalResult.importedJournal || devResult.importedJournal || 0,
       importedPastors: settingsResult.importedPastors || 0,
       importedPlanDays: devResult.importedPlanDays || 0,
+      importedHighlights: highlightsResult.imported || 0,
+      importedProgress: progressResult.imported || 0,
       sourceFolderId: folderId,
       sourceFiles: {
         devotions: devotionsFile.fileName || '',
         journals: journalsFile.fileName || '',
         settings: settingsFile.fileName || '',
+        highlights: highlightsFile.fileName || '',
+        progress: progressFile.fileName || '',
       },
       imported: true,
     };

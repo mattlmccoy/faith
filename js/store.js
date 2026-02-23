@@ -103,13 +103,15 @@ const Store = (() => {
         _state.googleClientId = DEFAULT_GOOGLE_CLIENT_ID;
       }
       if (!_state.googleDriveFiles || typeof _state.googleDriveFiles !== 'object') {
-        _state.googleDriveFiles = { devotions: '', journals: '', settings: '', shares: '' };
+        _state.googleDriveFiles = { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' };
       } else {
         _state.googleDriveFiles = {
           devotions: String(_state.googleDriveFiles.devotions || ''),
           journals: String(_state.googleDriveFiles.journals || ''),
           settings: String(_state.googleDriveFiles.settings || ''),
           shares: String(_state.googleDriveFiles.shares || ''),
+          highlights: String(_state.googleDriveFiles.highlights || ''),
+          progress: String(_state.googleDriveFiles.progress || ''),
         };
       }
       if (Number(_state._defaultsVersion || 0) < 3) {
@@ -1155,6 +1157,61 @@ const Store = (() => {
     }
   }
 
+  // --- Verse Highlights sync snapshots ---
+
+  function exportHighlightsSnapshot() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      verseHighlights: getVerseHighlights(),
+    };
+  }
+
+  function importHighlightsSnapshot(snapshot = {}) {
+    if (!_state) load();
+    const incoming = snapshot.verseHighlights && typeof snapshot.verseHighlights === 'object'
+      ? snapshot.verseHighlights : {};
+    const existing = _state.verseHighlights && typeof _state.verseHighlights === 'object'
+      ? _state.verseHighlights : {};
+    // Union merge — remote wins on conflicts (more recent sync wins)
+    _state.verseHighlights = { ...existing, ...incoming };
+    save();
+    return { imported: Object.keys(incoming).length };
+  }
+
+  // --- Reading Progress sync snapshots ---
+
+  function exportProgressSnapshot() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      readingProgress: getReadingProgress(),
+    };
+  }
+
+  function importProgressSnapshot(snapshot = {}) {
+    if (!_state) load();
+    const incoming = snapshot.readingProgress && typeof snapshot.readingProgress === 'object'
+      ? snapshot.readingProgress : {};
+    if (!_state.readingProgress || typeof _state.readingProgress !== 'object') {
+      _state.readingProgress = {};
+    }
+    // Union merge — combine chapter arrays, never lose locally-read chapters
+    Object.entries(incoming).forEach(([book, chapters]) => {
+      if (!Array.isArray(chapters)) return;
+      if (!Array.isArray(_state.readingProgress[book])) _state.readingProgress[book] = [];
+      chapters.forEach(ch => {
+        const n = parseInt(ch);
+        if (!isNaN(n) && !_state.readingProgress[book].includes(n)) {
+          _state.readingProgress[book].push(n);
+        }
+      });
+      _state.readingProgress[book].sort((a, b) => a - b);
+    });
+    save();
+    return { imported: Object.keys(incoming).length };
+  }
+
   // Initialize
   load();
 
@@ -1206,6 +1263,10 @@ const Store = (() => {
     clearVerseHighlight,
     getReadingProgress,
     markChapterRead,
+    exportHighlightsSnapshot,
+    importHighlightsSnapshot,
+    exportProgressSnapshot,
+    importProgressSnapshot,
     trackUsage,
     getUsageStats,
     getUsageLimits,
