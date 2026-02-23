@@ -312,6 +312,43 @@
     margin: 0 auto;
   }
 
+  /* ── HOME ACTION BUTTONS: desktop sizing ──────────────── */
+  /* Give each action row a glass card surface — matches app's card language */
+  body[data-route="/"] .home-view .home-actions,
+  body[data-route="/"] .home-view .home-complete-row {
+    background: var(--glass-fill);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    margin-top: var(--space-2) !important;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Tighter buttons — no more giant iPhone pills */
+  body[data-route="/"] .home-view .home-actions .btn,
+  body[data-route="/"] .home-view .home-complete-row .btn,
+  body[data-route="/"] .home-view .home-complete-row .btn-full {
+    font-size: var(--text-sm);
+    padding: 9px var(--space-4);
+  }
+
+  /* Mark as Done: centered, capped width */
+  body[data-route="/"] .home-view .home-complete-row .complete-btn {
+    font-size: var(--text-sm);
+    padding: 9px var(--space-5);
+    max-width: 210px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Action row: tighter gap */
+  body[data-route="/"] .home-view .home-actions {
+    margin-bottom: 0;
+    gap: var(--space-2);
+  }
+
   /* Plan page */
   body[data-route="/plan"] .view-content {
     max-width: 1180px;
@@ -485,10 +522,30 @@
   body[data-route="/"] .home-view .home-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 560px; /* don't let action buttons span 900px */
   }
 
-  body[data-route="/"] .home-view .home-complete-row .btn {
-    max-width: 560px;
+  body[data-route="/"] .home-view .home-complete-row {
+    justify-content: flex-start;
+    margin-top: var(--space-2) !important;
+  }
+
+  body[data-route="/"] .home-view .home-complete-row .btn,
+  body[data-route="/"] .home-view .home-complete-row .btn-full {
+    max-width: 420px;
+    font-size: var(--text-sm);
+    padding: 9px var(--space-4);
+  }
+
+  body[data-route="/"] .home-view .home-actions .btn {
+    font-size: var(--text-sm);
+    padding: 9px var(--space-4);
+  }
+
+  body[data-route="/"] .home-view .home-complete-row .complete-btn {
+    font-size: var(--text-sm);
+    padding: 9px var(--space-5);
+    max-width: 210px;
   }
 
   body[data-route="/"] .home-view .scripture-card__text {
