@@ -327,7 +327,9 @@
   }
 
   body[data-route="/"] .home-view .home-devotion-text {
-    -webkit-line-clamp: 12;
+    display: block;          /* remove -webkit-box clamp entirely */
+    overflow: visible;
+    -webkit-line-clamp: unset;
     font-size: var(--text-lg);
   }
 
@@ -559,7 +561,9 @@
   }
 
   body[data-route="/"] .home-view .home-devotion-text {
-    -webkit-line-clamp: 8;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
     font-size: 1.35rem;
     line-height: 1.6;
   }
