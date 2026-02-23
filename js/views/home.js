@@ -482,6 +482,11 @@ const HomeView = (() => {
       </button>
       `;
 
+    // Also update the desktop sidebar profile whenever home renders / sign-in state changes
+    if (typeof Router !== 'undefined' && Router.updateSidebarProfile) {
+      Router.updateSidebarProfile();
+    }
+
     return `
       ${googleAction}
       <button class="icon-btn" id="home-build-btn" title="Build This Week" onclick="Router.navigate('/plan')" aria-label="Build This Week">

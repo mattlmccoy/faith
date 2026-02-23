@@ -33,6 +33,7 @@ const Router = (() => {
     currentRoute = path;
     document.body.dataset.route = path;
     updateTabBar(path);
+    updateSidebarProfile();
     updateHeaderBack(path);
     renderRoute(path, goingBack);
   }
@@ -81,6 +82,46 @@ const Router = (() => {
     }
   }
 
+  function updateSidebarProfile() {
+    const el = document.getElementById('sidebar-profile');
+    if (!el) return; // no-op on mobile (element hidden, but guard anyway)
+
+    const profile = typeof Store !== 'undefined' ? Store.get('googleProfile') : null;
+    if (profile && (profile.email || profile.name)) {
+      const initial = (profile.name || profile.email || 'U')[0].toUpperCase();
+      const avatarHtml = profile.picture
+        ? `<img src="${profile.picture}" alt="${profile.name || ''}" />`
+        : `<span class="sidebar-profile__avatar--fallback">${initial}</span>`;
+      el.innerHTML = `
+        <div class="sidebar-profile__avatar">${avatarHtml}</div>
+        <div class="sidebar-profile__meta">
+          <div class="sidebar-profile__name">${profile.name || profile.email}</div>
+          <div class="sidebar-profile__status sidebar-profile__status--synced">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                 style="display:inline-block;vertical-align:-1px;margin-right:2px;">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>Synced
+          </div>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div class="sidebar-profile__avatar sidebar-profile__avatar--empty">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+        </div>
+        <div class="sidebar-profile__meta">
+          <div class="sidebar-profile__name">Not signed in</div>
+          <div class="sidebar-profile__status">
+            <a href="#/" class="sidebar-profile__connect">Connect Google</a>
+          </div>
+        </div>`;
+    }
+  }
+
   function setTitle(title) {
     const el = document.getElementById('view-title');
     if (el) el.textContent = title;
@@ -113,6 +154,7 @@ const Router = (() => {
     setTitle,
     setHeaderActions,
     clearHeaderActions,
+    updateSidebarProfile,
     init,
     get current() { return currentRoute; },
   };
