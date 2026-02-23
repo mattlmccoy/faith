@@ -564,9 +564,9 @@ const ScriptureView = (() => {
 
         <div style="margin-top:24px;">
           ${fromPhraseResults && activePhraseContext ? `
-          <button class="btn btn-secondary btn-sm" onclick="ScriptureView.backToPhraseResults()">← Back to Results</button>
+          <button class="btn btn-secondary btn-sm" id="passage-back-results-btn" onclick="ScriptureView.backToPhraseResults()">← Back to Results</button>
           ` : ''}
-          <button class="btn btn-ghost btn-sm" onclick="ScriptureView.clearPassage()">← Search again</button>
+          <button class="btn btn-ghost btn-sm" id="passage-search-again-btn" onclick="ScriptureView.clearPassage()">← Search again</button>
         </div>
       </div>
     `;

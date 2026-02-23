@@ -678,47 +678,68 @@ const HomeView = (() => {
       {
         route: '/', selector: '#home-build-btn', calloutPos: 'below', highlightPadding: 10,
         title: 'Build A Weekly Plan',
-        body: "Tap + to generate a fresh 7-day plan. You can rebuild anytime with a new topic.",
+        body: "Tap + to generate a fresh 7-day plan. You can replace now, queue a plan for tomorrow, and keep plan history.",
       },
       {
         route: '/plan', selector: '#pastor-chips', calloutPos: 'below', highlightPadding: 10,
-        title: 'Trusted Pastor Influence',
-        body: "These teachers shape the generated devotional tone and references. Manage this list in Settings.",
+        title: 'Choose Pastor Influence',
+        body: "Tap pastor chips to include/exclude who influences AI generation. These choices stay synced with Settings.",
       },
       {
         route: '/plan', selector: '.plan-dictation-row', calloutPos: 'below', highlightPadding: 10,
         title: 'Enter Your Topic',
-        body: "Pick a suggested topic or type your own. You can also use the mic button to dictate your topic.",
+        body: "Pick a suggested topic, type your own, or dictate with the mic. Long prompts are summarized into a short series title.",
       },
       {
         route: '/plan', selector: '#build-btn', calloutPos: 'above', highlightPadding: 10,
         title: 'Generate The Week',
-        body: "Tap Build to generate a full week of morning and evening content. When done, return to Today to read each day.",
+        body: "Tap Build to generate a full week of morning and evening devotions. You can Save Full Week and restore from Saved Series later.",
       },
       {
         route: '/', selector: '#home-google-btn', calloutPos: 'below', highlightPadding: 10,
-        title: 'Google Drive Sync',
-        body: "Connect Google to back up devotions, journals, and settings to your Drive so you can restore them on another device.",
+        title: 'Google Sync & Profile',
+        body: "Tap your avatar/Google icon to connect Drive, then upload/download devotions, journal entries, and settings metadata across devices.",
       },
       {
         route: '/', selector: '#home-session-toggle', calloutPos: 'below', highlightPadding: 10,
-        title: 'Morning & Evening Sessions',
-        body: "Switch between your morning and evening devotion here.",
+        title: 'Navigate Your Week',
+        body: "Use Previous/Next day and Morning/Evening toggles to move through each day of your active week.",
       },
       {
         route: '/scripture', selector: '[data-tab="scripture"]', calloutPos: 'above', highlightPadding: 8,
-        title: 'Scripture Search',
-        body: 'Use Scripture to search verses by reference or topic and change translations in Settings.',
+        title: 'Scripture Workspace',
+        body: 'Scripture supports reference lookup, topic/phrase discovery, translation compare, highlights, memory practice, and deeper study tools.',
+      },
+      {
+        route: '/scripture', selector: '#mode-phrase', calloutPos: 'below', highlightPadding: 10,
+        title: 'Topic / Phrase Search',
+        body: 'Switch to Topic/Phrase mode to find related passages. Results can be AI-ranked with reasoning and provider/model labels.',
+      },
+      {
+        route: '/scripture', selector: '#passage-back-results-btn', calloutPos: 'above', highlightPadding: 10,
+        title: 'Return To Search Results',
+        body: 'After opening one result, use Back to Results to continue the same search without retyping the phrase.',
+        setup: async () => {
+          if (window.ScriptureView?.searchPhrase && window.ScriptureView?.loadPassageFromPhrase) {
+            await window.ScriptureView.searchPhrase('abide in christ');
+            await window.ScriptureView.loadPassageFromPhrase('John 15:5');
+          }
+        },
       },
       {
         route: '/scripture', selector: '#passage-dive-btn', calloutPos: 'below', highlightPadding: 10,
         title: 'Deep Dive Any Verse',
-        body: "Use Dive Deeper on any passage to explore context and meaning with original-language insights. John 15:5 is loaded here because it inspired the name Abide.",
+        body: "Dive Deeper works on any verse, with word-level study and context. John 15:5 is shown here because it inspired the name Abide.",
         setup: async () => {
           if (window.ScriptureView?.loadPassage) {
             await window.ScriptureView.loadPassage('John 15:5');
           }
         },
+      },
+      {
+        route: '/scripture', selector: '#passage-parallel-btn', calloutPos: 'below', highlightPadding: 10,
+        title: 'Compare + Context',
+        body: "Use Compare for side-by-side translation reading, then open Historical Context and See Also for linked study.",
       },
       {
         route: '/prayer', selector: '[data-tab="prayer"]', calloutPos: 'above', highlightPadding: 8,
@@ -728,7 +749,17 @@ const HomeView = (() => {
       {
         route: '/journal', selector: '[data-tab="journal"]', calloutPos: 'above', highlightPadding: 8,
         title: 'Personal Journal',
-        body: "Capture responses to prompts and your own reflections. Journal history can be synced with Google Drive when connected.",
+        body: "Capture daily prompts, faith-stretch reflections, and past entries. Save locally, then sync to Drive when connected.",
+      },
+      {
+        route: '/journal', selector: '#journal-ask-panel', calloutPos: 'above', highlightPadding: 10,
+        title: 'Ask The Bible',
+        body: "Use this built-in Bible Q&A panel for follow-up questions directly from the Journal page.",
+      },
+      {
+        route: '/saved', selector: '.section-header', calloutPos: 'below', highlightPadding: 10,
+        title: 'Saved Series Library',
+        body: "Saved devotionals are grouped into series. Use This Week restores a saved series; Download/Upload keeps devices in sync.",
       },
       {
         route: '/settings', selector: '#settings-appearance-section .settings-group', calloutPos: 'below', highlightPadding: 10,
@@ -742,8 +773,8 @@ const HomeView = (() => {
       },
       {
         route: '/settings', selector: '#settings-pastors-section .settings-group', calloutPos: 'below', highlightPadding: 10,
-        title: 'Your Trusted Pastors',
-        body: "Enable or disable teachers whose theological style shapes your AI devotions. You can add anyone — the plan builder draws only from whoever is active here.",
+        title: 'Trusted Pastors & Teachers',
+        body: "Add/remove teachers here. The plan builder only draws influence from who is enabled.",
       },
     ];
 
