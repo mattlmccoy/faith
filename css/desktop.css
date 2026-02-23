@@ -32,6 +32,7 @@
       "sidebar legal";
     width: min(1400px, calc(100vw - 40px));
     max-width: none;
+    height: calc(100dvh - 40px);     /* bounded height so 1fr row is constrained */
     min-height: calc(100dvh - 40px);
     margin: 0 auto;
     border-radius: 24px;
@@ -242,27 +243,26 @@
     font-size: var(--text-2xl);
   }
 
+  /* ── AMBIENT BACKGROUND GRAPHICS ────────────────────────
+     Orbs are absolutely positioned inside .view-container.
+     overflow-x: clip trims orbs at the horizontal edge
+     without creating a new scroll container on the y-axis,
+     so scroll remains on the .view-container element itself. */
   .view-container {
     grid-area: main;
     border-left: 1px solid var(--divider-solid);
     padding-bottom: 0;
     scroll-padding-top: var(--space-4);
+    position: relative;
+    min-height: 0;          /* required for grid child to be bounded */
+    overflow-y: auto;       /* scroll lives here, NOT on body */
+    overflow-x: clip;       /* clip orbs horizontally only */
   }
 
   .view-content {
     max-width: 740px;
     margin: 0 auto;
     padding: var(--space-8) var(--space-8) var(--space-10);
-  }
-
-  /* ── AMBIENT BACKGROUND GRAPHICS ────────────────────────
-     Decorative orbs fill the empty flanking space in the
-     content column. Purely visual, non-interactive.
-     overflow: clip (not hidden) so orbs are trimmed at the
-     border without creating a new scroll container. */
-  .view-container {
-    position: relative;
-    overflow: clip; /* trims visually without blocking scroll */
   }
 
   .view-container::before,
@@ -480,6 +480,7 @@
 
   #app {
     width: 100%;
+    height: 100dvh;       /* bounded so grid 1fr row constrains scroll container */
     min-height: 100dvh;
     border-radius: 0;
     border: none;
