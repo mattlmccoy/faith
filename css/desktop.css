@@ -257,10 +257,12 @@
 
   /* ── AMBIENT BACKGROUND GRAPHICS ────────────────────────
      Decorative orbs fill the empty flanking space in the
-     content column. Purely visual, non-interactive. */
+     content column. Purely visual, non-interactive.
+     overflow: clip (not hidden) so orbs are trimmed at the
+     border without creating a new scroll container. */
   .view-container {
     position: relative;
-    overflow: hidden;
+    overflow: clip; /* trims visually without blocking scroll */
   }
 
   .view-container::before,
