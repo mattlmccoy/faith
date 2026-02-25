@@ -1043,6 +1043,30 @@ const Sync = (() => {
     };
   }
 
+  // Used by pull-to-refresh: silently validate auth first (no popup), then
+  // upload local changes before downloading from Drive. If the Google session
+  // has expired, throws AUTH_EXPIRED immediately so the caller can show a
+  // banner instead of freezing the UI while waiting for a popup.
+  async function syncForPullToRefresh() {
+    // Silent-only token check — requestToken(false) skips the interactive popup.
+    // GIS responds quickly with either a valid token or an error (e.g.
+    // "interaction_required") when the session is expired.
+    try {
+      await requestToken(false);
+    } catch (silentErr) {
+      if (silentErr.code === 'OFFLINE') throw silentErr; // truly offline
+      // Any other failure (interaction_required, access_denied, timeout while
+      // online) means the session is expired and the user must reconnect.
+      throw Object.assign(
+        new Error('Google session expired. Please reconnect your account.'),
+        { code: 'AUTH_EXPIRED' }
+      );
+    }
+    // Token is now cached and valid — upload local changes first, then pull.
+    await pushSavedDevotions();
+    await pullSavedDevotions();
+  }
+
   return {
     requestToken,
     fetchGoogleProfile,
@@ -1050,6 +1074,7 @@ const Sync = (() => {
     ensureGoogleClient,
     pushSavedDevotions,
     pullSavedDevotions,
+    syncForPullToRefresh,
     createSharedDevotionLink,
     createSharedSeriesLink,
     createSharedCurrentWeekLink,

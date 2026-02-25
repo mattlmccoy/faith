@@ -75,17 +75,24 @@ const HomeView = (() => {
           _refreshPill.textContent = 'Syncing…';
           try {
             const googleProfile = Store.get('googleProfile');
-            if (googleProfile && window.Sync?.pullSavedDevotions) {
-              await Sync.pullSavedDevotions();
+            if (googleProfile && window.Sync?.syncForPullToRefresh) {
+              // syncForPullToRefresh: validates auth silently (no popup),
+              // uploads local changes first, then downloads from Drive.
+              await Sync.syncForPullToRefresh();
             }
           } catch (err) {
             if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
             if (err.code === 'AUTH_EXPIRED') {
+              // Google session expired — show reconnect banner instead of freezing
               _showAuthExpiredBanner(container);
               return;
             }
             if (err.code === 'OFFLINE') {
-              // Silently dismiss the pull — user is offline, no alarm needed
+              if (navigator.onLine) {
+                // Online but sync failed (e.g. auth popup timed out) — treat as auth issue
+                _showAuthExpiredBanner(container);
+              }
+              // Truly offline: silently dismiss
               return;
             }
             // Other unexpected errors: dismiss pill, let render continue
