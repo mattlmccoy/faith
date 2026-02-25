@@ -275,6 +275,8 @@ const SettingsView = (() => {
       <div style="text-align:center;padding:var(--space-5) 0 var(--space-3);">
         <p class="text-xs text-muted">Abide · Personal Daily Devotion</p>
         <p class="text-xs text-muted settings-version-footer" id="settings-version" style="margin-top:4px;cursor:default;">${(() => { const swv = window.__ABIDE_SW_VERSION__ || ''; return `v${appVersion}${swv ? ' · SW ' + swv : ''}`; })()}</p>
+        <button class="btn btn-ghost btn-sm" id="check-updates-btn" type="button" style="margin-top:var(--space-3);font-size:var(--text-xs);padding:6px 16px;">Check for Updates</button>
+        <p id="check-updates-status" class="text-xs text-muted" style="margin-top:6px;min-height:1.2em;"></p>
       </div>
 
       <button class="btn btn-primary btn-full" id="save-settings">Save Settings</button>
@@ -412,6 +414,53 @@ const SettingsView = (() => {
         }
       });
     }
+
+    root.querySelector('#check-updates-btn')?.addEventListener('click', async () => {
+      const btn = root.querySelector('#check-updates-btn');
+      const statusEl = root.querySelector('#check-updates-status');
+      if (!btn || !statusEl) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      statusEl.textContent = '';
+
+      if (!('serviceWorker' in navigator)) {
+        statusEl.textContent = 'Service worker not supported in this browser.';
+        btn.disabled = false;
+        btn.textContent = 'Check for Updates';
+        return;
+      }
+
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.update();
+
+        if (reg.waiting || reg.installing) {
+          // A new SW was found — it will activate, write the meta cache stamp,
+          // and the visibilitychange handler will reload the page automatically.
+          statusEl.textContent = 'Update found — applying now…';
+          btn.textContent = 'Updating…';
+          // Nudge it to skip waiting immediately rather than waiting for a restart.
+          const sw = reg.waiting || reg.installing;
+          sw.postMessage({ type: 'SKIP_WAITING' });
+          setTimeout(() => window.location.reload(), 1400);
+        } else {
+          const v = window.__ABIDE_VERSION__ || 'current';
+          statusEl.textContent = `You're on the latest version (${v}).`;
+          btn.textContent = 'Up to date ✓';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Check for Updates';
+            statusEl.textContent = '';
+          }, 2800);
+        }
+      } catch (err) {
+        console.warn('[Abide] Update check failed:', err);
+        statusEl.textContent = 'Could not check for updates. Try again when online.';
+        btn.disabled = false;
+        btn.textContent = 'Check for Updates';
+      }
+    });
   }
 
   function applyTheme(theme) {

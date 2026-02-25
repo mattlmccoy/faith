@@ -3,11 +3,16 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v76';
+const SW_VERSION = 'abide-v77';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
 const p = (path = '') => `${BASE_PATH}${path}`;
+
+// Shown as an OS notification when this SW update activates on a device that
+// already had a previous version installed. Keep it to one sentence — it
+// appears in the system notification tray.
+const SW_RELEASE_NOTES = 'Smarter Drive sync — your weekly plan now uploads separately from your devotion archive for faster, leaner backups.';
 
 const STATIC_ASSETS = [
   p(''),
@@ -56,9 +61,17 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// --- Activate: clean old caches, stamp version, then notify open windows ---
+// --- Message: handle SKIP_WAITING from the "Check for Updates" button ---
+// When the user taps "Check for Updates" and a new SW is waiting, the page
+// sends this message so the update applies immediately without a full restart.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// --- Activate: clean old caches, stamp version, notify windows, push update alert ---
 self.addEventListener('activate', (event) => {
   event.waitUntil(
+    // 1. Delete old caches from prior SW versions.
     caches.keys().then(keys =>
       Promise.all(
         keys
@@ -68,26 +81,46 @@ self.addEventListener('activate', (event) => {
     )
     .then(() => self.clients.claim())
     .then(() => {
-      // Stamp current SW version into a persistent meta-cache entry.
-      // The page reads this on every foreground to detect if the SW was
-      // updated while the app was backgrounded (iOS suspends JS so the
-      // postMessage below is never received in that scenario).
-      return caches.open('abide-meta')
-        .then(cache => cache.put(
+      // 2. Read the PREVIOUS version stamp before overwriting it.
+      //    This lets us skip the update notification on first install
+      //    (when there is no prior stamp) and avoid a false-update
+      //    notification if the SW somehow activates without a version change.
+      return caches.open('abide-meta').then(async (cache) => {
+        const prev = await cache.match('sw-version');
+        const prevVersion = prev ? await prev.text() : null;
+        await cache.put(
           'sw-version',
           new Response(SW_VERSION, { headers: { 'Content-Type': 'text/plain' } })
-        ));
+        );
+        return prevVersion; // passed to the next .then()
+      });
     })
-    .then(() => {
-      // Also tell every currently-open window to reload immediately.
-      // postMessage works when the app is foregrounded; the cache stamp above
-      // covers the backgrounded case.
+    .then((prevVersion) => {
+      // 3. Tell every currently-open window to reload.
+      //    postMessage covers the foregrounded case; the cache stamp above
+      //    covers the backgrounded / iOS-suspended case.
       return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then(clientList => {
           clientList.forEach(client =>
             client.postMessage({ type: 'SW_UPDATED', version: SW_VERSION })
           );
+          return prevVersion;
         });
+    })
+    .then((prevVersion) => {
+      // 4. Show an OS update notification — but only when:
+      //    • We have release notes to show
+      //    • This is a real update (prevVersion exists and differs from current)
+      //    Silently swallowed if notification permission is not granted.
+      if (!SW_RELEASE_NOTES || !prevVersion || prevVersion === SW_VERSION) return;
+      return self.registration.showNotification('Abide Updated ✓', {
+        body: SW_RELEASE_NOTES,
+        icon: p('icons/icon-192.png'),
+        badge: p('icons/icon-192.png'),
+        tag: 'abide-update',   // replaces any previous update notification
+        silent: true,          // no sound — it's an informational alert
+        data: { url: p('') },
+      }).catch(() => {}); // no-op if permission denied or API unavailable
     })
   );
 });
