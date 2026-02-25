@@ -257,6 +257,12 @@ async function fetchYouVersion(ref, translationId, env) {
 
   const passageId = refToOsisId(ref);
   if (!passageId) {
+    // Try parsing as a chapter-only ref (e.g. "John 3" with no verse specified).
+    // These are used by the Scripture view's chapter navigation.
+    const chapterInfo = refToChapterId(ref);
+    if (chapterInfo) {
+      return fetchYouVersionChapter(chapterInfo, ref, translationId, bibleId, env);
+    }
     return { error: `Could not parse reference: ${ref}` };
   }
 
@@ -387,9 +393,81 @@ async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId,
   };
 }
 
-// Convert human ref to Tyndale NLT API format: "John 3:16" → "John.3:16"
+// Convert human ref to Tyndale NLT API format.
+// "John 3:16"   → "John.3:16"
+// "John 3:16-18"→ "John.3:16-18"
+// "John 3"      → "John.3"   (chapter-only — NLT API accepts this natively)
 function refToNLTFormat(ref) {
-  return ref.trim().replace(/\s+(\d+:\d+(?:-\d+(?::\d+)?)?)$/, '.$1');
+  // Replace the first whitespace before a chapter number (optionally followed by
+  // :verse[-endverse]) with a dot. The verse part is now optional.
+  return ref.trim().replace(/\s+(\d+(?::\d+(?:[-–]\d+(?::\d+)?)?)?)\s*$/, '.$1');
+}
+
+// Parse a chapter-only reference like "John 3" → { book: 'JHN', ch: 3, humanRef: 'John 3' }
+// Returns null if the ref already contains a verse (use refToOsisId for those).
+function refToChapterId(ref) {
+  const clean = ref.trim();
+  // Must end with a plain chapter number (no colon) to be a chapter-only ref
+  const m = clean.match(/^(.+?)\s+(\d+)$/i);
+  if (!m) return null;
+  const bookKey = m[1].toLowerCase().replace(/\s+/g, ' ');
+  const osis = OSIS_BOOKS[bookKey];
+  if (!osis) return null;
+  return { book: osis, ch: parseInt(m[2], 10), humanRef: clean };
+}
+
+// Fetch an entire chapter for a YouVersion translation using batched sequential requests.
+// YouVersion has no chapter endpoint — we fetch 10 verses/batch, stop when a batch
+// returns fewer than 10 hits (= reached the end of the chapter). This keeps request
+// counts low and avoids rate-limiting.
+async function fetchYouVersionChapter(chInfo, humanRef, translationId, bibleId, env) {
+  const { book, ch } = chInfo;
+  const yvParams = 'format=text&include_headings=false&include_notes=false';
+  const allVerses = [];
+  const BATCH = 10;
+  let batchStart = 1;
+
+  // Cap at 200 iterations (longest chapter is Psalm 119 at 176 verses)
+  while (batchStart <= 200) {
+    const batchIds = [];
+    for (let v = batchStart; v < batchStart + BATCH; v++) {
+      batchIds.push(`${book}.${ch}.${v}`);
+    }
+
+    const fetched = await Promise.all(
+      batchIds.map(vid => {
+        const u = `${YOUVERSION_API_BASE}/bibles/${bibleId}/passages/${vid}?${yvParams}`;
+        return fetch(u, { headers: { 'X-YVP-App-Key': env.YOUVERSION_API_KEY } })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null);
+      })
+    );
+
+    let hitsThisBatch = 0;
+    fetched.forEach((d, i) => {
+      if (!d?.content) return;
+      const verseNum = batchStart + i;
+      allVerses.push({ verse: verseNum, text: d.content.replace(/\s+/g, ' ').trim() });
+      hitsThisBatch++;
+    });
+
+    // Fewer than BATCH hits = end of chapter reached
+    if (hitsThisBatch < BATCH) break;
+    batchStart += BATCH;
+  }
+
+  if (!allVerses.length) {
+    return { error: `Could not load chapter: ${humanRef}` };
+  }
+
+  return {
+    reference: humanRef,
+    translation_id: translationId,
+    translation_name: YV_NAMES[translationId] || translationId.toUpperCase(),
+    translation_note: YV_NOTES[translationId] || '',
+    verses: allVerses,
+    text: allVerses.map(v => v.text).join(' '),
+  };
 }
 
 // Strip NLT HTML response to plain text verses.

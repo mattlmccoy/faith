@@ -923,9 +923,42 @@ const Store = (() => {
     };
   }
 
+  // Trim a plan's days object to only the 7 date keys declared by its .week string.
+  // Prevents a Drive-cached plan corrupted by a prior merge bug (e.g. 13 days) from
+  // expanding the current plan on every pull. Safe to call on any plan: if it already
+  // has ≤7 days or lacks a parseable week key, it is returned unchanged.
+  function sanitizePlanDays(plan) {
+    if (!plan || typeof plan !== 'object') return plan;
+    const days = plan.days && typeof plan.days === 'object' ? plan.days : {};
+    const keys = Object.keys(days);
+    if (keys.length <= 7) return plan; // already clean, skip work
+
+    // Build the valid 7-day key set from the plan's declared week string
+    const weekStart = (typeof plan.week === 'string' && plan.week)
+      ? plan.week
+      : DateUtils.weekStart(keys.slice().sort()[0] || DateUtils.today());
+    const validKeys = new Set(DateUtils.weekKeys(weekStart));
+    const filteredDays = {};
+    keys.forEach(k => { if (validKeys.has(k)) filteredDays[k] = days[k]; });
+
+    // If the week string was stale and filtered everything out, fall back to the
+    // 7 most-recent date keys — still far better than retaining all 13.
+    if (!Object.keys(filteredDays).length) {
+      keys.slice().sort().slice(-7).forEach(k => { filteredDays[k] = days[k]; });
+    }
+
+    return { ...plan, days: filteredDays };
+  }
+
   function mergePlan(currentPlan, incomingPlan) {
     if (!incomingPlan || typeof incomingPlan !== 'object') return currentPlan || null;
     if (!currentPlan || typeof currentPlan !== 'object') return JSON.parse(JSON.stringify(incomingPlan));
+
+    // Sanitize both plans up-front — repairs corruption from the pre-planId merge bug.
+    // A Drive file saved before planId was introduced may still contain 13 days; this
+    // trims it to the 7 days that belong to its declared week before we ever compare.
+    currentPlan  = sanitizePlanDays(currentPlan);
+    incomingPlan = sanitizePlanDays(incomingPlan);
 
     const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
     const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
@@ -962,7 +995,7 @@ const Store = (() => {
 
     // Same week — merge, keeping local completions/edits when keys overlap.
     const mergedDays = { ...incomingDays, ...currentDays };
-    return {
+    const merged = {
       ...incomingPlan,
       ...currentPlan,
       days: mergedDays,
@@ -970,6 +1003,9 @@ const Store = (() => {
         ? currentPlan.sources
         : (Array.isArray(incomingPlan.sources) ? incomingPlan.sources : []),
     };
+    // Final sanitize: guards against edge cases where same-week merge still
+    // produces >7 days (e.g. start-of-week boundary overlap).
+    return sanitizePlanDays(merged);
   }
 
   function importDevotionsSnapshot(snapshot = {}, options = {}) {
