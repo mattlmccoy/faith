@@ -920,20 +920,33 @@ const Store = (() => {
     if (!incomingPlan || typeof incomingPlan !== 'object') return currentPlan || null;
     if (!currentPlan || typeof currentPlan !== 'object') return JSON.parse(JSON.stringify(incomingPlan));
 
-    // If plans are from different weeks, don't merge their days — that's what
-    // causes a 7-day plan to expand to 13+ days when Drive has a stale week cached.
-    // Pick the newer plan by createdAt; fall back to the local plan if timestamps absent.
-    const currentWeek = currentPlan.week || '';
+    const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
+    const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
+
+    // Detect plans from different weeks. Use two independent signals so that the
+    // check works even when the `week` field is absent (common in older plans):
+    //
+    // Signal 1 — explicit week string mismatch (fast path when both present)
+    // Signal 2 — zero day-key overlap (date keys like "2026-02-24" never collide
+    //            across different weeks, so no overlap = definitely different weeks)
+    const currentWeek  = currentPlan.week  || '';
     const incomingWeek = incomingPlan.week || '';
-    if (currentWeek && incomingWeek && currentWeek !== incomingWeek) {
-      const ct = new Date(currentPlan.createdAt || 0).getTime();
+    const weekMismatch = currentWeek && incomingWeek && currentWeek !== incomingWeek;
+
+    const currentKeys  = Object.keys(currentDays);
+    const incomingKeys = Object.keys(incomingDays);
+    const noKeyOverlap = currentKeys.length > 0 && incomingKeys.length > 0 &&
+                         !currentKeys.some(k => Object.prototype.hasOwnProperty.call(incomingDays, k));
+
+    if (weekMismatch || noKeyOverlap) {
+      // Different weeks — never merge days; pick the newer plan by createdAt.
+      // Fall back to local plan when timestamps are absent or equal.
+      const ct = new Date(currentPlan.createdAt  || 0).getTime();
       const it = new Date(incomingPlan.createdAt || 0).getTime();
       return it > ct ? JSON.parse(JSON.stringify(incomingPlan)) : currentPlan;
     }
 
-    const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
-    const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
-    // Preserve local days when keys overlap; only fill missing days from incoming.
+    // Same week — merge, keeping local completions/edits when keys overlap.
     const mergedDays = { ...incomingDays, ...currentDays };
     return {
       ...incomingPlan,

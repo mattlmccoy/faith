@@ -12,9 +12,9 @@ const API = (() => {
   const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
 
   // Translations that MUST go through the worker (require server-side API keys)
-  // NIV: unlocked via Biblica Fast-track License v1 on YouVersion developer portal
-  // NLT/CSB/MSG: still 403 — require separate Tyndale/Holman/NavPress licenses
-  const WORKER_TRANSLATIONS = ['esv', 'niv', 'bsb', 'lsv'];
+  // ESV: api.esv.org token  NIV: YouVersion (Biblica Fast-track License)
+  // NLT: api.nlt.to (Tyndale)  BSB/LSV: YouVersion (CC BY-SA, free)
+  const WORKER_TRANSLATIONS = ['esv', 'niv', 'nlt', 'bsb', 'lsv'];
 
   function bibleTranslation() {
     return Store.get('bibleTranslation') || 'web';

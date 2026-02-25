@@ -4,7 +4,8 @@
  *
  * Secrets (set with: wrangler secret put SECRET_NAME):
  *   ESV_API_TOKEN      - api.esv.org token
- *   YOUVERSION_API_KEY - App key from platform.YouVersion.com (for NIV, NLT)
+ *   YOUVERSION_API_KEY - App key from platform.YouVersion.com (for NIV, BSB, LSV)
+ *   NLT_API_KEY        - License key from api.nlt.to (for NLT)
  *   SERPER_API_KEY     - Serper.dev search API key
  *   GEMINI_API_KEY     - Gemini API key for AI plan + phrase search
  *   GEMINI_MODEL       - Optional Gemini model name

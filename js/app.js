@@ -4,7 +4,7 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.24.4';
+  const APP_VERSION = '2026.02.24.5';
   window.__ABIDE_VERSION__ = APP_VERSION;
   window.__ABIDE_SW_VERSION__ = 'abide-v68';
 

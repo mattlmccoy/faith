@@ -18,6 +18,7 @@
 const BIBLE_API_BASE = 'https://bible-api.com';
 const ESV_API_BASE = 'https://api.esv.org/v3/passage/text';
 const YOUVERSION_API_BASE = 'https://api.youversion.com/v1';
+const NLT_API_BASE = 'https://api.nlt.to';
 const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
 // Translations supported by bible-api.com
@@ -25,12 +26,23 @@ const BIBLE_API_TRANSLATIONS = ['web', 'kjv', 'asv', 'bbe', 'darby', 'webbe'];
 
 // YouVersion Bible IDs. Only translations covered by an accepted license agreement
 // are accessible — others return 403. Verified via /bible/debug endpoint.
-// Unlocked so far: NIV (Biblica Fast-track License v1 accepted).
-// NLT (Tyndale), CSB (Holman), MSG (NavPress) still require separate publisher licenses.
+// Unlocked: NIV (Biblica Fast-track License v1). CSB/MSG still require publisher licenses.
 const YOUVERSION_BIBLES = {
   niv: 111,   // New International Version (2011) — NIV® © Biblica ✓ licensed
   bsb: 3034,  // Berean Standard Bible (2016-2024) — CC BY-SA 4.0
   lsv: 2660,  // Literal Standard Version — CC BY-SA 4.0
+};
+
+// Shared translation metadata used by fetchYouVersion + fetchYouVersionRange
+const YV_NAMES = {
+  niv: 'New International Version',
+  bsb: 'Berean Standard Bible',
+  lsv: 'Literal Standard Version',
+};
+const YV_NOTES = {
+  niv: 'NIV® © 1973, 2011 Biblica. Personal devotional use only.',
+  bsb: 'BSB © 2016–2024 by Bible Hub & Berean.Bible. CC BY-SA 4.0.',
+  lsv: 'LSV © 2020 by Covenant Press. CC BY-SA 4.0.',
 };
 
 // OSIS/USFM book abbreviation map for passage IDs (used by ESV + YouVersion)
@@ -95,6 +107,8 @@ export async function handleBible(request, url, env, origin, json) {
 
     if (translation === 'esv') {
       data = await fetchESV(ref, env);
+    } else if (translation === 'nlt') {
+      data = await fetchNLT(ref, env);
     } else if (YOUVERSION_BIBLES[translation]) {
       data = await fetchYouVersion(ref, translation, env);
     } else {
@@ -246,6 +260,12 @@ async function fetchYouVersion(ref, translationId, env) {
     return { error: `Could not parse reference: ${ref}` };
   }
 
+  // YouVersion /passages/ only accepts single verse IDs — ranges return 404.
+  // Expand ranges to parallel individual verse fetches.
+  if (passageId.includes('-')) {
+    return fetchYouVersionRange(passageId, ref, translationId, bibleId, env);
+  }
+
   const params = new URLSearchParams({
     format: 'text',
     include_headings: 'false',
@@ -263,56 +283,162 @@ async function fetchYouVersion(ref, translationId, env) {
   }
 
   const data = await res.json();
-  // YouVersion response shape: { id, content, reference }
-  const content = data?.content || '';
+  // YouVersion single-verse response: { id, content, reference }
+  // content is plain text with no verse markers — return as single verse.
+  const content = (data?.content || '').replace(/\s+/g, ' ').trim();
   const canonicalRef = data?.reference || ref;
 
-  // Parse verse numbers from content. YouVersion text format uses markers
-  // like "[1]" at the start of each verse.
-  const verses = [];
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  const verseRegex = /^[¶\s]*\[(\d+)\]\s*(.*)/;
-  let currentVerse = null;
-  let currentText = [];
-
-  for (const line of lines) {
-    const m = line.match(verseRegex);
-    if (m) {
-      if (currentVerse !== null) {
-        verses.push({ verse: currentVerse, text: currentText.join(' ').trim() });
-      }
-      currentVerse = parseInt(m[1], 10);
-      currentText = [m[2]];
-    } else if (currentVerse !== null) {
-      currentText.push(line);
-    }
-  }
-  if (currentVerse !== null) {
-    verses.push({ verse: currentVerse, text: currentText.join(' ').trim() });
-  }
-
-  // Fallback: return as single block if no verse markers found
-  if (!verses.length && content.trim()) {
-    const plain = content.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
-    verses.push({ verse: 1, text: plain });
-  }
-
-  const TRANSLATION_NAMES = {
-    niv: 'New International Version',
-    bsb: 'Berean Standard Bible',
-    lsv: 'Literal Standard Version',
-  };
-  const TRANSLATION_NOTES = {
-    niv: 'NIV® © 1973, 2011 Biblica. Personal devotional use only.',
-    bsb: 'BSB © 2016–2024 by Bible Hub & Berean.Bible. CC BY-SA 4.0.',
-    lsv: 'LSV © 2020 by Covenant Press. CC BY-SA 4.0.',
-  };
+  const verses = content ? [{ verse: 1, text: content }] : [];
 
   return {
     reference: canonicalRef,
     translation_id: translationId,
-    translation_name: TRANSLATION_NAMES[translationId] || translationId.toUpperCase(),
-    translation_note: TRANSLATION_NOTES[translationId] || '',
+    translation_name: YV_NAMES[translationId] || translationId.toUpperCase(),
+    translation_note: YV_NOTES[translationId] || '',
+    verses,
+    text: content,
+  };
+}
+
+// Expand a verse range by fetching each verse individually in parallel.
+// Needed because YouVersion /passages/ endpoint only accepts single verse IDs.
+async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId, env) {
+  const dashIdx = passageId.indexOf('-');
+  const startId = passageId.slice(0, dashIdx);   // e.g. JHN.3.16
+  const endId   = passageId.slice(dashIdx + 1);  // e.g. JHN.3.21 or 3.21
+
+  const startParts = startId.split('.');
+  const endParts   = endId.split('.');
+  const book    = startParts[0];
+  const startCh = parseInt(startParts[1], 10);
+  const startVs = parseInt(startParts[2], 10);
+
+  let endCh, endVs;
+  if (endParts.length >= 3) {        // JHN.3.21
+    endCh = parseInt(endParts[1], 10);
+    endVs = parseInt(endParts[2], 10);
+  } else if (endParts.length === 2) { // 3.21
+    endCh = parseInt(endParts[0], 10);
+    endVs = parseInt(endParts[1], 10);
+  } else {                            // 21 (same chapter implied)
+    endCh = startCh;
+    endVs = parseInt(endParts[0], 10);
+  }
+
+  // Build individual verse IDs (same-chapter ranges only; cross-chapter is rare
+  // in devotional use and falls back to just the start verse)
+  const verseIds = [];
+  if (startCh === endCh && endVs >= startVs && (endVs - startVs) <= 30) {
+    for (let v = startVs; v <= endVs; v++) {
+      verseIds.push(`${book}.${startCh}.${v}`);
+    }
+  } else {
+    verseIds.push(startId); // cross-chapter fallback
+  }
+
+  const yvParams = 'format=text&include_headings=false&include_notes=false';
+  const fetched = await Promise.all(
+    verseIds.map(vid => {
+      const u = `${YOUVERSION_API_BASE}/bibles/${bibleId}/passages/${vid}?${yvParams}`;
+      return fetch(u, { headers: { 'X-YVP-App-Key': env.YOUVERSION_API_KEY } })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);
+    })
+  );
+
+  const verses = fetched
+    .map((d, i) => d?.content
+      ? { verse: startVs + i, text: d.content.replace(/\s+/g, ' ').trim() }
+      : null
+    )
+    .filter(Boolean);
+
+  if (!verses.length) {
+    return { error: `Could not load passage range: ${humanRef}` };
+  }
+
+  return {
+    reference: humanRef,
+    translation_id: translationId,
+    translation_name: YV_NAMES[translationId] || translationId.toUpperCase(),
+    translation_note: YV_NOTES[translationId] || '',
+    verses,
+    text: verses.map(v => v.text).join(' '),
+  };
+}
+
+// Convert human ref to Tyndale NLT API format: "John 3:16" → "John.3:16"
+function refToNLTFormat(ref) {
+  return ref.trim().replace(/\s+(\d+:\d+(?:-\d+(?::\d+)?)?)$/, '.$1');
+}
+
+// Strip NLT HTML response to plain text verses.
+// Tyndale wraps each verse in <verse_export vn="N"> with translator notes in <span class="tn">.
+function parseNLTHtml(html) {
+  const verses = [];
+  const verseExportRe = /<verse_export[^>]*\bvn="(\d+)"[^>]*>([\s\S]*?)<\/verse_export>/gi;
+  let m;
+  while ((m = verseExportRe.exec(html)) !== null) {
+    let content = m[2];
+    // Remove translator notes (can contain nested tags)
+    content = content.replace(/<span[^>]*class="tn"[^>]*>[\s\S]*?<\/span>/gi, '');
+    // Remove footnote anchor links
+    content = content.replace(/<a[^>]*class="a-tn"[^>]*>[\s\S]*?<\/a>/gi, '');
+    // Strip remaining HTML tags
+    content = content.replace(/<[^>]+>/g, '');
+    // Decode basic HTML entities
+    content = content.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
+    content = content.replace(/\s+/g, ' ').trim();
+    if (content) verses.push({ verse: parseInt(m[1], 10), text: content });
+  }
+
+  // Fallback: strip all HTML and return as single block
+  if (!verses.length) {
+    const plain = html
+      .replace(/<span[^>]*class="tn"[^>]*>[\s\S]*?<\/span>/gi, '')
+      .replace(/<a[^>]*class="a-tn"[^>]*>[\s\S]*?<\/a>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    if (plain) verses.push({ verse: 1, text: plain });
+  }
+
+  return verses;
+}
+
+async function fetchNLT(ref, env) {
+  if (!env.NLT_API_KEY) {
+    return { error: 'NLT API key not configured on server. Run: wrangler secret put NLT_API_KEY' };
+  }
+
+  const nltRef = refToNLTFormat(ref);
+  const params = new URLSearchParams({ ref: nltRef, key: env.NLT_API_KEY, version: 'NLT' });
+  const res = await fetch(`${NLT_API_BASE}/api/passages?${params}`);
+
+  if (!res.ok) {
+    return { error: `NLT API error: ${res.status}` };
+  }
+
+  const html = await res.text();
+
+  if (!html.includes('verse_export')) {
+    return { error: 'Passage not found in NLT. Check reference format.' };
+  }
+
+  // Extract canonical reference from the HTML header (e.g. "John 3:16-18, NLT")
+  const headerMatch = html.match(/<h2 class="bk_ch_vs_header">([^<]+)<\/h2>/);
+  const canonicalRef = headerMatch
+    ? headerMatch[1].replace(/,\s*NLT\S*$/i, '').trim()
+    : ref;
+
+  const verses = parseNLTHtml(html);
+
+  return {
+    reference: canonicalRef,
+    translation_id: 'nlt',
+    translation_name: 'New Living Translation',
+    translation_note: 'NLT © 1996, 2004, 2015 Tyndale House Foundation. Personal devotional use only.',
     verses,
     text: verses.map(v => v.text).join(' '),
   };
