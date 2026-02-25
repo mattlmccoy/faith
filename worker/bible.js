@@ -126,6 +126,52 @@ export async function handleBible(request, url, env, origin, json) {
     return json({ suggestions }, 200, origin);
   }
 
+  // GET /bible/versions — diagnostic: lists YouVersion bible IDs for English bibles.
+  // Use this to verify/correct the YOUVERSION_BIBLES ID map.
+  // Example: curl https://abide-worker.mattlmccoy.workers.dev/bible/versions
+  if (url.pathname === '/bible/versions') {
+    if (!env.YOUVERSION_API_KEY) {
+      return json({ error: 'YOUVERSION_API_KEY not set' }, 500, origin);
+    }
+    const res = await fetch(`${YOUVERSION_API_BASE}/bibles?language_ranges[]=en`, {
+      headers: { 'X-YVP-App-Key': env.YOUVERSION_API_KEY },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return json({ error: `YouVersion API error: ${res.status}`, detail: body.slice(0, 300) }, res.status, origin);
+    }
+    const bibles = await res.json();
+    // Return just the fields useful for ID matching: id, abbreviation, local_title
+    const summary = Array.isArray(bibles)
+      ? bibles.map(b => ({ id: b.id, abbr: b.abbreviation, title: b.local_title || b.title }))
+      : bibles;
+    return json({ configured_ids: YOUVERSION_BIBLES, available: summary }, 200, origin);
+  }
+
+  // GET /bible/debug?ref=John+3:16&translation=niv — test a single passage fetch and
+  // return the raw YouVersion response (before normalisation) alongside any error.
+  if (url.pathname === '/bible/debug') {
+    const ref = url.searchParams.get('ref') || 'John 3:16';
+    const translation = (url.searchParams.get('translation') || 'niv').toLowerCase();
+    if (!env.YOUVERSION_API_KEY) {
+      return json({ error: 'YOUVERSION_API_KEY not set' }, 500, origin);
+    }
+    const bibleId = YOUVERSION_BIBLES[translation];
+    if (!bibleId) return json({ error: `Unknown translation: ${translation}`, known: Object.keys(YOUVERSION_BIBLES) }, 400, origin);
+    const passageId = refToOsisId(ref);
+    if (!passageId) return json({ error: `Could not parse ref: ${ref}` }, 400, origin);
+    const apiUrl = `${YOUVERSION_API_BASE}/bibles/${bibleId}/passages/${encodeURIComponent(passageId)}?format=text&include_headings=false&include_notes=false`;
+    const res = await fetch(apiUrl, { headers: { 'X-YVP-App-Key': env.YOUVERSION_API_KEY } });
+    const body = await res.text().catch(() => '');
+    let parsed;
+    try { parsed = JSON.parse(body); } catch { parsed = null; }
+    return json({
+      status: res.status,
+      ref, translation, bibleId, passageId, apiUrl,
+      response: parsed || body.slice(0, 500),
+    }, 200, origin);
+  }
+
   return json({ error: 'Not found' }, 404, origin);
 }
 
