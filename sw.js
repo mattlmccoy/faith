@@ -3,7 +3,7 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v77';
+const SW_VERSION = 'abide-v78';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
@@ -12,7 +12,7 @@ const p = (path = '') => `${BASE_PATH}${path}`;
 // Shown as an OS notification when this SW update activates on a device that
 // already had a previous version installed. Keep it to one sentence — it
 // appears in the system notification tray.
-const SW_RELEASE_NOTES = 'Smarter Drive sync — your weekly plan now uploads separately from your devotion archive for faster, leaner backups.';
+const SW_RELEASE_NOTES = 'Your Google profile photo now appears in Settings when your account is connected.';
 
 const STATIC_ASSETS = [
   p(''),

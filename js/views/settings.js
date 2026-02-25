@@ -35,6 +35,10 @@ const SettingsView = (() => {
     const trustedPastors = Store.getTrustedPastors();
     const appVersion = window.__ABIDE_VERSION__ || 'dev';
     const currentPalette = state.palette || 'mountain-mist';
+    const googlePicture = state.googleProfile?.picture || '';
+    const nameIconHtml = googlePicture
+      ? `<img src="${escapeHtml(googlePicture)}" width="32" height="32" style="border-radius:50%;object-fit:cover;display:block;" alt="Google profile" />`
+      : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 
     const div = document.createElement('div');
     div.className = 'view-content tab-switch-enter';
@@ -45,7 +49,7 @@ const SettingsView = (() => {
         <div class="settings-group">
           <div class="settings-row">
             <div class="settings-row__icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              ${nameIconHtml}
             </div>
             <div class="settings-row__content">
               <div class="settings-row__label">Your Name</div>
