@@ -12,7 +12,7 @@ const p = (path = '') => `${BASE_PATH}${path}`;
 // Shown as an OS notification when this SW update activates on a device that
 // already had a previous version installed. Keep it to one sentence — it
 // appears in the system notification tray.
-const SW_RELEASE_NOTES = 'Your Google profile photo now appears in Settings when your account is connected.';
+const SW_RELEASE_NOTES = 'Pull-to-refresh now safely uploads your data before downloading, and you\'ll see a sign-in prompt if your session expires.';
 
 const STATIC_ASSETS = [
   p(''),

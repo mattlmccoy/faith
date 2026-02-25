@@ -76,27 +76,30 @@
     //     the app was backgrounded (JS was suspended, so SW_UPDATED was never received).
     //     The SW writes its version to 'abide-meta' on every activate; comparing that
     //     to the version baked into this page detects staleness without any message.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible') return;
-
-      // Path 1: trigger update check (handles foreground updates)
-      navigator.serviceWorker.ready
-        .then(reg => reg.update())
-        .catch(() => {});
-
-      // Path 2: cache stamp check (handles backgrounded updates on iOS)
+    function checkForSwUpdate(reg) {
+      if (swReloading) return;
+      reg.update().catch(() => {});
       if ('caches' in window) {
         caches.open('abide-meta')
           .then(cache  => cache.match('sw-version'))
           .then(resp   => resp ? resp.text() : null)
           .then(cachedVer => {
-            if (cachedVer && cachedVer !== window.__ABIDE_SW_VERSION__) {
-              reloadForUpdate();
-            }
+            if (cachedVer && cachedVer !== window.__ABIDE_SW_VERSION__) reloadForUpdate();
           })
           .catch(() => {});
       }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker.ready.then(reg => checkForSwUpdate(reg)).catch(() => {});
     });
+
+    // Periodic check every 30 min — guards against iOS JS suspension killing
+    // the visibilitychange handler, and covers apps left open in the foreground.
+    navigator.serviceWorker.ready.then(reg => {
+      setInterval(() => checkForSwUpdate(reg), 30 * 60 * 1000);
+    }).catch(() => {});
 
     navigator.serviceWorker.register(`${basePath}sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
       scope: basePath,
