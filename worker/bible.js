@@ -373,34 +373,48 @@ function refToNLTFormat(ref) {
 }
 
 // Strip NLT HTML response to plain text verses.
-// Tyndale wraps each verse in <verse_export vn="N"> with translator notes in <span class="tn">.
+// Tyndale wraps each verse in <verse_export vn="N">.
+// Translator notes live in <span class="tn"><span class="tn-ref">…</span> text <em>…</em></span>
+// The non-greedy [\s\S]*?</span> stops at the first </span> inside the tn span (tn-ref),
+// leaving the note text behind. Fix: multi-pass — collapse inner tags first, then remove tn.
+function stripNLTNotes(html) {
+  let s = html;
+  // Pass 1: remove leaf elements that nest inside tn spans
+  s = s.replace(/<span[^>]*class="tn-ref"[^>]*>[^<]*<\/span>/gi, '');
+  s = s.replace(/<em>[^<]*<\/em>/gi, '');
+  s = s.replace(/<strong>[^<]*<\/strong>/gi, '');
+  s = s.replace(/<i>[^<]*<\/i>/gi, '');
+  // Pass 2: tn spans are now flat (no nested tags) — safe to remove with non-greedy match
+  s = s.replace(/<span[^>]*class="tn"[^>]*>[^<]*<\/span>/gi, '');
+  // Safety pass: catch any remaining tn spans that still have nested content
+  s = s.replace(/<span[^>]*class="tn"[^>]*>[\s\S]*?<\/span>/gi, '');
+  // Remove footnote anchor links  e.g. <a class="a-tn">*</a>
+  s = s.replace(/<a[^>]*class="a-tn"[^>]*>[^<]*<\/a>/gi, '');
+  // Remove visible verse-number spans  e.g. <span class="vn">16</span>
+  s = s.replace(/<span[^>]*class="vn"[^>]*>\d+<\/span>/gi, '');
+  return s;
+}
+
+function htmlToPlain(html) {
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
 function parseNLTHtml(html) {
   const verses = [];
   const verseExportRe = /<verse_export[^>]*\bvn="(\d+)"[^>]*>([\s\S]*?)<\/verse_export>/gi;
   let m;
   while ((m = verseExportRe.exec(html)) !== null) {
-    let content = m[2];
-    // Remove translator notes (can contain nested tags)
-    content = content.replace(/<span[^>]*class="tn"[^>]*>[\s\S]*?<\/span>/gi, '');
-    // Remove footnote anchor links
-    content = content.replace(/<a[^>]*class="a-tn"[^>]*>[\s\S]*?<\/a>/gi, '');
-    // Strip remaining HTML tags
-    content = content.replace(/<[^>]+>/g, '');
-    // Decode basic HTML entities
-    content = content.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-                     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
-    content = content.replace(/\s+/g, ' ').trim();
-    if (content) verses.push({ verse: parseInt(m[1], 10), text: content });
+    const text = htmlToPlain(stripNLTNotes(m[2]));
+    if (text) verses.push({ verse: parseInt(m[1], 10), text });
   }
 
   // Fallback: strip all HTML and return as single block
   if (!verses.length) {
-    const plain = html
-      .replace(/<span[^>]*class="tn"[^>]*>[\s\S]*?<\/span>/gi, '')
-      .replace(/<a[^>]*class="a-tn"[^>]*>[\s\S]*?<\/a>/gi, '')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
-      .replace(/\s+/g, ' ').trim();
+    const plain = htmlToPlain(stripNLTNotes(html));
     if (plain) verses.push({ verse: 1, text: plain });
   }
 

@@ -335,6 +335,12 @@ const Store = (() => {
     if (nextPlan && typeof nextPlan === 'object' && nextPlan.seedDefault !== true) {
       nextPlan.seedDefault = false;
     }
+    // Stamp a unique planId if not already present — used by mergePlan() to
+    // definitively detect when local and Drive plans are different devotions.
+    if (nextPlan && typeof nextPlan === 'object' && !nextPlan.planId) {
+      const weekKey = nextPlan.week || DateUtils.weekStart(DateUtils.today());
+      nextPlan.planId = `plan-${weekKey}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    }
     set('currentWeekPlan', nextPlan);
     _state.pendingWeekPlan = null;
     const keys = getPlanDayKeys();
@@ -725,6 +731,7 @@ const Store = (() => {
       seedDefault: false,
       fromSavedSeries: true,
       createdAt: new Date().toISOString(),
+      planId: `plan-${week}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       days,
     };
 
@@ -923,12 +930,19 @@ const Store = (() => {
     const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
     const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
 
-    // Detect plans from different weeks. Use two independent signals so that the
-    // check works even when the `week` field is absent (common in older plans):
+    // Detect plans that are different devotions. Three independent signals,
+    // checked in order of reliability:
     //
+    // Signal 0 — planId mismatch: strongest signal. Every plan generated after
+    //            this update carries a unique planId. If both exist and differ,
+    //            these are categorically different devotionals — never merge.
     // Signal 1 — explicit week string mismatch (fast path when both present)
     // Signal 2 — zero day-key overlap (date keys like "2026-02-24" never collide
     //            across different weeks, so no overlap = definitely different weeks)
+    const currentId  = currentPlan.planId  || '';
+    const incomingId = incomingPlan.planId || '';
+    const idMismatch = !!(currentId && incomingId && currentId !== incomingId);
+
     const currentWeek  = currentPlan.week  || '';
     const incomingWeek = incomingPlan.week || '';
     const weekMismatch = currentWeek && incomingWeek && currentWeek !== incomingWeek;
@@ -938,7 +952,7 @@ const Store = (() => {
     const noKeyOverlap = currentKeys.length > 0 && incomingKeys.length > 0 &&
                          !currentKeys.some(k => Object.prototype.hasOwnProperty.call(incomingDays, k));
 
-    if (weekMismatch || noKeyOverlap) {
+    if (idMismatch || weekMismatch || noKeyOverlap) {
       // Different weeks — never merge days; pick the newer plan by createdAt.
       // Fall back to local plan when timestamps are absent or equal.
       const ct = new Date(currentPlan.createdAt  || 0).getTime();
