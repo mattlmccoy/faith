@@ -9,6 +9,7 @@ const Sync = (() => {
   const SETTINGS_FILE_NAME = 'abide-settings.json';
   const HIGHLIGHTS_FILE_NAME = 'abide-highlights.json';
   const PROGRESS_FILE_NAME = 'abide-progress.json';
+  const PLAN_FILE_NAME = 'abide-plan.json';
   const SHARES_FOLDER_NAME = 'abide-shares';
   const FOLDER_NAME = 'abidefaith-docs';
   const LEGACY_FOLDER_NAMES = ['abide-devotions', 'abide-devotions-docs', 'abidefaith'];
@@ -17,6 +18,7 @@ const Sync = (() => {
   const SETTINGS_FILE_CANDIDATES = [SETTINGS_FILE_NAME, 'abide-settings'];
   const HIGHLIGHTS_FILE_CANDIDATES = [HIGHLIGHTS_FILE_NAME, 'abide-highlights'];
   const PROGRESS_FILE_CANDIDATES = [PROGRESS_FILE_NAME, 'abide-progress'];
+  const PLAN_FILE_CANDIDATES = [PLAN_FILE_NAME, 'abide-plan'];
   const LEGACY_SNAPSHOT_FILE_CANDIDATES = [LEGACY_FILE_NAME, 'abide-saved-devotions', 'abide-devotions.json', 'abide-devotions'];
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   const PROFILE_SCOPE = 'openid email profile';
@@ -813,17 +815,22 @@ const Sync = (() => {
     const settings = Store.exportSettingsSnapshot();
     const highlights = Store.exportHighlightsSnapshot();
     const progress = Store.exportProgressSnapshot();
+    // Plan is now its own file — current week plan changes weekly but the devotion
+    // archive grows forever, so keeping them separate avoids re-uploading the full
+    // history on every new plan generation.
+    const plan = Store.exportPlanSnapshot();
     const folderId = await findOrCreateFolderId();
     if (!folderId) throw new Error('Could not create/find Google Drive folder');
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' };
-    const [devotionsFileId, journalsFileId, settingsFileId, highlightsFileId, progressFileId] = await Promise.all([
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '', plan: '' };
+    const [devotionsFileId, journalsFileId, settingsFileId, highlightsFileId, progressFileId, planFileId] = await Promise.all([
       upsertJsonFile(folderId, DEVOTIONS_FILE_NAME, devotions, knownFiles.devotions || ''),
       upsertJsonFile(folderId, JOURNALS_FILE_NAME, journals, knownFiles.journals || ''),
       upsertJsonFile(folderId, SETTINGS_FILE_NAME, settings, knownFiles.settings || ''),
       upsertJsonFile(folderId, HIGHLIGHTS_FILE_NAME, highlights, knownFiles.highlights || ''),
       upsertJsonFile(folderId, PROGRESS_FILE_NAME, progress, knownFiles.progress || ''),
+      upsertJsonFile(folderId, PLAN_FILE_NAME, plan, knownFiles.plan || ''),
     ]);
 
     Store.update({
@@ -836,6 +843,7 @@ const Sync = (() => {
         shares: String(knownFiles.shares || ''),
         highlights: highlightsFileId,
         progress: progressFileId,
+        plan: planFileId,
       },
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -846,7 +854,7 @@ const Sync = (() => {
       pastors: Array.isArray(settings.trustedPastors) ? settings.trustedPastors.length : 0,
       highlights: Object.keys(highlights.verseHighlights || {}).length,
       progress: Object.keys(progress.readingProgress || {}).length,
-      files: 5,
+      files: 6,
     };
   }
 
@@ -855,21 +863,26 @@ const Sync = (() => {
     if (!folderId) return { fileId: '', count: 0, imported: false };
 
     const state = Store.get();
-    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' };
-    const [knownDevotions, knownJournals, knownSettings, knownHighlights, knownProgress] = await Promise.all([
+    const knownFiles = state.googleDriveFiles || { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '', plan: '' };
+    const [knownDevotions, knownJournals, knownSettings, knownHighlights, knownProgress, knownPlan] = await Promise.all([
       readJsonFileById(knownFiles.devotions || ''),
       readJsonFileById(knownFiles.journals || ''),
       readJsonFileById(knownFiles.settings || ''),
       readJsonFileById(knownFiles.highlights || ''),
       readJsonFileById(knownFiles.progress || ''),
+      readJsonFileById(knownFiles.plan || ''),
     ]);
 
-    let [devotionsFile, journalsFile, settingsFile, highlightsFile, progressFile] = await Promise.all([
+    let [devotionsFile, journalsFile, settingsFile, highlightsFile, progressFile, planFile] = await Promise.all([
       knownDevotions.found ? knownDevotions : readJsonFileByCandidates(folderId, DEVOTIONS_FILE_CANDIDATES),
       knownJournals.found ? knownJournals : readJsonFileByCandidates(folderId, JOURNALS_FILE_CANDIDATES),
       knownSettings.found ? knownSettings : readJsonFileByCandidates(folderId, SETTINGS_FILE_CANDIDATES),
       knownHighlights.found ? knownHighlights : readJsonFileByCandidates(folderId, HIGHLIGHTS_FILE_CANDIDATES),
       knownProgress.found ? knownProgress : readJsonFileByCandidates(folderId, PROGRESS_FILE_CANDIDATES),
+      // Prefer dedicated plan file; backward compat — older Drive snapshots that
+      // embedded currentWeekPlan inside abide-devotions.json still work via
+      // importDevotionsSnapshot's mergePlan call below.
+      knownPlan.found ? knownPlan : readJsonFileByCandidates(folderId, PLAN_FILE_CANDIDATES),
     ]);
 
     // Backward compatibility: older installs may store data in legacy folder names.
@@ -919,6 +932,17 @@ const Sync = (() => {
       progressResult = Store.importProgressSnapshot(progressFile.data || {});
       imported = true;
     }
+    // Import plan from dedicated abide-plan.json (new format).
+    // Backward compat: if abide-plan.json is missing, the plan is still merged from
+    // abide-devotions.json via importDevotionsSnapshot's mergePlan call above.
+    if (planFile.found && planFile.data && typeof planFile.data === 'object') {
+      const planResult = Store.importPlanSnapshot(planFile.data);
+      devResult = {
+        ...devResult,
+        importedPlanDays: Math.max(Number(devResult.importedPlanDays || 0), Number(planResult.importedPlanDays || 0)),
+      };
+      imported = true;
+    }
 
     // Backward compatibility with old single-file sync.
     // Import it when modern devotions were not found OR when nothing imported.
@@ -962,6 +986,7 @@ const Sync = (() => {
         shares: String(knownFiles.shares || ''),
         highlights: highlightsFile.fileId || '',
         progress: progressFile.fileId || '',
+        plan: planFile.fileId || '',
       },
       lastDriveSyncAt: new Date().toISOString(),
     });
@@ -982,6 +1007,7 @@ const Sync = (() => {
         settings: settingsFile.fileName || '',
         highlights: highlightsFile.fileName || '',
         progress: progressFile.fileName || '',
+        plan: planFile.fileName || '',
       },
       imported: true,
     };
@@ -998,7 +1024,7 @@ const Sync = (() => {
       googleConnectedAt: null,
       googleDriveFolderId: null,
       googleDriveFileId: null,
-      googleDriveFiles: { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' },
+      googleDriveFiles: { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '', plan: '' },
     });
   }
 

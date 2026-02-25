@@ -911,7 +911,19 @@ const Store = (() => {
   }
 
   function exportDevotionsSnapshot() {
+    // Pure archive of saved entries only — plan fields move to exportPlanSnapshot().
+    // Keeping this lean means generating a new weekly plan never forces a re-upload
+    // of the entire devotion history.
     const base = exportSavedDevotionsSnapshot();
+    return {
+      version: 1,
+      exportedAt: base.exportedAt,
+      savedDevotions: base.savedDevotions,
+      savedDevotionLibrary: base.savedDevotionLibrary,
+    };
+  }
+
+  function exportPlanSnapshot() {
     // Never upload a seed/fallback plan to Drive — it is a local placeholder only.
     // Uploading it would corrupt other devices by replacing their real plans.
     const planToExport = (_state.currentWeekPlan?.seedDefault === true)
@@ -919,13 +931,34 @@ const Store = (() => {
       : (_state.currentWeekPlan || null);
     return {
       version: 1,
-      exportedAt: base.exportedAt,
-      savedDevotions: base.savedDevotions,
-      savedDevotionLibrary: base.savedDevotionLibrary,
+      exportedAt: new Date().toISOString(),
       currentWeekPlan: planToExport,
       selectedDevotionDate: _state.selectedDevotionDate || null,
       sessionOverride: _state._sessionOverride || null,
     };
+  }
+
+  function importPlanSnapshot(snapshot = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return { importedPlanDays: 0 };
+    const incoming = snapshot.currentWeekPlan || null;
+    const merged = mergePlan(_state.currentWeekPlan, incoming);
+    const patch = {};
+    let importedPlanDays = 0;
+    if (merged && merged !== _state.currentWeekPlan) {
+      patch.currentWeekPlan = merged;
+      importedPlanDays = Object.keys(merged?.days || {}).length;
+    }
+    if (snapshot.selectedDevotionDate && !_state.selectedDevotionDate) {
+      patch.selectedDevotionDate = String(snapshot.selectedDevotionDate);
+    }
+    if (snapshot.sessionOverride && !_state._sessionOverride) {
+      patch._sessionOverride = String(snapshot.sessionOverride);
+    }
+    if (Object.keys(patch).length) {
+      Object.assign(_state, patch);
+      save();
+    }
+    return { importedPlanDays };
   }
 
   // Trim a plan's days object to only the 7 date keys declared by its .week string.
@@ -1375,6 +1408,8 @@ const Store = (() => {
     useSavedSeries,
     exportDevotionsSnapshot,
     importDevotionsSnapshot,
+    exportPlanSnapshot,
+    importPlanSnapshot,
     exportJournalSnapshot,
     importJournalSnapshot,
     exportSettingsSnapshot,
