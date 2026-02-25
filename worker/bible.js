@@ -23,13 +23,12 @@ const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 // Translations supported by bible-api.com
 const BIBLE_API_TRANSLATIONS = ['web', 'kjv', 'asv', 'bbe', 'darby', 'webbe'];
 
-// YouVersion Bible IDs for proprietary translations.
-// Verify/update IDs by querying GET /v1/bibles?language_ranges[]=en
+// YouVersion Bible IDs — only public-domain / freely-licensed translations are accessible
+// via the developer API. Copyrighted bibles (NIV, NLT, CSB, MSG) return 403 "Access denied".
+// Verified IDs via GET /v1/bibles?language_ranges[]=en
 const YOUVERSION_BIBLES = {
-  niv: 111,   // New International Version (2011) — NIV® © Biblica
-  nlt: 116,   // New Living Translation — NLT © Tyndale House
-  csb: 1713,  // Christian Standard Bible — © Holman Bible Publishers
-  msg: 97,    // The Message — © 1993–2018 Eugene H. Peterson / NavPress
+  bsb: 3034,  // Berean Standard Bible (2016-2024) — CC BY-SA 4.0
+  lsv: 2660,  // Literal Standard Version — CC BY-SA 4.0
 };
 
 // OSIS/USFM book abbreviation map for passage IDs (used by ESV + YouVersion)
@@ -294,16 +293,12 @@ async function fetchYouVersion(ref, translationId, env) {
   }
 
   const TRANSLATION_NAMES = {
-    niv: 'New International Version',
-    nlt: 'New Living Translation',
-    csb: 'Christian Standard Bible',
-    msg: 'The Message',
+    bsb: 'Berean Standard Bible',
+    lsv: 'Literal Standard Version',
   };
   const TRANSLATION_NOTES = {
-    niv: 'NIV® © 1973, 2011 Biblica. Personal devotional use only.',
-    nlt: 'NLT © 1996, 2015 Tyndale House. Personal devotional use only.',
-    csb: 'CSB © 2017 Holman Bible Publishers. Personal devotional use only.',
-    msg: 'The Message © 1993–2018 Eugene H. Peterson / NavPress. Personal devotional use only.',
+    bsb: 'BSB © 2016–2024 by Bible Hub & Berean.Bible. CC BY-SA 4.0.',
+    lsv: 'LSV © 2020 by Covenant Press. CC BY-SA 4.0.',
   };
 
   return {

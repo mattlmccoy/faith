@@ -11,8 +11,9 @@ const API = (() => {
   // Override in Settings → Advanced only if self-hosting.
   const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
 
-  // Translations that MUST go through the worker (have server-side API keys)
-  const WORKER_TRANSLATIONS = ['esv', 'niv', 'nlt', 'csb', 'msg'];
+  // Translations that MUST go through the worker (require server-side API keys)
+  // Note: YouVersion developer API only allows public-domain bibles (NIV/NLT/CSB/MSG = 403).
+  const WORKER_TRANSLATIONS = ['esv', 'bsb', 'lsv'];
 
   function bibleTranslation() {
     return Store.get('bibleTranslation') || 'web';
