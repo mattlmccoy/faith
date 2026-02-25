@@ -326,9 +326,11 @@ async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId,
   }
 
   // Build individual verse IDs.
-  // Same-chapter: expand exactly. Cross-chapter (up to 3 chapters apart): expand
-  // generously — YouVersion returns null for non-existent verses so over-fetching
-  // is safe; nulls are filtered out before building the response.
+  // Same-chapter: expand exactly. Cross-chapter: keep the total small (≤20) to
+  // avoid hitting YouVersion's parallel-request rate limit. For the start chapter,
+  // we only fetch up to 10 verses past startVs — enough to cover most chapter
+  // tails in devotional use (chapters rarely have 10+ verses remaining from
+  // a typical opening-verse start point). 404s are filtered as null.
   const verseIds = [];
   if (startCh === endCh) {
     if (endVs >= startVs && (endVs - startVs) <= 40) {
@@ -339,11 +341,11 @@ async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId,
       verseIds.push(startId); // very long same-chapter range: just first verse
     }
   } else if (endCh <= startCh + 3) {
-    // Adjacent chapters (1–3 apart): fetch generously, null-filter trims the rest
-    for (let ch = startCh; ch <= endCh && verseIds.length < 60; ch++) {
+    // Cross-chapter: cap total at 20 to avoid rate limiting
+    for (let ch = startCh; ch <= endCh && verseIds.length < 20; ch++) {
       const vsStart = ch === startCh ? startVs : 1;
-      const vsEnd   = ch === endCh   ? endVs   : startVs + 50; // generous upper bound
-      for (let v = vsStart; v <= vsEnd && verseIds.length < 60; v++) {
+      const vsEnd   = ch === endCh   ? endVs   : startVs + 10; // small tail buffer
+      for (let v = vsStart; v <= vsEnd && verseIds.length < 20; v++) {
         verseIds.push(`${book}.${ch}.${v}`);
       }
     }
