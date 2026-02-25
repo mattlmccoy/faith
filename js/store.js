@@ -986,8 +986,38 @@ const Store = (() => {
                          !currentKeys.some(k => Object.prototype.hasOwnProperty.call(incomingDays, k));
 
     if (idMismatch || weekMismatch || noKeyOverlap) {
-      // Different weeks — never merge days; pick the newer plan by createdAt.
-      // Fall back to local plan when timestamps are absent or equal.
+      // Plans are definitively different devotions — never merge days.
+      // Pick by the following priority:
+      //
+      // 1. Week recency — never let a plan for a PAST week replace one for the
+      //    current or a future week. This is the key guard against stale Drive
+      //    content clobbering an active local plan (e.g. the sanitised Drive plan
+      //    ends up for last week after trimming, while local is this week).
+      // 2. Later week wins (both in the future, or both in the past).
+      // 3. createdAt tiebreak when effective weeks are equal, preferring local.
+      const thisWeekStart = DateUtils.weekStart(DateUtils.today());
+
+      // Derive each plan's effective week: use the .week field, or fall back to
+      // the latest date key so we don't treat a missing field as "no week".
+      const cWeek = currentPlan.week  || ([...currentKeys].sort().pop()  || '');
+      const iWeek = incomingPlan.week || ([...incomingKeys].sort().pop() || '');
+
+      if (cWeek && iWeek && cWeek !== iWeek) {
+        const cIsCurrent = cWeek >= thisWeekStart;
+        const iIsCurrent = iWeek >= thisWeekStart;
+
+        // Local is current/future, Drive is past → always keep local
+        if (cIsCurrent && !iIsCurrent) return currentPlan;
+        // Drive is current/future, local is past → take Drive
+        if (iIsCurrent && !cIsCurrent) return JSON.parse(JSON.stringify(incomingPlan));
+        // Both current/future, or both past → prefer the later week
+        return cWeek > iWeek
+          ? currentPlan
+          : JSON.parse(JSON.stringify(incomingPlan));
+      }
+
+      // Same effective week (or week info absent on one/both sides) —
+      // prefer local unless Drive was clearly created more recently.
       const ct = new Date(currentPlan.createdAt  || 0).getTime();
       const it = new Date(incomingPlan.createdAt || 0).getTime();
       return it > ct ? JSON.parse(JSON.stringify(incomingPlan)) : currentPlan;
