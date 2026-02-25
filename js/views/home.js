@@ -79,11 +79,16 @@ const HomeView = (() => {
               await Sync.pullSavedDevotions();
             }
           } catch (err) {
+            if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
             if (err.code === 'AUTH_EXPIRED') {
-              if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
               _showAuthExpiredBanner(container);
               return;
             }
+            if (err.code === 'OFFLINE') {
+              // Silently dismiss the pull — user is offline, no alarm needed
+              return;
+            }
+            // Other unexpected errors: dismiss pill, let render continue
           }
           if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
           const vc = document.getElementById('view-container');
@@ -525,6 +530,10 @@ const HomeView = (() => {
       if (err.code === 'AUTH_EXPIRED') {
         const vc = document.getElementById('view-container');
         if (vc) _showAuthExpiredBanner(vc);
+        return;
+      }
+      if (err.code === 'OFFLINE') {
+        alert('No internet connection. Connect to Wi-Fi or cellular to sync.');
         return;
       }
       alert(`Download failed: ${err.message}`);

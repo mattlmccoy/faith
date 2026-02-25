@@ -325,15 +325,30 @@ async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId,
     endVs = parseInt(endParts[0], 10);
   }
 
-  // Build individual verse IDs (same-chapter ranges only; cross-chapter is rare
-  // in devotional use and falls back to just the start verse)
+  // Build individual verse IDs.
+  // Same-chapter: expand exactly. Cross-chapter (up to 3 chapters apart): expand
+  // generously — YouVersion returns null for non-existent verses so over-fetching
+  // is safe; nulls are filtered out before building the response.
   const verseIds = [];
-  if (startCh === endCh && endVs >= startVs && (endVs - startVs) <= 30) {
-    for (let v = startVs; v <= endVs; v++) {
-      verseIds.push(`${book}.${startCh}.${v}`);
+  if (startCh === endCh) {
+    if (endVs >= startVs && (endVs - startVs) <= 40) {
+      for (let v = startVs; v <= endVs; v++) {
+        verseIds.push(`${book}.${startCh}.${v}`);
+      }
+    } else {
+      verseIds.push(startId); // very long same-chapter range: just first verse
+    }
+  } else if (endCh <= startCh + 3) {
+    // Adjacent chapters (1–3 apart): fetch generously, null-filter trims the rest
+    for (let ch = startCh; ch <= endCh && verseIds.length < 60; ch++) {
+      const vsStart = ch === startCh ? startVs : 1;
+      const vsEnd   = ch === endCh   ? endVs   : startVs + 50; // generous upper bound
+      for (let v = vsStart; v <= vsEnd && verseIds.length < 60; v++) {
+        verseIds.push(`${book}.${ch}.${v}`);
+      }
     }
   } else {
-    verseIds.push(startId); // cross-chapter fallback
+    verseIds.push(startId); // wide multi-chapter range: just the opening verse
   }
 
   const yvParams = 'format=text&include_headings=false&include_notes=false';
@@ -347,10 +362,13 @@ async function fetchYouVersionRange(passageId, humanRef, translationId, bibleId,
   );
 
   const verses = fetched
-    .map((d, i) => d?.content
-      ? { verse: startVs + i, text: d.content.replace(/\s+/g, ' ').trim() }
-      : null
-    )
+    .map((d, i) => {
+      if (!d?.content) return null;
+      // Extract verse number from the USFM ID (e.g. JHN.3.16 → 16)
+      const idParts = verseIds[i].split('.');
+      const verseNum = parseInt(idParts[idParts.length - 1], 10) || (startVs + i);
+      return { verse: verseNum, text: d.content.replace(/\s+/g, ' ').trim() };
+    })
     .filter(Boolean);
 
   if (!verses.length) {

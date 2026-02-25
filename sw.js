@@ -3,7 +3,7 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v72';
+const SW_VERSION = 'abide-v73';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
@@ -56,7 +56,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// --- Activate: clean old caches ---
+// --- Activate: clean old caches, then notify all open windows ---
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -65,7 +65,18 @@ self.addEventListener('activate', (event) => {
           .filter(k => k !== STATIC_CACHE && k !== CONTENT_CACHE)
           .map(k => caches.delete(k))
       )
-    ).then(() => self.clients.claim())
+    )
+    .then(() => self.clients.claim())
+    .then(() => {
+      // Tell every open window to reload immediately. postMessage is more
+      // reliable than relying on controllerchange alone (especially on iOS Safari).
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then(clientList => {
+          clientList.forEach(client =>
+            client.postMessage({ type: 'SW_UPDATED', version: SW_VERSION })
+          );
+        });
+    })
   );
 });
 

@@ -393,7 +393,8 @@ const SavedView = (() => {
       const result = await Sync.pushSavedDevotions();
       alert(`Uploaded ${result.count || 0} saved devotionals, ${result.journals || 0} journal entries, and settings metadata.`);
     } catch (err) {
-      alert(`Upload failed: ${err.message}`);
+      if (err.code === 'OFFLINE') { alert('No internet connection. Connect to sync.'); }
+      else { alert(`Upload failed: ${err.message}`); }
     } finally {
       syncing = false;
       render(document.getElementById('view-container'));
@@ -412,7 +413,8 @@ const SavedView = (() => {
       }
       alert(`Downloaded ${result.importedLibrary || 0} saved devotionals, ${result.importedJournal || 0} journal entries, and settings metadata.`);
     } catch (err) {
-      alert(`Download failed: ${err.message}`);
+      if (err.code === 'OFFLINE') { alert('No internet connection. Connect to sync.'); }
+      else { alert(`Download failed: ${err.message}`); }
     } finally {
       syncing = false;
       render(document.getElementById('view-container'));

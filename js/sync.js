@@ -95,6 +95,16 @@ const Sync = (() => {
 
   async function requestToken(interactive = true) {
     if (_accessToken && Date.now() < (_accessTokenExpiresAt - 30_000)) return _accessToken;
+
+    // Fail fast when offline — Google Identity Services callbacks hang indefinitely
+    // without network connectivity, causing the UI to freeze with no feedback.
+    if (!navigator.onLine) {
+      throw Object.assign(
+        new Error('No internet connection. Connect to sync.'),
+        { code: 'OFFLINE' }
+      );
+    }
+
     const clientId = await ensureClientConfig();
 
     if (!_tokenClient) {
@@ -105,11 +115,26 @@ const Sync = (() => {
       });
     }
 
+    // Wrap a token request Promise with a 12-second timeout. When the network is
+    // degraded (but technically "online"), GIS callbacks can silently never fire.
+    function withTimeout(promiseFn) {
+      return Promise.race([
+        new Promise(promiseFn),
+        new Promise((_, reject) =>
+          setTimeout(() =>
+            reject(Object.assign(
+              new Error('Sync timed out. Check your connection and try again.'),
+              { code: 'OFFLINE' }
+            )), 12_000)
+        ),
+      ]);
+    }
+
     // Try silent refresh first to avoid unnecessary consent prompts.
     // If silent fails (no active Google session), fall back to interactive.
     if (interactive) {
       try {
-        const silentToken = await new Promise((resolve, reject) => {
+        const silentToken = await withTimeout((resolve, reject) => {
           _tokenClient.callback = (resp) => {
             if (resp?.error) return reject(new Error(resp.error));
             if (!resp?.access_token) return reject(new Error('No access token'));
@@ -120,12 +145,13 @@ const Sync = (() => {
         _accessToken = silentToken.access_token;
         _accessTokenExpiresAt = Date.now() + (Number(silentToken.expires_in || 3600) * 1000);
         return _accessToken;
-      } catch (_) {
+      } catch (err) {
+        if (err.code === 'OFFLINE') throw err; // don't try interactive when offline/timed-out
         // Silent failed — fall through to interactive below
       }
     }
 
-    const token = await new Promise((resolve, reject) => {
+    const token = await withTimeout((resolve, reject) => {
       _tokenClient.callback = (resp) => {
         if (resp?.error) return reject(new Error(resp.error));
         if (!resp?.access_token) return reject(new Error('No access token returned'));

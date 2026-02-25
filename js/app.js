@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.25.1';
+  const APP_VERSION = '2026.02.25.2';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v72';
+  window.__ABIDE_SW_VERSION__ = 'abide-v73';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -47,16 +47,35 @@
 
     const basePath = getBasePath();
 
-    // Auto-reload when a new SW takes over (covers iOS where manual cache clearing
-    // is buried in Settings → Safari → Website Data). The `skipWaiting` call in
-    // sw.js means the new SW activates immediately after install; `clients.claim`
-    // then fires `controllerchange` on every open tab, triggering this reload.
-    // Guard flag prevents double-reload within the same page lifecycle.
+    // Capture controller state BEFORE registering so we can distinguish a
+    // genuine update (existing controller replaced) from a first-time install
+    // (no previous controller), preventing a spurious reload on fresh installs.
+    const hadController = !!navigator.serviceWorker.controller;
     let swReloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!swReloading) {
+
+    function reloadForUpdate() {
+      if (!swReloading && hadController) {
         swReloading = true;
         window.location.reload();
+      }
+    }
+
+    // Primary path: new SW sends SW_UPDATED via postMessage after clients.claim().
+    // More reliable on iOS Safari than waiting for the controllerchange event.
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'SW_UPDATED') reloadForUpdate();
+    });
+
+    // Fallback: controllerchange fires when a new SW takes over the page.
+    navigator.serviceWorker.addEventListener('controllerchange', reloadForUpdate);
+
+    // iOS PWA: users background the app for days. Check for a pending SW update
+    // every time the app is foregrounded so updates aren't missed between sessions.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        navigator.serviceWorker.ready
+          .then(reg => reg.update())
+          .catch(() => {});
       }
     });
 
