@@ -282,8 +282,11 @@ const Sync = (() => {
   }
 
   async function findOrCreateFolderId() {
-    let folderId = (Store.get('googleDriveFolderId') || '').trim();
-    if (!folderId) folderId = await findFolderId();
+    // Always do a fresh Drive search first so we never pass a stale cached folder
+    // ID into file operations (which would get a 403 → false AUTH_EXPIRED error).
+    // The drive.file scope means the search returns only folders this app created,
+    // so the result is always authoritative and safe to use as the parent for writes.
+    let folderId = await findFolderId();
     if (!folderId) folderId = await createFolder();
     if (folderId) Store.update({ googleDriveFolderId: folderId });
     return folderId;
@@ -986,9 +989,16 @@ const Sync = (() => {
 
   function clearSession() {
     clearToken();
+    // Also clear stale Drive folder/file IDs so a future reconnect starts fresh.
+    // Leaving these set can cause new uploads to use an inaccessible folder (403 →
+    // false AUTH_EXPIRED) if the cached IDs were from a different OAuth client or
+    // a previous install.
     Store.update({
       googleProfile: null,
       googleConnectedAt: null,
+      googleDriveFolderId: null,
+      googleDriveFileId: null,
+      googleDriveFiles: { devotions: '', journals: '', settings: '', shares: '', highlights: '', progress: '' },
     });
   }
 
