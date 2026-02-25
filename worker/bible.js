@@ -1,29 +1,36 @@
 /**
  * ABIDE Worker - Bible API handler
  * Proxies bible-api.com (free translations) + api.esv.org (ESV)
- *           + api.scripture.api.bible (NIV, NLT)
+ *           + api.youversion.com (NIV, NLT) via YouVersion Developer API
  * All API keys stay server-side, never exposed to clients.
  *
  * Secrets needed:
- *   ESV_API_TOKEN     - Token from api.esv.org (set via: wrangler secret put ESV_API_TOKEN)
- *   SCRIPTURE_API_KEY - Key from scripture.api.bible (set via: wrangler secret put SCRIPTURE_API_KEY)
+ *   ESV_API_TOKEN      - Token from api.esv.org (wrangler secret put ESV_API_TOKEN)
+ *   YOUVERSION_API_KEY - App key from platform.YouVersion.com (wrangler secret put YOUVERSION_API_KEY)
+ *
+ * YouVersion compliance:
+ *   - App key must be sent as X-YVP-App-Key header on every request (per api-usage docs)
+ *   - NIV © Biblica, NLT © Tyndale — for personal devotional use only
+ *   - Attribution shown to user via translation_note field in API responses
+ *   - Developer must accept YouVersion license agreements at platform.YouVersion.com
  */
 
 const BIBLE_API_BASE = 'https://bible-api.com';
 const ESV_API_BASE = 'https://api.esv.org/v3/passage/text';
-const SCRIPTURE_API_BASE = 'https://api.scripture.api.bible/v1';
+const YOUVERSION_API_BASE = 'https://api.youversion.com/v1';
 const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
 // Translations supported by bible-api.com
 const BIBLE_API_TRANSLATIONS = ['web', 'kjv', 'asv', 'bbe', 'darby', 'webbe'];
 
-// Scripture API Bible IDs for proprietary translations
-const SCRIPTURE_API_BIBLES = {
-  niv: 'de4e12af7f28f599-01',
-  nlt: '65eec8e0b60e656b-01',
+// YouVersion Bible IDs for proprietary translations.
+// Verify/update IDs by querying GET /v1/bibles?language_ranges[]=en
+const YOUVERSION_BIBLES = {
+  niv: 111,   // New International Version (2011) — NIV® © Biblica
+  nlt: 116,   // New Living Translation — NLT © Tyndale House
 };
 
-// OSIS book abbreviation map for Scripture API passage IDs
+// OSIS/USFM book abbreviation map for passage IDs (used by ESV + YouVersion)
 const OSIS_BOOKS = {
   genesis: 'GEN', exodus: 'EXO', leviticus: 'LEV', numbers: 'NUM', deuteronomy: 'DEU',
   joshua: 'JOS', judges: 'JDG', ruth: 'RUT',
@@ -85,8 +92,8 @@ export async function handleBible(request, url, env, origin, json) {
 
     if (translation === 'esv') {
       data = await fetchESV(ref, env);
-    } else if (SCRIPTURE_API_BIBLES[translation]) {
-      data = await fetchScriptureAPI(ref, translation, env);
+    } else if (YOUVERSION_BIBLES[translation]) {
+      data = await fetchYouVersion(ref, translation, env);
     } else {
       // Use bible-api.com for all other translations
       const t = BIBLE_API_TRANSLATIONS.includes(translation) ? translation : 'web';
@@ -174,12 +181,12 @@ async function fetchESV(ref, env) {
   };
 }
 
-async function fetchScriptureAPI(ref, translationId, env) {
-  if (!env.SCRIPTURE_API_KEY) {
-    return { error: 'Scripture API key not configured on server. Run: wrangler secret put SCRIPTURE_API_KEY' };
+async function fetchYouVersion(ref, translationId, env) {
+  if (!env.YOUVERSION_API_KEY) {
+    return { error: 'YouVersion API key not configured on server. Run: wrangler secret put YOUVERSION_API_KEY' };
   }
 
-  const bibleId = SCRIPTURE_API_BIBLES[translationId];
+  const bibleId = YOUVERSION_BIBLES[translationId];
   if (!bibleId) return { error: `Unsupported translation: ${translationId}` };
 
   const passageId = refToOsisId(ref);
@@ -188,29 +195,28 @@ async function fetchScriptureAPI(ref, translationId, env) {
   }
 
   const params = new URLSearchParams({
-    'content-type': 'text',
-    'include-verse-numbers': 'true',
-    'include-titles': 'false',
-    'include-chapter-numbers': 'false',
-    'include-verse-spans': 'false',
+    format: 'text',
+    include_headings: 'false',
+    include_notes: 'false',
   });
 
-  const apiUrl = `${SCRIPTURE_API_BASE}/bibles/${bibleId}/passages/${encodeURIComponent(passageId)}?${params}`;
+  const apiUrl = `${YOUVERSION_API_BASE}/bibles/${bibleId}/passages/${encodeURIComponent(passageId)}?${params}`;
   const res = await fetch(apiUrl, {
-    headers: { 'api-key': env.SCRIPTURE_API_KEY },
+    headers: { 'X-YVP-App-Key': env.YOUVERSION_API_KEY },
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    return { error: `Scripture API error: ${res.status} ${body.slice(0, 120)}` };
+    return { error: `YouVersion API error: ${res.status} ${body.slice(0, 120)}` };
   }
 
-  const json = await res.json();
-  const content = json?.data?.content || '';
-  const canonicalRef = json?.data?.reference || ref;
+  const data = await res.json();
+  // YouVersion response shape: { id, content, reference }
+  const content = data?.content || '';
+  const canonicalRef = data?.reference || ref;
 
-  // Parse verse numbers from content. Scripture API text format includes
-  // verse markers like "[3]" or "¶ [3]" at the start of each verse.
+  // Parse verse numbers from content. YouVersion text format uses markers
+  // like "[1]" at the start of each verse.
   const verses = [];
   const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
   const verseRegex = /^[¶\s]*\[(\d+)\]\s*(.*)/;
@@ -235,7 +241,7 @@ async function fetchScriptureAPI(ref, translationId, env) {
 
   // Fallback: return as single block if no verse markers found
   if (!verses.length && content.trim()) {
-    const plain = content.replace(/\[[\d¶]+\]/g, '').replace(/\s+/g, ' ').trim();
+    const plain = content.replace(/\[\d+\]/g, '').replace(/\s+/g, ' ').trim();
     verses.push({ verse: 1, text: plain });
   }
 
