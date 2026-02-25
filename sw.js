@@ -3,7 +3,7 @@
    Caching strategy + push notification handler
    ============================================================ */
 
-const SW_VERSION = 'abide-v75';
+const SW_VERSION = 'abide-v76';
 const STATIC_CACHE = `${SW_VERSION}-static`;
 const CONTENT_CACHE = `${SW_VERSION}-content`;
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '/');
@@ -56,7 +56,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// --- Activate: clean old caches, then notify all open windows ---
+// --- Activate: clean old caches, stamp version, then notify open windows ---
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -68,8 +68,20 @@ self.addEventListener('activate', (event) => {
     )
     .then(() => self.clients.claim())
     .then(() => {
-      // Tell every open window to reload immediately. postMessage is more
-      // reliable than relying on controllerchange alone (especially on iOS Safari).
+      // Stamp current SW version into a persistent meta-cache entry.
+      // The page reads this on every foreground to detect if the SW was
+      // updated while the app was backgrounded (iOS suspends JS so the
+      // postMessage below is never received in that scenario).
+      return caches.open('abide-meta')
+        .then(cache => cache.put(
+          'sw-version',
+          new Response(SW_VERSION, { headers: { 'Content-Type': 'text/plain' } })
+        ));
+    })
+    .then(() => {
+      // Also tell every currently-open window to reload immediately.
+      // postMessage works when the app is foregrounded; the cache stamp above
+      // covers the backgrounded case.
       return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then(clientList => {
           clientList.forEach(client =>

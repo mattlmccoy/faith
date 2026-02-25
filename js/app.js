@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.25.6';
+  const APP_VERSION = '2026.02.25.7';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v75';
+  window.__ABIDE_SW_VERSION__ = 'abide-v76';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -69,12 +69,31 @@
     // Fallback: controllerchange fires when a new SW takes over the page.
     navigator.serviceWorker.addEventListener('controllerchange', reloadForUpdate);
 
-    // iOS PWA: users background the app for days. Check for a pending SW update
-    // every time the app is foregrounded so updates aren't missed between sessions.
+    // iOS PWA: users background the app for days. On every foreground, do two things:
+    //  1. reg.update() — triggers a fresh SW fetch; if a new SW is available it will
+    //     install + activate and the SW_UPDATED postMessage path handles the reload.
+    //  2. Cache version check — handles the case where the SW *already* updated while
+    //     the app was backgrounded (JS was suspended, so SW_UPDATED was never received).
+    //     The SW writes its version to 'abide-meta' on every activate; comparing that
+    //     to the version baked into this page detects staleness without any message.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        navigator.serviceWorker.ready
-          .then(reg => reg.update())
+      if (document.visibilityState !== 'visible') return;
+
+      // Path 1: trigger update check (handles foreground updates)
+      navigator.serviceWorker.ready
+        .then(reg => reg.update())
+        .catch(() => {});
+
+      // Path 2: cache stamp check (handles backgrounded updates on iOS)
+      if ('caches' in window) {
+        caches.open('abide-meta')
+          .then(cache  => cache.match('sw-version'))
+          .then(resp   => resp ? resp.text() : null)
+          .then(cachedVer => {
+            if (cachedVer && cachedVer !== window.__ABIDE_SW_VERSION__) {
+              reloadForUpdate();
+            }
+          })
           .catch(() => {});
       }
     });
