@@ -4,9 +4,9 @@
 
 (function () {
   'use strict';
-  const APP_VERSION = '2026.02.24.1';
+  const APP_VERSION = '2026.02.24.2';
   window.__ABIDE_VERSION__ = APP_VERSION;
-  window.__ABIDE_SW_VERSION__ = 'abide-v67';
+  window.__ABIDE_SW_VERSION__ = 'abide-v68';
 
   function getBasePath() {
     const path = window.location.pathname || '/';
@@ -43,20 +43,35 @@
 
   // --- Register service worker ---
   function registerSW() {
-    if ('serviceWorker' in navigator) {
-      const basePath = getBasePath();
-      navigator.serviceWorker.register(`${basePath}sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
-        scope: basePath,
-        updateViaCache: 'none',
+    if (!('serviceWorker' in navigator)) return;
+
+    const basePath = getBasePath();
+
+    // Auto-reload when a new SW takes over (covers iOS where manual cache clearing
+    // is buried in Settings → Safari → Website Data). The `skipWaiting` call in
+    // sw.js means the new SW activates immediately after install; `clients.claim`
+    // then fires `controllerchange` on every open tab, triggering this reload.
+    // Guard flag prevents double-reload within the same page lifecycle.
+    let swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!swReloading) {
+        swReloading = true;
+        window.location.reload();
+      }
+    });
+
+    navigator.serviceWorker.register(`${basePath}sw.js?v=${encodeURIComponent(APP_VERSION)}`, {
+      scope: basePath,
+      updateViaCache: 'none',
+    })
+      .then(reg => {
+        console.log('[Abide] SW registered:', reg.scope);
+        // Proactively check for an updated SW every time the app loads.
+        reg.update().catch(() => {});
       })
-        .then(reg => {
-          console.log('[Abide] SW registered:', reg.scope);
-          reg.update().catch(() => {});
-        })
-        .catch(err => {
-          console.warn('[Abide] SW registration failed:', err);
-        });
-    }
+      .catch(err => {
+        console.warn('[Abide] SW registration failed:', err);
+      });
   }
 
   // --- Register routes ---

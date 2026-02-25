@@ -12,7 +12,7 @@ const API = (() => {
   const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
 
   // Translations that MUST go through the worker (have server-side API keys)
-  const WORKER_TRANSLATIONS = ['esv', 'niv', 'nlt'];
+  const WORKER_TRANSLATIONS = ['esv', 'niv', 'nlt', 'csb', 'msg'];
 
   function bibleTranslation() {
     return Store.get('bibleTranslation') || 'web';
