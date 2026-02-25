@@ -12,8 +12,9 @@ const API = (() => {
   const DEFAULT_WORKER_URL = 'https://abide-worker.mattlmccoy.workers.dev';
 
   // Translations that MUST go through the worker (require server-side API keys)
-  // Note: YouVersion developer API only allows public-domain bibles (NIV/NLT/CSB/MSG = 403).
-  const WORKER_TRANSLATIONS = ['esv', 'bsb', 'lsv'];
+  // NIV: unlocked via Biblica Fast-track License v1 on YouVersion developer portal
+  // NLT/CSB/MSG: still 403 — require separate Tyndale/Holman/NavPress licenses
+  const WORKER_TRANSLATIONS = ['esv', 'niv', 'bsb', 'lsv'];
 
   function bibleTranslation() {
     return Store.get('bibleTranslation') || 'web';

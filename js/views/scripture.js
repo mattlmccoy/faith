@@ -63,6 +63,7 @@ const ScriptureView = (() => {
   // Copyright attribution strings for each translation
   const TRANSLATION_ATTRIBUTION = {
     esv: 'ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.',
+    niv: 'Holy Bible, New International Version®, NIV® © 1973, 1978, 1984, 2011 by Biblica, Inc.™ Used by permission. All rights reserved worldwide.',
     bsb: 'The Holy Bible, Berean Standard Bible (BSB), © 2016–2024 by Bible Hub and Berean.Bible. Used by permission. CC BY-SA 4.0.',
     lsv: 'Literal Standard Version (LSV), © 2020 by Covenant Press. CC BY-SA 4.0.',
     kjv: 'King James Version (KJV). Public Domain.',
@@ -418,7 +419,7 @@ const ScriptureView = (() => {
     const translationId = (data.translation_id || API.bibleTranslation()).toLowerCase();
     const translationLabel = translationId.toUpperCase();
     const attribution = TRANSLATION_ATTRIBUTION[translationId] || '';
-    const isCopyrighted = ['esv'].includes(translationId); // BSB/LSV are CC BY-SA, not strictly "copyrighted" in the restrictive sense
+    const isCopyrighted = ['esv', 'niv'].includes(translationId); // BSB/LSV are CC BY-SA open licenses
 
     // Track reading progress — only count a full chapter load (no verse range in reference)
     // A reference with ':' means a specific verse or range (e.g. "John 3:16"), not a full chapter.

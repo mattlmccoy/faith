@@ -143,6 +143,7 @@ const SettingsView = (() => {
               <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
                 <option value="web" ${(state.bibleTranslation || 'web') === 'web' ? 'selected' : ''}>WEB — World English Bible</option>
                 <option value="esv" ${state.bibleTranslation === 'esv' ? 'selected' : ''}>ESV — English Standard Version</option>
+                <option value="niv" ${state.bibleTranslation === 'niv' ? 'selected' : ''}>NIV — New International Version</option>
                 <option value="bsb" ${state.bibleTranslation === 'bsb' ? 'selected' : ''}>BSB — Berean Standard Bible</option>
                 <option value="lsv" ${state.bibleTranslation === 'lsv' ? 'selected' : ''}>LSV — Literal Standard Version</option>
                 <option value="kjv" ${state.bibleTranslation === 'kjv' ? 'selected' : ''}>KJV — King James Version</option>
@@ -152,9 +153,9 @@ const SettingsView = (() => {
               </select>
             </div>
           </div>
-          <div id="translation-notice" style="display:${['esv','bsb','lsv'].includes(state.bibleTranslation) ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+          <div id="translation-notice" style="display:${['esv','niv','bsb','lsv'].includes(state.bibleTranslation) ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
             <div style="font-size:var(--text-xs);line-height:1.6;color:var(--text-secondary);">
-              ESV requires a Cloudflare Worker with API key. BSB and LSV are freely licensed (CC BY-SA 4.0) and served via the Worker.
+              ESV and NIV are served via the Cloudflare Worker. BSB and LSV are freely licensed (CC BY-SA 4.0).
             </div>
           </div>
           <div class="settings-row" id="settings-devotion-length-row">
@@ -298,7 +299,7 @@ const SettingsView = (() => {
     root.querySelector('#theme-select')?.addEventListener('change', (e) => applyTheme(e.target.value));
     root.querySelector('#translation-select')?.addEventListener('change', (e) => {
       const notice = root.querySelector('#translation-notice');
-      if (notice) notice.style.display = ['esv', 'bsb', 'lsv'].includes(e.target.value) ? 'flex' : 'none';
+      if (notice) notice.style.display = ['esv', 'niv', 'bsb', 'lsv'].includes(e.target.value) ? 'flex' : 'none';
     });
 
     root.querySelector('#save-settings')?.addEventListener('click', async () => {

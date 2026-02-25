@@ -23,10 +23,12 @@ const CACHE_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 // Translations supported by bible-api.com
 const BIBLE_API_TRANSLATIONS = ['web', 'kjv', 'asv', 'bbe', 'darby', 'webbe'];
 
-// YouVersion Bible IDs — only public-domain / freely-licensed translations are accessible
-// via the developer API. Copyrighted bibles (NIV, NLT, CSB, MSG) return 403 "Access denied".
-// Verified IDs via GET /v1/bibles?language_ranges[]=en
+// YouVersion Bible IDs. Only translations covered by an accepted license agreement
+// are accessible — others return 403. Verified via /bible/debug endpoint.
+// Unlocked so far: NIV (Biblica Fast-track License v1 accepted).
+// NLT (Tyndale), CSB (Holman), MSG (NavPress) still require separate publisher licenses.
 const YOUVERSION_BIBLES = {
+  niv: 111,   // New International Version (2011) — NIV® © Biblica ✓ licensed
   bsb: 3034,  // Berean Standard Bible (2016-2024) — CC BY-SA 4.0
   lsv: 2660,  // Literal Standard Version — CC BY-SA 4.0
 };
@@ -147,16 +149,19 @@ export async function handleBible(request, url, env, origin, json) {
     return json({ configured_ids: YOUVERSION_BIBLES, available: summary }, 200, origin);
   }
 
-  // GET /bible/debug?ref=John+3:16&translation=niv — test a single passage fetch and
-  // return the raw YouVersion response (before normalisation) alongside any error.
+  // GET /bible/debug?ref=John+3:16&translation=niv[&bibleId=111] — test a single passage fetch
+  // and return the raw YouVersion response (before normalisation) alongside any error.
+  // Pass bibleId explicitly to test translations not yet in YOUVERSION_BIBLES.
   if (url.pathname === '/bible/debug') {
     const ref = url.searchParams.get('ref') || 'John 3:16';
     const translation = (url.searchParams.get('translation') || 'niv').toLowerCase();
     if (!env.YOUVERSION_API_KEY) {
       return json({ error: 'YOUVERSION_API_KEY not set' }, 500, origin);
     }
-    const bibleId = YOUVERSION_BIBLES[translation];
-    if (!bibleId) return json({ error: `Unknown translation: ${translation}`, known: Object.keys(YOUVERSION_BIBLES) }, 400, origin);
+    // Allow explicit bibleId override for testing IDs not yet in the map
+    const rawId = url.searchParams.get('bibleId');
+    const bibleId = rawId ? parseInt(rawId, 10) : YOUVERSION_BIBLES[translation];
+    if (!bibleId) return json({ error: `Unknown translation: ${translation}`, known: Object.keys(YOUVERSION_BIBLES), tip: 'Pass &bibleId=111 to test NIV directly' }, 400, origin);
     const passageId = refToOsisId(ref);
     if (!passageId) return json({ error: `Could not parse ref: ${ref}` }, 400, origin);
     const apiUrl = `${YOUVERSION_API_BASE}/bibles/${bibleId}/passages/${encodeURIComponent(passageId)}?format=text&include_headings=false&include_notes=false`;
@@ -293,10 +298,12 @@ async function fetchYouVersion(ref, translationId, env) {
   }
 
   const TRANSLATION_NAMES = {
+    niv: 'New International Version',
     bsb: 'Berean Standard Bible',
     lsv: 'Literal Standard Version',
   };
   const TRANSLATION_NOTES = {
+    niv: 'NIV® © 1973, 2011 Biblica. Personal devotional use only.',
     bsb: 'BSB © 2016–2024 by Bible Hub & Berean.Bible. CC BY-SA 4.0.',
     lsv: 'LSV © 2020 by Covenant Press. CC BY-SA 4.0.',
   };
