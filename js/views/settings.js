@@ -141,18 +141,20 @@ const SettingsView = (() => {
             </div>
             <div class="settings-row__action">
               <select id="translation-select" class="input" style="width:auto;padding:6px 12px;">
-                <option value="web" ${(state.bibleTranslation || 'web') === 'web' ? 'selected' : ''}>WEB</option>
-                <option value="asv" ${state.bibleTranslation === 'asv' ? 'selected' : ''}>ASV</option>
-                <option value="bbe" ${state.bibleTranslation === 'bbe' ? 'selected' : ''}>BBE</option>
-                <option value="kjv" ${state.bibleTranslation === 'kjv' ? 'selected' : ''}>KJV</option>
-                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>DARBY</option>
-                <option value="esv" ${state.bibleTranslation === 'esv' ? 'selected' : ''}>ESV</option>
+                <option value="web" ${(state.bibleTranslation || 'web') === 'web' ? 'selected' : ''}>WEB — World English Bible</option>
+                <option value="esv" ${state.bibleTranslation === 'esv' ? 'selected' : ''}>ESV — English Standard Version</option>
+                <option value="niv" ${state.bibleTranslation === 'niv' ? 'selected' : ''}>NIV — New International Version</option>
+                <option value="nlt" ${state.bibleTranslation === 'nlt' ? 'selected' : ''}>NLT — New Living Translation</option>
+                <option value="kjv" ${state.bibleTranslation === 'kjv' ? 'selected' : ''}>KJV — King James Version</option>
+                <option value="asv" ${state.bibleTranslation === 'asv' ? 'selected' : ''}>ASV — American Standard Version</option>
+                <option value="bbe" ${state.bibleTranslation === 'bbe' ? 'selected' : ''}>BBE — Bible in Basic English</option>
+                <option value="darby" ${state.bibleTranslation === 'darby' ? 'selected' : ''}>DARBY — Darby Translation</option>
               </select>
             </div>
           </div>
-          <div id="translation-notice" style="display:${state.bibleTranslation === 'esv' ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
+          <div id="translation-notice" style="display:${['esv','niv','nlt'].includes(state.bibleTranslation) ? 'flex' : 'none'};background:var(--accent-soft);border-radius:var(--radius-sm);padding:var(--space-3);margin:0 var(--space-1);">
             <div style="font-size:var(--text-xs);line-height:1.6;color:var(--text-secondary);">
-              ESV is copyrighted. Display is for personal devotional use with attribution.
+              ESV, NIV, and NLT are copyrighted translations. Display is for personal devotional use with attribution. Requires Cloudflare Worker with API key configured.
             </div>
           </div>
           <div class="settings-row" id="settings-devotion-length-row">
@@ -296,7 +298,7 @@ const SettingsView = (() => {
     root.querySelector('#theme-select')?.addEventListener('change', (e) => applyTheme(e.target.value));
     root.querySelector('#translation-select')?.addEventListener('change', (e) => {
       const notice = root.querySelector('#translation-notice');
-      if (notice) notice.style.display = e.target.value === 'esv' ? 'flex' : 'none';
+      if (notice) notice.style.display = ['esv', 'niv', 'nlt'].includes(e.target.value) ? 'flex' : 'none';
     });
 
     root.querySelector('#save-settings')?.addEventListener('click', async () => {

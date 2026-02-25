@@ -78,7 +78,13 @@ const HomeView = (() => {
             if (googleProfile && window.Sync?.pullSavedDevotions) {
               await Sync.pullSavedDevotions();
             }
-          } catch (_) {}
+          } catch (err) {
+            if (err.code === 'AUTH_EXPIRED') {
+              if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
+              _showAuthExpiredBanner(container);
+              return;
+            }
+          }
           if (_refreshPill) { _refreshPill.remove(); _refreshPill = null; }
           const vc = document.getElementById('view-container');
           if (vc) HomeView.render(vc);
@@ -516,8 +522,29 @@ const HomeView = (() => {
       }
       alert(`Downloaded ${result.importedLibrary || 0} saved devotionals, ${result.importedJournal || 0} journal entries, and settings metadata.`);
     } catch (err) {
+      if (err.code === 'AUTH_EXPIRED') {
+        const vc = document.getElementById('view-container');
+        if (vc) _showAuthExpiredBanner(vc);
+        return;
+      }
       alert(`Download failed: ${err.message}`);
     }
+  }
+
+  function _showAuthExpiredBanner(container) {
+    // Remove any existing banner
+    container.querySelector('.auth-expired-banner')?.remove();
+    const banner = document.createElement('div');
+    banner.className = 'auth-expired-banner';
+    banner.style.cssText = 'position:sticky;top:0;z-index:100;background:var(--color-warning-bg,#fff3cd);border-bottom:1px solid var(--color-warning-border,#ffc107);padding:10px 16px;display:flex;align-items:center;gap:12px;font-size:var(--text-sm);';
+    banner.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--color-warning,#856404)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span style="flex:1;color:var(--color-warning,#856404)">Google session expired.</span>
+      <button class="btn btn-sm btn-primary" onclick="HomeView.connectGoogle().then(()=>this.closest('.auth-expired-banner')?.remove())">Reconnect</button>
+      <button onclick="this.closest('.auth-expired-banner').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;line-height:1;color:var(--text-secondary);" aria-label="Dismiss">×</button>
+    `;
+    container.prepend(banner);
+    if (typeof Router !== 'undefined' && Router.updateSidebarProfile) Router.updateSidebarProfile();
   }
 
   function toggleComplete() {

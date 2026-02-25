@@ -105,13 +105,33 @@ const Sync = (() => {
       });
     }
 
+    // Try silent refresh first to avoid unnecessary consent prompts.
+    // If silent fails (no active Google session), fall back to interactive.
+    if (interactive) {
+      try {
+        const silentToken = await new Promise((resolve, reject) => {
+          _tokenClient.callback = (resp) => {
+            if (resp?.error) return reject(new Error(resp.error));
+            if (!resp?.access_token) return reject(new Error('No access token'));
+            resolve(resp);
+          };
+          _tokenClient.requestAccessToken({ prompt: '' });
+        });
+        _accessToken = silentToken.access_token;
+        _accessTokenExpiresAt = Date.now() + (Number(silentToken.expires_in || 3600) * 1000);
+        return _accessToken;
+      } catch (_) {
+        // Silent failed — fall through to interactive below
+      }
+    }
+
     const token = await new Promise((resolve, reject) => {
       _tokenClient.callback = (resp) => {
         if (resp?.error) return reject(new Error(resp.error));
         if (!resp?.access_token) return reject(new Error('No access token returned'));
         resolve(resp);
       };
-      _tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+      _tokenClient.requestAccessToken({ prompt: interactive ? 'select_account' : '' });
     });
 
     _accessToken = token.access_token;
@@ -134,6 +154,15 @@ const Sync = (() => {
     if ((res.status === 401 || res.status === 403) && retry) {
       clearToken();
       return driveFetch(url, options, false);
+    }
+    if ((res.status === 401 || res.status === 403) && !retry) {
+      // Both attempts failed — Google session is fully expired.
+      // Tag the error so callers can show a reconnect prompt.
+      clearSession();
+      throw Object.assign(
+        new Error('Google session expired. Please reconnect your account.'),
+        { code: 'AUTH_EXPIRED' }
+      );
     }
     if (!res.ok) {
       const body = await res.text();

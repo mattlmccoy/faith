@@ -21,6 +21,9 @@ const Store = (() => {
     { name: 'Louie Giglio', enabled: true },
     { name: 'John Piper', enabled: true },
     { name: 'Ben Stuart', enabled: true },
+    { name: 'Dallas Willard', enabled: true },
+    { name: 'Charles Spurgeon', enabled: true },
+    { name: 'C.S. Lewis', enabled: true },
   ];
 
   const defaults = {
@@ -916,6 +919,18 @@ const Store = (() => {
   function mergePlan(currentPlan, incomingPlan) {
     if (!incomingPlan || typeof incomingPlan !== 'object') return currentPlan || null;
     if (!currentPlan || typeof currentPlan !== 'object') return JSON.parse(JSON.stringify(incomingPlan));
+
+    // If plans are from different weeks, don't merge their days — that's what
+    // causes a 7-day plan to expand to 13+ days when Drive has a stale week cached.
+    // Pick the newer plan by createdAt; fall back to the local plan if timestamps absent.
+    const currentWeek = currentPlan.week || '';
+    const incomingWeek = incomingPlan.week || '';
+    if (currentWeek && incomingWeek && currentWeek !== incomingWeek) {
+      const ct = new Date(currentPlan.createdAt || 0).getTime();
+      const it = new Date(incomingPlan.createdAt || 0).getTime();
+      return it > ct ? JSON.parse(JSON.stringify(incomingPlan)) : currentPlan;
+    }
+
     const currentDays = currentPlan.days && typeof currentPlan.days === 'object' ? currentPlan.days : {};
     const incomingDays = incomingPlan.days && typeof incomingPlan.days === 'object' ? incomingPlan.days : {};
     // Preserve local days when keys overlap; only fill missing days from incoming.

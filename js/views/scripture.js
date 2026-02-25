@@ -692,40 +692,100 @@ const ScriptureView = (() => {
 
   // Helper: wire parallel translation toggle
   function _wireParallelTranslation({ container, reference, currentTranslationId, translationLabel }) {
-    const btn   = container.querySelector('#passage-parallel-btn');
-    const panel = container.querySelector('#passage-parallel-panel');
-    const close = container.querySelector('#passage-parallel-close');
-    const altEl = container.querySelector('#parallel-alt');
+    const btn      = container.querySelector('#passage-parallel-btn');
+    const panel    = container.querySelector('#passage-parallel-panel');
+    const close    = container.querySelector('#passage-parallel-close');
+    const altEl    = container.querySelector('#parallel-alt');
     const altLabel = container.querySelector('#parallel-alt-label');
     const panelLabel = container.querySelector('#parallel-translation-label');
+    const headerEl = container.querySelector('.passage-parallel-header');
     if (!btn || !panel) return;
 
-    // Determine the "other" translation
-    const PARALLEL_PAIRS = { esv: 'web', web: 'esv', kjv: 'web', net: 'web', bbe: 'web', darby: 'web', asv: 'web' };
-    const altTranslationId = PARALLEL_PAIRS[currentTranslationId] || (currentTranslationId === 'web' ? 'kjv' : 'web');
-    const altLabel_ = altTranslationId.toUpperCase();
-    if (altLabel) altLabel.textContent = altLabel_;
-    if (panelLabel) panelLabel.textContent = `Comparing ${translationLabel} · ${altLabel_}`;
+    // All available translations (in display order), excluding the current one
+    const ALL_TRANSLATIONS = [
+      { id: 'web', label: 'WEB' }, { id: 'esv', label: 'ESV' },
+      { id: 'niv', label: 'NIV' }, { id: 'nlt', label: 'NLT' },
+      { id: 'kjv', label: 'KJV' }, { id: 'asv', label: 'ASV' },
+      { id: 'bbe', label: 'BBE' }, { id: 'darby', label: 'DARBY' },
+    ];
+    const options = ALL_TRANSLATIONS.filter(t => t.id !== currentTranslationId);
 
-    let loaded = false;
+    // Default: pick a sensible comparison translation
+    const PARALLEL_PAIRS = { esv: 'web', web: 'esv', niv: 'esv', nlt: 'esv', kjv: 'web', bbe: 'web', darby: 'web', asv: 'web' };
+    let selectedAltId = PARALLEL_PAIRS[currentTranslationId] || options[0]?.id || 'web';
+
+    // Inject a translation picker dropdown into the panel header
+    if (headerEl) {
+      const picker = document.createElement('select');
+      picker.className = 'input';
+      picker.style.cssText = 'font-size:var(--text-xs);padding:3px 8px;height:auto;margin-left:auto;margin-right:var(--space-3);';
+      picker.setAttribute('aria-label', 'Comparison translation');
+      options.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.label;
+        if (t.id === selectedAltId) opt.selected = true;
+        picker.appendChild(opt);
+      });
+      // Insert before close button
+      const closeBtn = headerEl.querySelector('#passage-parallel-close');
+      if (closeBtn) headerEl.insertBefore(picker, closeBtn);
+      picker.addEventListener('change', () => {
+        selectedAltId = picker.value;
+        if (altLabel) altLabel.textContent = picker.options[picker.selectedIndex].text;
+        if (panelLabel) panelLabel.textContent = `Comparing ${translationLabel} · ${picker.options[picker.selectedIndex].text}`;
+        _loadAlt(selectedAltId);
+      });
+    }
+
+    function _renderAlt(data) {
+      const verses = data.verses || [];
+      if (altEl) {
+        altEl.innerHTML = verses.length > 0
+          ? verses.map(v => `<span class="passage-verse"><sup class="verse-num">${v.verse}</sup>${v.text.trim()}</span> `).join('')
+          : `<span class="passage-verse">${data.text || ''}</span>`;
+      }
+    }
+
+    async function _loadAlt(translationId) {
+      if (!altEl) return;
+      altEl.innerHTML = '<div class="passage-parallel-loading"><div class="plan-searching__spinner" style="width:20px;height:20px;margin:0 auto;"></div></div>';
+      const labelText = options.find(t => t.id === translationId)?.label || translationId.toUpperCase();
+      try {
+        const data = await API.getPassage_translation(reference, translationId);
+        if (data && !data.error) {
+          _renderAlt(data);
+          return;
+        }
+        throw new Error(data?.error || 'Not found');
+      } catch (err) {
+        // Fallback to WEB if the requested translation fails
+        if (translationId !== 'web') {
+          try {
+            const fallback = await API.getPassage_translation(reference, 'web');
+            if (fallback && !fallback.error) {
+              if (altLabel) altLabel.textContent = `WEB`;
+              if (panelLabel) panelLabel.textContent = `Comparing ${translationLabel} · WEB (${labelText} unavailable)`;
+              _renderAlt(fallback);
+              return;
+            }
+          } catch (_) {}
+        }
+        altEl.innerHTML = `<p class="text-sm text-muted" style="padding:var(--space-3)">Could not load ${labelText}: ${err.message}</p>`;
+      }
+    }
+
+    if (altLabel) altLabel.textContent = options.find(t => t.id === selectedAltId)?.label || selectedAltId.toUpperCase();
+    if (panelLabel) panelLabel.textContent = `Comparing ${translationLabel} · ${options.find(t => t.id === selectedAltId)?.label || selectedAltId.toUpperCase()}`;
+
+    let opened = false;
     btn.addEventListener('click', async () => {
       panel.hidden = false;
       btn.style.display = 'none';
       haptic([6]);
-
-      if (!loaded) {
-        loaded = true;
-        try {
-          const altData = await API.getPassage_translation(reference, altTranslationId);
-          const altVerses = altData.verses || [];
-          if (altEl) {
-            altEl.innerHTML = altVerses.length > 0
-              ? altVerses.map(v => `<span class="passage-verse"><sup class="verse-num">${v.verse}</sup>${v.text.trim()}</span> `).join('')
-              : `<span class="passage-verse">${altData.text || ''}</span>`;
-          }
-        } catch (err) {
-          if (altEl) altEl.innerHTML = `<p class="text-sm text-muted">Could not load ${altLabel_}: ${err.message}</p>`;
-        }
+      if (!opened) {
+        opened = true;
+        _loadAlt(selectedAltId);
       }
     });
 

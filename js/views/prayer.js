@@ -8,6 +8,20 @@ const PrayerView = (() => {
   let timer = null;
   let timerSeconds = 0;
   let currentFramework = null;
+  let sessionScripture = null; // { reference, text, verses[] } — set during pre-step
+
+  // Frameworks that benefit from a scripture passage pre-step
+  const SCRIPTURE_FRAMEWORKS = ['lectio', 'breath'];
+
+  // Curated passages well-suited to contemplative prayer
+  const CURATED_PASSAGES = [
+    { ref: 'Psalm 23:1-6', label: 'Psalm 23 — The Lord is my shepherd' },
+    { ref: 'Psalm 46:1-3', label: 'Psalm 46 — God is our refuge' },
+    { ref: 'John 15:1-8', label: 'John 15 — The vine and the branches' },
+    { ref: 'Philippians 4:6-7', label: 'Philippians 4:6-7 — Do not be anxious' },
+    { ref: 'Isaiah 40:31', label: 'Isaiah 40:31 — Renew your strength' },
+    { ref: 'Matthew 11:28-30', label: 'Matthew 11:28-30 — Come to me and rest' },
+  ];
 
   const FRAMEWORKS = [
     {
@@ -238,6 +252,158 @@ const PrayerView = (() => {
     currentFramework = framework;
     stepIndex = 0;
     sessionActive = true;
+    sessionScripture = null;
+
+    if (SCRIPTURE_FRAMEWORKS.includes(framework.id)) {
+      renderScripturePicker(container, framework);
+    } else {
+      renderStep(container, framework, 0);
+    }
+  }
+
+  function renderScripturePicker(container, framework) {
+    Router.setTitle(framework.name);
+    Router.setHeaderActions(`<button class="btn btn-ghost btn-sm" onclick="PrayerView.endSession()">Done</button>`);
+
+    const div = document.createElement('div');
+    div.className = 'view-content prayer-step-enter';
+    div.innerHTML = `
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-family:var(--font-serif);font-size:var(--text-2xl);color:var(--text-primary);margin-bottom:6px;">Choose a Passage</div>
+        <div style="font-size:var(--text-sm);color:var(--text-secondary);">Select the scripture you'll meditate on during ${framework.name}.</div>
+      </div>
+
+      <!-- Today's devotion option -->
+      <div class="prayer-scripture-option" id="picker-today" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:var(--radius-md);margin-bottom:12px;cursor:pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--accent)"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--text-primary);">Today's Devotion</div>
+          <div style="font-size:var(--text-xs);color:var(--text-secondary)" id="today-verse-ref">Loading…</div>
+        </div>
+        <div class="prayer-scripture-spinner" id="today-spinner" style="display:none;"><div class="plan-searching__spinner" style="width:16px;height:16px;"></div></div>
+      </div>
+
+      <!-- Topic/phrase search -->
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="scripture-topic-input" class="input" placeholder="Search by topic or phrase…" style="flex:1;" />
+          <button class="btn btn-secondary btn-sm" id="scripture-search-btn">Search</button>
+        </div>
+        <div id="scripture-search-results" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- Curated suggestions -->
+      <div class="section-header" style="margin-bottom:10px;"><span class="section-title">Suggested Passages</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+        ${CURATED_PASSAGES.map(p => `
+          <button class="btn btn-secondary picker-curated" data-ref="${p.ref}" style="text-align:left;justify-content:flex-start;font-size:var(--text-sm);padding:10px 14px;">
+            ${p.label}
+          </button>
+        `).join('')}
+      </div>
+
+      <button class="btn btn-ghost btn-sm" style="width:100%;" id="picker-skip">Skip — use my own passage</button>
+    `;
+
+    container.innerHTML = '';
+    container.appendChild(div);
+
+    // Auto-load today's verse reference using Store APIs
+    const todayRef = container.querySelector('#today-verse-ref');
+    const todaySpinner = container.querySelector('#today-spinner');
+    const todayCard = container.querySelector('#picker-today');
+    (() => {
+      try {
+        const dateKey = Store.getSelectedDevotionDate();
+        const dayData = Store.getDevotionData(dateKey);
+        const session = (typeof DateUtils !== 'undefined' ? DateUtils.session() : 'morning');
+        const sessionData = dayData?.[session] || dayData?.morning;
+        const verseRef = sessionData?.scripture_reference || sessionData?.verse_reference || sessionData?.reference;
+        if (verseRef) {
+          if (todayRef) todayRef.textContent = verseRef;
+          todayCard._verseRef = verseRef;
+        } else {
+          if (todayRef) todayRef.textContent = 'No devotion loaded yet';
+          todayCard.style.opacity = '0.5';
+          todayCard.style.pointerEvents = 'none';
+        }
+      } catch (_) {
+        if (todayRef) todayRef.textContent = 'No devotion loaded yet';
+      }
+    })();
+
+    // Today's devotion click
+    todayCard.addEventListener('click', async () => {
+      const ref = todayCard._verseRef;
+      if (!ref) return;
+      if (todaySpinner) todaySpinner.style.display = 'block';
+      await _loadAndStart(container, framework, ref);
+    });
+
+    // Curated passage clicks
+    div.querySelectorAll('.picker-curated').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+        await _loadAndStart(container, framework, btn.dataset.ref);
+      });
+    });
+
+    // Topic search
+    const searchBtn = div.querySelector('#scripture-search-btn');
+    const topicInput = div.querySelector('#scripture-topic-input');
+    const resultsEl = div.querySelector('#scripture-search-results');
+    searchBtn.addEventListener('click', async () => {
+      const q = topicInput.value.trim();
+      if (!q) return;
+      searchBtn.disabled = true;
+      searchBtn.textContent = '…';
+      resultsEl.innerHTML = '<div class="plan-searching__spinner" style="width:18px;height:18px;margin:8px auto;"></div>';
+      try {
+        const results = await API.searchPhrase(q);
+        const verses = results?.results || results?.verses || [];
+        if (!verses.length) {
+          resultsEl.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-secondary);padding:4px 0;">No results found.</p>';
+        } else {
+          resultsEl.innerHTML = verses.slice(0, 4).map(v => `
+            <button class="btn btn-secondary picker-search-result" data-ref="${v.reference || v.ref}" style="text-align:left;justify-content:flex-start;font-size:var(--text-xs);padding:10px 12px;line-height:1.5;">
+              <strong style="display:block;margin-bottom:2px;">${v.reference || v.ref}</strong>
+              <span style="color:var(--text-secondary);">${(v.text || '').slice(0, 100)}${(v.text || '').length > 100 ? '…' : ''}</span>
+            </button>
+          `).join('');
+          resultsEl.querySelectorAll('.picker-search-result').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              btn.disabled = true;
+              await _loadAndStart(container, framework, btn.dataset.ref);
+            });
+          });
+        }
+      } catch (_) {
+        resultsEl.innerHTML = '<p style="font-size:var(--text-xs);color:var(--text-secondary);padding:4px 0;">Search unavailable.</p>';
+      }
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    });
+    topicInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchBtn.click(); });
+
+    // Skip
+    div.querySelector('#picker-skip').addEventListener('click', () => {
+      sessionScripture = null;
+      renderStep(container, framework, 0);
+    });
+  }
+
+  async function _loadAndStart(container, framework, ref) {
+    try {
+      const data = await API.getPassage(ref);
+      sessionScripture = {
+        reference: data.reference || ref,
+        text: data.text || '',
+        verses: data.verses || [],
+      };
+    } catch (_) {
+      sessionScripture = { reference: ref, text: '', verses: [] };
+    }
     renderStep(container, framework, 0);
   }
 
@@ -272,6 +438,34 @@ const PrayerView = (() => {
       <div class="prayer-card" style="margin-bottom:24px;text-align:center;">
         <div class="prayer-card__text" style="font-style:normal;font-size:var(--text-base);line-height:1.7;">${step.description}</div>
       </div>
+
+      <!-- Scripture passage (Lectio Divina / Breath Prayer) -->
+      ${sessionScripture && SCRIPTURE_FRAMEWORKS.includes(framework.id) ? (() => {
+        const verses = sessionScripture.verses || [];
+        const passageHtml = verses.length > 0
+          ? verses.map(v => `<span class="passage-verse" style="display:block;margin-bottom:6px;"><sup style="font-size:0.7em;margin-right:4px;color:var(--text-tertiary);">${v.verse}</sup>${v.text.trim()}</span>`).join('')
+          : `<p style="line-height:1.8;">${sessionScripture.text || ''}</p>`;
+        if (index === 0) {
+          // Step 1: show passage prominently
+          return `
+            <div class="scripture-card" style="margin-bottom:24px;">
+              <div class="scripture-card__ref" style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">${sessionScripture.reference}</div>
+              <div class="scripture-card__text" style="font-family:var(--font-serif);font-size:var(--text-lg);line-height:1.7;">${passageHtml}</div>
+            </div>
+          `;
+        } else {
+          // Later steps: collapsed reference bar, expandable
+          return `
+            <details style="margin-bottom:16px;background:var(--glass-fill);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:8px 12px;">
+              <summary style="font-size:var(--text-xs);color:var(--text-secondary);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                ${sessionScripture.reference}
+              </summary>
+              <div style="margin-top:10px;font-family:var(--font-serif);font-size:var(--text-base);line-height:1.7;color:var(--text-primary);">${passageHtml}</div>
+            </details>
+          `;
+        }
+      })() : ''}
 
       <!-- Prompts -->
       ${step.prompts?.length ? `
@@ -382,6 +576,7 @@ const PrayerView = (() => {
     sessionActive = false;
     currentFramework = null;
     stepIndex = 0;
+    sessionScripture = null;
     Router.clearHeaderActions();
     const container = document.getElementById('view-container');
     render(container);
