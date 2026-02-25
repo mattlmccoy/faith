@@ -912,12 +912,17 @@ const Store = (() => {
 
   function exportDevotionsSnapshot() {
     const base = exportSavedDevotionsSnapshot();
+    // Never upload a seed/fallback plan to Drive — it is a local placeholder only.
+    // Uploading it would corrupt other devices by replacing their real plans.
+    const planToExport = (_state.currentWeekPlan?.seedDefault === true)
+      ? null
+      : (_state.currentWeekPlan || null);
     return {
       version: 1,
       exportedAt: base.exportedAt,
       savedDevotions: base.savedDevotions,
       savedDevotionLibrary: base.savedDevotionLibrary,
-      currentWeekPlan: _state.currentWeekPlan || null,
+      currentWeekPlan: planToExport,
       selectedDevotionDate: _state.selectedDevotionDate || null,
       sessionOverride: _state._sessionOverride || null,
     };
@@ -952,7 +957,17 @@ const Store = (() => {
 
   function mergePlan(currentPlan, incomingPlan) {
     if (!incomingPlan || typeof incomingPlan !== 'object') return currentPlan || null;
-    if (!currentPlan || typeof currentPlan !== 'object') return JSON.parse(JSON.stringify(incomingPlan));
+    if (!currentPlan || typeof currentPlan !== 'object') {
+      // Don't import a seed plan onto a blank device — return null so the device
+      // generates its own placeholder rather than inheriting a Drive seed.
+      if (incomingPlan.seedDefault === true) return null;
+      return JSON.parse(JSON.stringify(incomingPlan));
+    }
+
+    // Seed/fallback plans are local placeholders only — never let one replace a
+    // real plan in either direction.
+    if (incomingPlan.seedDefault === true) return currentPlan;
+    if (currentPlan.seedDefault === true)  return JSON.parse(JSON.stringify(incomingPlan));
 
     // Sanitize both plans up-front — repairs corruption from the pre-planId merge bug.
     // A Drive file saved before planId was introduced may still contain 13 days; this
